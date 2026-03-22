@@ -1,0 +1,21 @@
+.DS_Store
+
+# Local sandbox environment
+.conda-env/
+.hf/
+
+# Downloaded models and runtime artifacts
+models/*
+!models/.gitkeep
+outputs/*
+!outputs/.gitkeep
+tmp/*
+!tmp/.gitkeep
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Editor / shell noise
+*.log
+*.swp
