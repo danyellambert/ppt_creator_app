@@ -7,7 +7,9 @@ from pptx.util import Inches
 def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
     c = renderer.theme.canvas
     t = renderer.theme.typography
+    components = renderer.theme.components
     colors = renderer.theme.colors
+    variant = renderer.resolve_layout_variant(slide_spec, "image_right")
 
     if slide_spec.eyebrow:
         eyebrow_box = renderer.textbox(slide, c.margin_x, 0.78, 4.6, 0.25)
@@ -20,10 +22,12 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
         subtitle_box = renderer.textbox(slide, c.margin_x, 1.8, 5.4, 0.45)
         renderer.write_paragraph(subtitle_box.text_frame, slide_spec.subtitle, size=t.subtitle_size, color=colors.muted)
 
-    image_left = 7.1
+    image_left = 7.1 if variant == "image_right" else c.margin_x
     image_top = 1.28
     image_width = 5.15
     image_height = 4.95
+    text_left = c.margin_x if variant == "image_right" else 7.1
+    text_width = 5.4 if variant == "image_right" else 5.15
     asset = renderer.resolve_asset(slide_spec.image_path)
     if asset:
         slide.shapes.add_picture(
@@ -35,7 +39,7 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
         )
     else:
         panel = renderer.add_panel(slide, image_left, image_top, image_width, image_height, fill_color=colors.surface, line_color=colors.line)
-        renderer.add_accent_bar(slide, image_left, image_top, image_width, 0.08, color=colors.line)
+        renderer.add_accent_bar(slide, image_left, image_top, image_width, components.accent_bar_height, color=colors.line)
         placeholder = slide.shapes.add_shape(
             MSO_AUTO_SHAPE_TYPE.RECTANGLE,
             panel.left,
@@ -71,7 +75,7 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
                 color=colors.muted,
             )
 
-    text_box = renderer.textbox(slide, c.margin_x, 2.45, 5.4, 3.1)
+    text_box = renderer.textbox(slide, text_left, 2.45, text_width, 3.1)
     tf = text_box.text_frame
     if slide_spec.body:
         renderer.write_paragraph(tf, slide_spec.body, size=t.body_size, color=colors.text, space_after=10)

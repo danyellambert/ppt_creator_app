@@ -60,6 +60,18 @@ Separação principal:
 
 Todos suportam `speaker_notes`.
 
+### Variantes de layout já suportadas
+
+- `bullets`
+  - `insight_panel` (padrão)
+  - `full_width`
+- `metrics`
+  - `standard` (padrão)
+  - `compact`
+- `image_text`
+  - `image_right` (padrão)
+  - `image_left`
+
 ---
 
 ## Tema visual: Executive Premium Minimal
@@ -104,6 +116,17 @@ Estrutura de alto nível:
 ```
 
 Exemplo completo: `examples/ai_sales.json`
+
+Exemplo de variante:
+
+```json
+{
+  "type": "image_text",
+  "title": "Operating model",
+  "body": "Structured deployment model.",
+  "layout_variant": "image_left"
+}
+```
 
 ---
 

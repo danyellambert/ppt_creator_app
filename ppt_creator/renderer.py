@@ -50,6 +50,9 @@ class PresentationRenderer:
             raise ValueError(f"Output path must end with .pptx: {destination}")
         return destination
 
+    def resolve_layout_variant(self, slide_spec: Slide, default: str) -> str:
+        return slide_spec.layout_variant or default
+
     def render_slide(
         self,
         slide: "PptxSlide",
@@ -179,7 +182,7 @@ class PresentationRenderer:
         shape.fill.solid()
         shape.fill.fore_color.rgb = rgb(fill_color)
         shape.line.color.rgb = rgb(line_color)
-        shape.line.width = Pt(1)
+        shape.line.width = Pt(self.theme.components.panel_border_width_pt)
         return shape
 
     def add_accent_bar(self, slide: "PptxSlide", left: float, top: float, width: float, height: float, *, color: str):
@@ -215,7 +218,15 @@ class PresentationRenderer:
         right_run.text = f"{index:02d} / {total_slides:02d}"
         self.set_run_style(right_run, size=self.theme.typography.small_size, color=self.theme.colors.muted)
 
-        self.add_rule(slide, c.margin_x, 6.86, 12.45, 6.86, color=self.theme.colors.line, width_pt=0.8)
+        self.add_rule(
+            slide,
+            c.margin_x,
+            6.86,
+            12.45,
+            6.86,
+            color=self.theme.colors.line,
+            width_pt=self.theme.components.footer_rule_width_pt,
+        )
 
     def add_speaker_notes(self, slide: "PptxSlide", notes: str | None) -> None:
         if not notes:

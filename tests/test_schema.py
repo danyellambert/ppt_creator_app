@@ -67,3 +67,37 @@ def test_bullets_slide_rejects_too_many_bullets() -> None:
 
     with pytest.raises(Exception):
         PresentationInput.model_validate(payload)
+
+
+def test_layout_variant_is_normalized() -> None:
+    payload = {
+        "presentation": {"title": "Deck", "theme": "executive_premium_minimal"},
+        "slides": [
+            {
+                "type": "image_text",
+                "title": "Image",
+                "body": "Body",
+                "layout_variant": "Image Left"
+            }
+        ]
+    }
+
+    spec = PresentationInput.model_validate(payload)
+    assert spec.slides[0].layout_variant == "image_left"
+
+
+def test_invalid_layout_variant_is_rejected() -> None:
+    payload = {
+        "presentation": {"title": "Deck", "theme": "executive_premium_minimal"},
+        "slides": [
+            {
+                "type": "metrics",
+                "title": "KPIs",
+                "layout_variant": "image_left",
+                "metrics": [{"value": "10%", "label": "lift"}]
+            }
+        ]
+    }
+
+    with pytest.raises(Exception):
+        PresentationInput.model_validate(payload)

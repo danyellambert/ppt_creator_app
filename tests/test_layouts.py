@@ -91,3 +91,48 @@ def test_missing_image_uses_placeholder_text(tmp_path: Path) -> None:
 
     assert "Image unavailable" in joined
     assert "Missing asset: missing-image.png" in joined
+
+
+def test_layout_variants_render_without_crashing(tmp_path: Path) -> None:
+    spec = PresentationInput.model_validate(
+        {
+            "presentation": {
+                "title": "Variant Deck",
+                "theme": "executive_premium_minimal",
+            },
+            "slides": [
+                {
+                    "type": "bullets",
+                    "title": "Full Width Bullets",
+                    "layout_variant": "full_width",
+                    "bullets": ["One", "Two", "Three"],
+                },
+                {
+                    "type": "metrics",
+                    "title": "Compact KPIs",
+                    "layout_variant": "compact",
+                    "metrics": [
+                        {"value": "10%", "label": "lift"},
+                        {"value": "2x", "label": "speed"},
+                        {"value": "98%", "label": "quality"},
+                        {"value": "4h", "label": "saved"},
+                    ],
+                },
+                {
+                    "type": "image_text",
+                    "title": "Image Left",
+                    "layout_variant": "image_left",
+                    "body": "Body copy",
+                    "image_path": "missing-image.png",
+                },
+            ],
+        }
+    )
+    output = tmp_path / "variant-layouts.pptx"
+
+    renderer = PresentationRenderer(asset_root="examples")
+    rendered = renderer.render(spec, output)
+
+    assert rendered.exists()
+    presentation = Presentation(str(rendered))
+    assert len(presentation.slides) == 3

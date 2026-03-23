@@ -4,7 +4,9 @@ from __future__ import annotations
 def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
     c = renderer.theme.canvas
     t = renderer.theme.typography
+    components = renderer.theme.components
     colors = renderer.theme.colors
+    variant = renderer.resolve_layout_variant(slide_spec, "standard")
 
     if slide_spec.eyebrow:
         eyebrow_box = renderer.textbox(slide, c.margin_x, 0.78, 5.2, 0.25)
@@ -23,18 +25,22 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
     total_width = 11.63
     card_width = (total_width - gap * (count - 1)) / count
     left = c.margin_x
-    top = 2.55
+    top = 2.55 if variant == "standard" else 2.35
+    panel_height = 2.7 if variant == "standard" else 2.15
+    value_size = t.metric_value_size if variant == "standard" else t.metric_value_size - 4
+    label_size = t.metric_label_size + 1 if variant == "standard" else t.metric_label_size
+    detail_size = t.small_size + 1 if variant == "standard" else t.small_size
 
     for idx, metric in enumerate(metrics):
         x = left + idx * (card_width + gap)
-        renderer.add_panel(slide, x, top, card_width, 2.7, fill_color=colors.surface, line_color=colors.line)
-        renderer.add_accent_bar(slide, x, top, card_width, 0.08, color=colors.navy if idx % 2 == 0 else colors.accent)
+        renderer.add_panel(slide, x, top, card_width, panel_height, fill_color=colors.surface, line_color=colors.line)
+        renderer.add_accent_bar(slide, x, top, card_width, components.accent_bar_height, color=colors.navy if idx % 2 == 0 else colors.accent)
 
-        box = renderer.textbox(slide, x + 0.24, top + 0.28, card_width - 0.48, 2.05)
+        box = renderer.textbox(slide, x + 0.24, top + 0.24, card_width - 0.48, panel_height - 0.42)
         tf = box.text_frame
-        renderer.write_paragraph(tf, metric.value, size=t.metric_value_size, color=colors.navy, bold=True, space_after=6)
-        renderer.write_paragraph(tf, metric.label, size=t.metric_label_size + 1, color=colors.text, bold=True, space_after=8)
+        renderer.write_paragraph(tf, metric.value, size=value_size, color=colors.navy, bold=True, space_after=6)
+        renderer.write_paragraph(tf, metric.label, size=label_size, color=colors.text, bold=True, space_after=8)
         if metric.detail:
-            renderer.write_paragraph(tf, metric.detail, size=t.small_size + 1, color=colors.muted, space_after=5)
+            renderer.write_paragraph(tf, metric.detail, size=detail_size, color=colors.muted, space_after=5)
         if metric.trend:
-            renderer.write_paragraph(tf, metric.trend, size=t.small_size + 1, color=colors.accent, bold=True)
+            renderer.write_paragraph(tf, metric.trend, size=detail_size, color=colors.accent, bold=True)

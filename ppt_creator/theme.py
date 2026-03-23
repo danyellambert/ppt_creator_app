@@ -34,6 +34,15 @@ class TypographyTokens:
 
 
 @dataclass(frozen=True)
+class SpacingTokens:
+    xs: float = 0.12
+    sm: float = 0.20
+    md: float = 0.32
+    lg: float = 0.48
+    xl: float = 0.72
+
+
+@dataclass(frozen=True)
 class ColorTokens:
     background: str = "F7F5F2"
     surface: str = "FFFDFC"
@@ -46,18 +55,30 @@ class ColorTokens:
 
 
 @dataclass(frozen=True)
+class ComponentTokens:
+    panel_padding: float = 0.24
+    accent_bar_height: float = 0.08
+    panel_border_width_pt: float = 1.0
+    footer_rule_width_pt: float = 0.8
+
+
+@dataclass(frozen=True)
 class Theme:
     name: str
     canvas: CanvasTokens
     typography: TypographyTokens
+    spacing: SpacingTokens
     colors: ColorTokens
+    components: ComponentTokens
 
 
 EXECUTIVE_PREMIUM_MINIMAL = Theme(
     name="executive_premium_minimal",
     canvas=CanvasTokens(),
     typography=TypographyTokens(),
+    spacing=SpacingTokens(),
     colors=ColorTokens(),
+    components=ComponentTokens(),
 )
 
 THEMES = {

@@ -10,6 +10,8 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 MAX_BULLETS_PER_SLIDE = 6
 MAX_METRICS_PER_SLIDE = 4
 
+LAYOUT_VARIANTS_BY_SLIDE_TYPE: dict["SlideType", set[str]] = {}
+
 
 def _clean_optional_text(value: object) -> str | None | object:
     if value is None or not isinstance(value, str):
@@ -37,6 +39,13 @@ class SlideType(str, Enum):
     METRICS = "metrics"
     IMAGE_TEXT = "image_text"
     CLOSING = "closing"
+
+
+LAYOUT_VARIANTS_BY_SLIDE_TYPE = {
+    SlideType.BULLETS: {"insight_panel", "full_width"},
+    SlideType.METRICS: {"standard", "compact"},
+    SlideType.IMAGE_TEXT: {"image_right", "image_left"},
+}
 
 
 class CardItem(BaseModel):
@@ -124,6 +133,7 @@ class Slide(BaseModel):
     image_path: str | None = None
     image_caption: str | None = None
     speaker_notes: str | None = None
+    layout_variant: str | None = None
 
     @field_validator(
         "title",
@@ -141,6 +151,17 @@ class Slide(BaseModel):
     @classmethod
     def clean_optional_fields(cls, value: object) -> str | None | object:
         return _clean_optional_text(value)
+
+    @field_validator("layout_variant", mode="before")
+    @classmethod
+    def normalize_layout_variant(cls, value: object) -> str | None | object:
+        if value is None:
+            return None
+        if not isinstance(value, str):
+            return value
+
+        normalized = value.strip().lower().replace("-", "_").replace(" ", "_")
+        return normalized or None
 
     @field_validator("bullets")
     @classmethod
@@ -184,6 +205,16 @@ class Slide(BaseModel):
 
         if self.type == SlideType.CLOSING and not (self.quote or self.title):
             raise ValueError("closing slide requires quote or title")
+
+        if self.layout_variant:
+            allowed_variants = LAYOUT_VARIANTS_BY_SLIDE_TYPE.get(self.type)
+            if not allowed_variants:
+                raise ValueError(f"slide type '{self.type.value}' does not support layout_variant")
+            if self.layout_variant not in allowed_variants:
+                allowed = ", ".join(sorted(allowed_variants))
+                raise ValueError(
+                    f"slide type '{self.type.value}' only supports layout_variant values: {allowed}"
+                )
 
         return self
 

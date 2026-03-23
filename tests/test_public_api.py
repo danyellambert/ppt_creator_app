@@ -15,3 +15,9 @@ def test_public_api_exports_expected_symbols() -> None:
 
 def test_layout_registry_covers_all_slide_types() -> None:
     assert set(LAYOUT_RENDERERS) == set(ppt_creator.SlideType)
+
+
+def test_theme_token_groups_are_exposed() -> None:
+    theme = ppt_creator.get_theme("executive_premium_minimal")
+    assert isinstance(theme.spacing, ppt_creator.SpacingTokens)
+    assert isinstance(theme.components, ppt_creator.ComponentTokens)
