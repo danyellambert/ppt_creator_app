@@ -1,0 +1,226 @@
+# PPT Creator
+
+Gerador reutilizável de apresentações `.pptx` a partir de JSON estruturado, com foco em um visual **Executive Premium Minimal**.
+
+> O playground de LLM continua existindo normalmente neste repositório. A documentação original do sandbox está em `README_hf_llm_playground.md`. Este `README.md` documenta o novo componente desacoplado `ppt_creator/`.
+
+---
+
+## Objetivo
+
+O componente `ppt_creator` foi criado para manter um pipeline simples e portátil:
+
+1. JSON estruturado entra
+2. um renderizador Python gera um `.pptx`
+3. o layout segue um tema consistente e reutilizável
+
+Sem depender de PowerPoint, LibreOffice, Ollama, MLX, llama.cpp ou Transformers.
+
+---
+
+## Arquitetura
+
+```text
+ppt_creator/
+├── __init__.py
+├── cli.py
+├── renderer.py
+├── schema.py
+├── theme.py
+└── layouts/
+    ├── __init__.py
+    ├── bullets.py
+    ├── cards.py
+    ├── closing.py
+    ├── image_text.py
+    ├── metrics.py
+    ├── section.py
+    └── title.py
+```
+
+Separação principal:
+
+- `schema.py`: contratos do JSON de entrada com `pydantic`
+- `theme.py`: style tokens e tema `Executive Premium Minimal`
+- `renderer.py`: renderizador central e utilitários comuns
+- `layouts/`: implementação isolada por tipo de slide
+- `cli.py`: interface de linha de comando
+
+---
+
+## Tipos de slide suportados
+
+- `title`
+- `section`
+- `bullets`
+- `cards`
+- `metrics`
+- `image_text`
+- `closing`
+
+Todos suportam `speaker_notes`.
+
+---
+
+## Tema visual: Executive Premium Minimal
+
+Direção implementada:
+
+- base clara / off-white
+- azul-marinho profundo como cor principal
+- cinzas suaves para suporte
+- destaque discreto em bronze sóbrio
+- muito espaço em branco
+- alinhamento rígido
+- cards limpos com bordas leves
+- sem excesso de shapes ou cores
+
+O tema foi estruturado com tokens para facilitar futuros temas adicionais.
+
+---
+
+## Formato do JSON
+
+Estrutura de alto nível:
+
+```json
+{
+  "presentation": {
+    "title": "AI copilots for sales teams",
+    "subtitle": "Executive strategy deck",
+    "author": "Your Name",
+    "date": "2026-03-22",
+    "theme": "executive_premium_minimal"
+  },
+  "slides": [
+    {
+      "type": "title",
+      "title": "AI copilots for sales teams",
+      "subtitle": "How revenue teams scale quality without scaling friction",
+      "speaker_notes": "Opening framing"
+    }
+  ]
+}
+```
+
+Exemplo completo: `examples/ai_sales.json`
+
+---
+
+## Instalação local
+
+Se quiser usar o ambiente local do playground:
+
+```bash
+./.conda-env/bin/python -m pip install -e .
+./.conda-env/bin/python -m pip install -e ".[dev]"
+```
+
+Ou com o Python ativo no seu shell:
+
+```bash
+python -m pip install -e .
+python -m pip install -e ".[dev]"
+```
+
+---
+
+## Como rodar localmente
+
+Renderizar um deck:
+
+```bash
+python -m ppt_creator.cli render examples/ai_sales.json outputs/ai_sales.pptx
+```
+
+Ou usando o helper:
+
+```bash
+bash bin/render_ppt_creator.sh examples/ai_sales.json outputs/ai_sales.pptx
+```
+
+---
+
+## Como rodar com Docker
+
+Build:
+
+```bash
+docker build -t ppt-creator .
+```
+
+Run com bind mount do diretório atual:
+
+```bash
+docker run --rm -v "$PWD:/work" ppt-creator \
+  python -m ppt_creator.cli render /work/examples/ai_sales.json /work/outputs/ai_sales.pptx
+```
+
+Ou com helper:
+
+```bash
+bash bin/render_ppt_creator_docker.sh examples/ai_sales.json outputs/ai_sales.pptx
+```
+
+---
+
+## Como gerar o deck de exemplo
+
+```bash
+python -m ppt_creator.cli render examples/ai_sales.json outputs/ai_sales.pptx
+```
+
+Saída esperada:
+
+- arquivo `.pptx` real em `outputs/ai_sales.pptx`
+- deck com 7 slides
+- notas do apresentador por slide
+
+---
+
+## Testes
+
+Executar testes rápidos:
+
+```bash
+pytest -q
+```
+
+Os testes cobrem:
+
+- validação do schema
+- renderização mínima de `.pptx`
+- execução simples da CLI
+
+---
+
+## Reuso em outro projeto
+
+Formas simples de reaproveitar:
+
+1. copiar `ppt_creator/`, `pyproject.toml`, `Dockerfile` e `bin/`
+2. instalar o pacote em outro diretório
+3. montar JSONs compatíveis com o schema
+4. gerar decks sem depender do restante do playground
+
+Como o componente não está acoplado ao runtime de LLM, ele pode ser usado como etapa final de renderização em qualquer pipeline.
+
+---
+
+## Limitações atuais
+
+- sem gráficos nativos ainda
+- sem geração automática de conteúdo por LLM
+- sem múltiplos temas prontos além do tema base
+- imagens são opcionais e não passam por tratamento avançado de crop/layout inteligente
+- não usa templates `.potx` externos nesta primeira versão
+
+---
+
+## Próximos passos possíveis
+
+- integração opcional com LLM para gerar JSON
+- múltiplos temas visuais
+- gráficos e tabelas executivas
+- sugestão automática de imagens
+- suporte opcional a template externo premium

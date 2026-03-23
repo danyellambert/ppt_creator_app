@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ppt-creator"
+version = "0.1.0"
+description = "Reusable JSON-to-PPTX creator with an Executive Premium Minimal theme."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "python-pptx>=0.6.23,<1.0.0",
+  "pydantic>=2.6,<3.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0,<9.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["ppt_creator*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
