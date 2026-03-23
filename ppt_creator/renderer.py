@@ -9,7 +9,7 @@ from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
 from pptx.util import Inches, Pt
 
 from ppt_creator.schema import PresentationInput, PresentationMeta, Slide, SlideType
-from ppt_creator.theme import Theme, get_theme, rgb
+from ppt_creator.theme import get_theme, rgb
 
 if TYPE_CHECKING:
     from pptx.slide import Slide as PptxSlide
@@ -24,6 +24,7 @@ class PresentationRenderer:
 
     def render(self, spec: PresentationInput, output_path: str | Path) -> Path:
         self.theme = get_theme(self.requested_theme_name or spec.presentation.theme or self.theme.name)
+        destination = self.validate_output_path(output_path)
         presentation = Presentation()
         presentation.slide_width = Inches(self.theme.canvas.width)
         presentation.slide_height = Inches(self.theme.canvas.height)
@@ -38,9 +39,14 @@ class PresentationRenderer:
             self.add_footer(slide, spec.presentation, index, total_slides)
             self.add_speaker_notes(slide, slide_spec.speaker_notes)
 
-        destination = Path(output_path)
         destination.parent.mkdir(parents=True, exist_ok=True)
         presentation.save(str(destination))
+        return destination
+
+    def validate_output_path(self, output_path: str | Path) -> Path:
+        destination = Path(output_path)
+        if destination.suffix.lower() != ".pptx":
+            raise ValueError(f"Output path must end with .pptx: {destination}")
         return destination
 
     def render_slide(
@@ -228,7 +234,10 @@ class PresentationRenderer:
         notes_slide = slide.notes_slide
         text_frame = getattr(notes_slide, "notes_text_frame", None)
         if text_frame is None:
-            text_frame = notes_slide.placeholders[1].text_frame
+            fallback_placeholders = [placeholder for placeholder in notes_slide.placeholders if hasattr(placeholder, "text_frame")]
+            if not fallback_placeholders:
+                return
+            text_frame = fallback_placeholders[-1].text_frame
 
         text_frame.clear()
         paragraph = text_frame.paragraphs[0]

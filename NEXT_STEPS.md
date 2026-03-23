@@ -91,26 +91,38 @@ Antes das fases, vale explicitar os critérios de qualidade desejados.
 
 Objetivo: deixar a base atual estável, limpa e pronta para crescer.
 
+### Status de acompanhamento
+
+- [x] normalizar nomes de tema e campos textuais no schema
+- [x] melhorar mensagens de erro da CLI
+- [x] validar arquivo de entrada inexistente com erro claro
+- [x] validar extensão de saída `.pptx`
+- [x] adicionar testes rápidos para validações e erros comuns
+- [ ] revisar a API pública do pacote
+- [ ] padronizar nomes de funções, classes e arquivos
+- [ ] adicionar testes de regressão mínimos para todos os layouts
+- [ ] documentar melhor limitações restantes da Fase 0
+
 ### Entregas
 
-- revisar a API pública do pacote
-- padronizar nomes de funções, classes e arquivos
-- revisar mensagens de erro da CLI
-- melhorar validações do schema
-- revisar tratamento de caminhos de imagem e output
-- adicionar testes de regressão mínimos para cada layout
-- documentar melhor limitações conhecidas
+- [ ] revisar a API pública do pacote
+- [ ] padronizar nomes de funções, classes e arquivos
+- [x] revisar mensagens de erro da CLI
+- [x] melhorar validações do schema
+- [x] revisar tratamento de caminhos de imagem e output
+- [ ] adicionar testes de regressão mínimos para cada layout
+- [ ] documentar melhor limitações conhecidas
 
 ### Itens concretos
 
-- garantir que todos os tipos de slide tenham comportamento consistente
-- validar limites úteis, por exemplo:
-  - quantidade máxima recomendada de bullets
-  - quantidade esperada de métricas
-  - campos obrigatórios por tipo
-- melhorar o fallback de imagem ausente
-- revisar geração de notes para evitar edge cases
-- padronizar strings de tema e nomes internos
+- [ ] garantir que todos os tipos de slide tenham comportamento consistente
+- [x] validar limites úteis, por exemplo:
+  - [x] quantidade máxima recomendada de bullets
+  - [x] quantidade esperada de métricas
+  - [x] campos obrigatórios por tipo
+- [ ] melhorar o fallback de imagem ausente
+- [x] revisar geração de notes para evitar edge cases
+- [x] padronizar strings de tema e nomes internos
 
 ### Resultado esperado
 

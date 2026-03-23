@@ -69,5 +69,5 @@ def get_theme(name: str | None) -> Theme:
     if not name:
         return EXECUTIVE_PREMIUM_MINIMAL
 
-    normalized = name.strip().lower().replace("-", "_")
+    normalized = name.strip().lower().replace("-", "_").replace(" ", "_")
     return THEMES.get(normalized, EXECUTIVE_PREMIUM_MINIMAL)
