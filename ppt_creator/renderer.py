@@ -50,6 +50,10 @@ class PresentationRenderer:
             raise ValueError(f"Output path must end with .pptx: {destination}")
         return destination
 
+    def content_bounds(self) -> tuple[float, float, float]:
+        grid = self.theme.grid
+        return grid.content_left, grid.content_right, grid.content_width
+
     def resolve_layout_variant(self, slide_spec: Slide, default: str) -> str:
         return slide_spec.layout_variant or default
 
@@ -89,6 +93,102 @@ class PresentationRenderer:
         text_frame.margin_top = Pt(margin)
         text_frame.margin_bottom = Pt(margin)
         return shape
+
+    def add_eyebrow(
+        self,
+        slide: "PptxSlide",
+        text: str,
+        *,
+        left: float,
+        top: float,
+        width: float = 4.6,
+        align: PP_ALIGN = PP_ALIGN.LEFT,
+        uppercase: bool = True,
+    ):
+        shape = self.textbox(slide, left, top, width, 0.25)
+        paragraph = shape.text_frame.paragraphs[0]
+        paragraph.alignment = align
+        run = paragraph.add_run()
+        run.text = text.upper() if uppercase else text
+        self.set_run_style(run, size=self.theme.typography.eyebrow_size, color=self.theme.colors.accent, bold=True)
+        return shape
+
+    def add_heading(
+        self,
+        slide: "PptxSlide",
+        *,
+        title: str,
+        left: float,
+        top: float,
+        width: float,
+        subtitle: str | None = None,
+        eyebrow: str | None = None,
+        title_size: int | None = None,
+        subtitle_width: float | None = None,
+        align: PP_ALIGN = PP_ALIGN.LEFT,
+    ) -> None:
+        if eyebrow:
+            self.add_eyebrow(slide, eyebrow, left=left, top=top - 0.27, width=min(width, 4.8), align=align)
+
+        title_box = self.textbox(slide, left, top, width, 0.95)
+        self.write_paragraph(
+            title_box.text_frame,
+            title,
+            size=title_size or self.theme.typography.title_size,
+            color=self.theme.colors.navy,
+            bold=True,
+            align=align,
+        )
+
+        if subtitle:
+            subtitle_box = self.textbox(slide, left, top + 0.78, subtitle_width or width, 0.45)
+            self.write_paragraph(
+                subtitle_box.text_frame,
+                subtitle,
+                size=self.theme.typography.subtitle_size,
+                color=self.theme.colors.muted,
+                align=align,
+            )
+
+    def panel_content_box(
+        self,
+        slide: "PptxSlide",
+        *,
+        left: float,
+        top: float,
+        width: float,
+        height: float,
+        padding: float | None = None,
+    ):
+        pad = padding if padding is not None else self.theme.components.panel_padding
+        return self.textbox(slide, left + pad, top + pad, width - (pad * 2), height - (pad * 2))
+
+    def add_quote_block(
+        self,
+        slide: "PptxSlide",
+        *,
+        quote: str,
+        left: float,
+        top: float,
+        width: float,
+        height: float,
+        attribution: str | None = None,
+    ) -> None:
+        quote_box = self.textbox(slide, left, top, width, height)
+        paragraph = quote_box.text_frame.paragraphs[0]
+        paragraph.alignment = PP_ALIGN.LEFT
+        run = paragraph.add_run()
+        run.text = quote
+        self.set_run_style(run, size=self.theme.typography.quote_size, color=self.theme.colors.navy, bold=True, italic=True)
+
+        if attribution:
+            attribution_box = self.textbox(slide, left, top + height + 0.3, min(width, 4.2), 0.35)
+            self.write_paragraph(
+                attribution_box.text_frame,
+                attribution,
+                size=self.theme.typography.body_size - 1,
+                color=self.theme.colors.muted,
+            )
 
     def set_run_style(
         self,
@@ -199,19 +299,19 @@ class PresentationRenderer:
         return shape
 
     def add_footer(self, slide: "PptxSlide", meta: PresentationMeta, index: int, total_slides: int) -> None:
-        c = self.theme.canvas
+        grid = self.theme.grid
         left_text = meta.author or meta.title
         if meta.date:
             left_text = f"{left_text}  •  {meta.date}" if left_text else meta.date
 
-        left_box = self.textbox(slide, c.margin_x, 6.92, 6.0, 0.2)
+        left_box = self.textbox(slide, grid.content_left, grid.footer_top, 6.0, 0.2)
         left_paragraph = left_box.text_frame.paragraphs[0]
         left_paragraph.alignment = PP_ALIGN.LEFT
         left_run = left_paragraph.add_run()
         left_run.text = left_text or ""
         self.set_run_style(left_run, size=self.theme.typography.small_size, color=self.theme.colors.muted)
 
-        right_box = self.textbox(slide, 10.9, 6.92, 1.35, 0.2)
+        right_box = self.textbox(slide, 10.9, grid.footer_top, 1.35, 0.2)
         right_paragraph = right_box.text_frame.paragraphs[0]
         right_paragraph.alignment = PP_ALIGN.RIGHT
         right_run = right_paragraph.add_run()
@@ -220,10 +320,10 @@ class PresentationRenderer:
 
         self.add_rule(
             slide,
-            c.margin_x,
-            6.86,
-            12.45,
-            6.86,
+            grid.content_left,
+            grid.footer_line_y,
+            grid.content_right,
+            grid.footer_line_y,
             color=self.theme.colors.line,
             width_pt=self.theme.components.footer_rule_width_pt,
         )

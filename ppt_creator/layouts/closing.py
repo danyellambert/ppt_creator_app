@@ -5,28 +5,27 @@ from pptx.enum.text import PP_ALIGN
 
 def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
     c = renderer.theme.canvas
+    g = renderer.theme.grid
     t = renderer.theme.typography
     colors = renderer.theme.colors
 
-    renderer.add_accent_bar(slide, c.margin_x, 1.0, 0.1, 4.8, color=colors.accent)
+    renderer.add_accent_bar(slide, g.content_left, 1.0, 0.1, 4.8, color=colors.accent)
 
     if slide_spec.title:
-        title_box = renderer.textbox(slide, 1.28, 1.15, 5.0, 0.7)
-        renderer.write_paragraph(title_box.text_frame, slide_spec.title, size=t.eyebrow_size + 1, color=colors.accent, bold=True)
+        renderer.add_eyebrow(slide, slide_spec.title, left=g.content_left + 0.43, top=1.15, width=5.0, uppercase=False)
 
-    quote_box = renderer.textbox(slide, 1.28, 2.0, 8.8, 1.7)
-    paragraph = quote_box.text_frame.paragraphs[0]
-    paragraph.alignment = PP_ALIGN.LEFT
-    run = paragraph.add_run()
-    run.text = slide_spec.quote or slide_spec.body or ""
-    renderer.set_run_style(run, size=t.quote_size, color=colors.navy, bold=True, italic=True)
-
-    if slide_spec.attribution:
-        attribution_box = renderer.textbox(slide, 1.28, 4.0, 4.2, 0.45)
-        renderer.write_paragraph(attribution_box.text_frame, slide_spec.attribution, size=t.body_size - 1, color=colors.muted)
+    renderer.add_quote_block(
+        slide,
+        quote=slide_spec.quote or slide_spec.body or "",
+        attribution=slide_spec.attribution,
+        left=g.content_left + 0.43,
+        top=2.0,
+        width=8.8,
+        height=1.7,
+    )
 
     renderer.add_panel(slide, 9.2, 1.55, 3.05, 3.0, fill_color=colors.surface, line_color=colors.line)
-    box = renderer.textbox(slide, 9.55, 1.95, 2.35, 2.2)
+    box = renderer.panel_content_box(slide, left=9.2, top=1.55, width=3.05, height=3.0, padding=0.35)
     tf = box.text_frame
     renderer.write_paragraph(tf, "Next", size=t.eyebrow_size, color=colors.accent, bold=True, space_after=8)
     renderer.write_paragraph(tf, "Approve the narrative, connect your content pipeline, and reuse the same renderer across future decks.", size=t.body_size - 1, color=colors.text)

@@ -5,41 +5,27 @@ from pptx.enum.text import PP_ALIGN
 
 def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
     c = renderer.theme.canvas
+    g = renderer.theme.grid
     t = renderer.theme.typography
     colors = renderer.theme.colors
 
-    renderer.add_accent_bar(slide, c.margin_x, 0.72, 0.1, 1.15, color=colors.accent)
+    renderer.add_accent_bar(slide, g.content_left, 0.72, 0.1, 1.15, color=colors.accent)
 
-    if slide_spec.eyebrow or meta.subtitle:
-        eyebrow = renderer.textbox(slide, 1.18, 0.75, 4.0, 0.28)
-        eyebrow_tf = eyebrow.text_frame
-        p = eyebrow_tf.paragraphs[0]
-        p.alignment = PP_ALIGN.LEFT
-        run = p.add_run()
-        run.text = (slide_spec.eyebrow or meta.subtitle or "").upper()
-        renderer.set_run_style(run, size=t.eyebrow_size, color=colors.accent, bold=True)
-
-    title_box = renderer.textbox(slide, 1.18, 1.25, 7.8, 1.45)
-    renderer.write_paragraph(
-        title_box.text_frame,
-        slide_spec.title or meta.title,
-        size=t.title_size + 6,
-        color=colors.navy,
-        bold=True,
-        space_after=6,
+    heading_left = g.content_left + 0.33
+    renderer.add_heading(
+        slide,
+        title=slide_spec.title or meta.title,
+        subtitle=slide_spec.subtitle,
+        eyebrow=slide_spec.eyebrow or meta.subtitle,
+        left=heading_left,
+        top=1.25,
+        width=7.8,
+        subtitle_width=6.8,
+        title_size=t.title_size + 6,
     )
 
-    if slide_spec.subtitle:
-        subtitle_box = renderer.textbox(slide, 1.18, 2.55, 6.8, 1.0)
-        renderer.write_paragraph(
-            subtitle_box.text_frame,
-            slide_spec.subtitle,
-            size=t.subtitle_size + 1,
-            color=colors.muted,
-        )
-
     if slide_spec.body:
-        body_box = renderer.textbox(slide, 1.18, 3.35, 5.5, 1.25)
+        body_box = renderer.textbox(slide, heading_left, 3.35, 5.5, 1.25)
         renderer.write_paragraph(
             body_box.text_frame,
             slide_spec.body,
@@ -49,7 +35,7 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
 
     panel = renderer.add_panel(
         slide,
-        9.5,
+        g.side_panel_left + 1.0,
         1.05,
         2.75,
         4.65,
@@ -57,7 +43,7 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
         line_color=colors.line,
     )
 
-    meta_box = renderer.textbox(slide, 9.9, 1.45, 1.95, 3.7)
+    meta_box = renderer.panel_content_box(slide, left=g.side_panel_left + 1.0, top=1.05, width=2.75, height=4.65, padding=0.40)
     tf = meta_box.text_frame
     renderer.write_paragraph(tf, "DECK", size=t.eyebrow_size, color=colors.accent, bold=True, space_after=8)
     renderer.write_paragraph(tf, meta.title, size=t.body_size + 1, color=colors.navy, bold=True, space_after=12)

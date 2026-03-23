@@ -7,6 +7,7 @@ from ppt_creator.theme import (
     CanvasTokens,
     ColorTokens,
     ComponentTokens,
+    GridTokens,
     SpacingTokens,
     Theme,
     TypographyTokens,
@@ -16,8 +17,10 @@ from ppt_creator.theme import (
 __version__ = "0.1.0"
 
 __all__ = [
+    "CanvasTokens",
     "ColorTokens",
     "ComponentTokens",
+    "GridTokens",
     "__version__",
     "CardItem",
     "EXECUTIVE_PREMIUM_MINIMAL",
@@ -27,9 +30,9 @@ __all__ = [
     "PresentationRenderer",
     "SpacingTokens",
     "Slide",
-    "TypographyTokens",
     "SlideType",
     "Theme",
+    "TypographyTokens",
     "get_theme",
     "render_presentation",
 ]

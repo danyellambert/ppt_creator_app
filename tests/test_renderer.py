@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 from pptx import Presentation
+from pptx.util import Inches
 
 from ppt_creator.renderer import PresentationRenderer
 from ppt_creator.schema import PresentationInput
@@ -27,3 +28,15 @@ def test_renderer_requires_pptx_output_extension(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError):
         renderer.render(spec, tmp_path / "example.txt")
+
+
+def test_panel_content_box_uses_theme_padding() -> None:
+    presentation = Presentation()
+    slide = presentation.slides.add_slide(presentation.slide_layouts[6])
+    renderer = PresentationRenderer(asset_root="examples")
+
+    box = renderer.panel_content_box(slide, left=1.0, top=1.0, width=4.0, height=2.0)
+    padding = renderer.theme.components.panel_padding
+
+    assert box.left == Inches(1.0 + padding)
+    assert box.width == Inches(4.0 - (padding * 2))

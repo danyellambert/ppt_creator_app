@@ -138,17 +138,17 @@ Objetivo: elevar muito a qualidade visual e tornar o tema realmente reutilizáve
 
 - [x] expandir tokens com grupos de spacing e components
 - [x] criar primeiras variantes de layout reutilizáveis
-- [ ] formalizar grid/layout base de forma mais abrangente
-- [ ] criar helpers adicionais para blocos visuais recorrentes
-- [ ] revisar proporções e alinhamentos slide a slide
+- [x] formalizar grid/layout base de forma mais abrangente
+- [x] criar helpers adicionais para blocos visuais recorrentes
+- [x] revisar proporções e alinhamentos slide a slide
 
 ### Entregas
 
 - [x] expandir tokens visuais
-- [ ] formalizar grid/layout base
+- [x] formalizar grid/layout base
 - [x] criar regras consistentes de spacing
 - [x] criar componentes visuais reutilizáveis
-- [ ] reduzir diferenças visuais entre layouts
+- [x] reduzir diferenças visuais entre layouts
 
 ### Itens concretos
 
@@ -156,18 +156,18 @@ Objetivo: elevar muito a qualidade visual e tornar o tema realmente reutilizáve
   - [x] cores
   - [x] tipografia
   - [x] spacing
-  - [ ] grid
+  - [x] grid
   - [x] cards
   - [x] métricas
   - [x] imagem/placeholder
-- [ ] definir áreas seguras por slide
-- [ ] criar helpers para:
-  - [ ] título padrão
-  - [ ] eyebrow padrão
-  - [ ] footer padrão
+- [x] definir áreas seguras por slide
+- [x] criar helpers para:
+  - [x] título padrão
+  - [x] eyebrow padrão
+  - [x] footer padrão
   - [x] painéis/cartões padrão
-  - [ ] blocos de quote
-- [ ] revisar proporções e alinhamentos slide a slide
+  - [x] blocos de quote
+- [x] revisar proporções e alinhamentos slide a slide
 - [x] criar pelo menos 2 variantes por alguns layouts
   - [x] bullets: “left text / right insight” e “full-width bullets”
   - [x] metrics: “3 KPIs” e “4 KPIs compactos”

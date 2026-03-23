@@ -43,6 +43,25 @@ class SpacingTokens:
 
 
 @dataclass(frozen=True)
+class GridTokens:
+    content_left: float = 0.85
+    content_right: float = 12.45
+    header_top: float = 0.78
+    title_top: float = 1.02
+    body_top: float = 2.45
+    side_panel_left: float = 8.5
+    side_panel_width: float = 3.75
+    image_left: float = 7.1
+    image_width: float = 5.15
+    footer_top: float = 6.92
+    footer_line_y: float = 6.86
+
+    @property
+    def content_width(self) -> float:
+        return self.content_right - self.content_left
+
+
+@dataclass(frozen=True)
 class ColorTokens:
     background: str = "F7F5F2"
     surface: str = "FFFDFC"
@@ -68,6 +87,7 @@ class Theme:
     canvas: CanvasTokens
     typography: TypographyTokens
     spacing: SpacingTokens
+    grid: GridTokens
     colors: ColorTokens
     components: ComponentTokens
 
@@ -77,6 +97,7 @@ EXECUTIVE_PREMIUM_MINIMAL = Theme(
     canvas=CanvasTokens(),
     typography=TypographyTokens(),
     spacing=SpacingTokens(),
+    grid=GridTokens(),
     colors=ColorTokens(),
     components=ComponentTokens(),
 )

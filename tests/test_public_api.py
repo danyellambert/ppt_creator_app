@@ -21,3 +21,5 @@ def test_theme_token_groups_are_exposed() -> None:
     theme = ppt_creator.get_theme("executive_premium_minimal")
     assert isinstance(theme.spacing, ppt_creator.SpacingTokens)
     assert isinstance(theme.components, ppt_creator.ComponentTokens)
+    assert isinstance(theme.grid, ppt_creator.GridTokens)
+    assert theme.grid.content_width > 0

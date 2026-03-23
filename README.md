@@ -89,6 +89,15 @@ Direção implementada:
 
 O tema foi estruturado com tokens para facilitar futuros temas adicionais.
 
+Hoje o tema já separa tokens em grupos para:
+
+- canvas
+- typography
+- spacing
+- grid
+- colors
+- components
+
 ---
 
 ## Formato do JSON
