@@ -123,6 +123,25 @@ python -m pip install -e .
 python -m pip install -e ".[dev]"
 ```
 
+### VS Code / Pylance
+
+Se o VS Code mostrar avisos como `Import could not be resolved` para `pytest` ou `pptx`, normalmente o problema é o interpretador Python errado no workspace.
+
+Este repositório agora inclui `.vscode/settings.json` apontando para o ambiente local do projeto:
+
+```text
+.conda-env/bin/python
+```
+
+Se os avisos continuarem:
+
+1. abra o Command Palette
+2. rode `Python: Select Interpreter`
+3. escolha `${workspaceFolder}/.conda-env/bin/python`
+4. rode `Developer: Reload Window`
+
+Isso costuma resolver os warnings do Pylance sem mudar o código.
+
 ---
 
 ## Como rodar localmente
@@ -213,6 +232,7 @@ Como o componente não está acoplado ao runtime de LLM, ele pode ser usado como
 - sem geração automática de conteúdo por LLM
 - sem múltiplos temas prontos além do tema base
 - imagens são opcionais e não passam por tratamento avançado de crop/layout inteligente
+- imagens ausentes usam um placeholder estruturado, mas ainda sem fallback visual avançado por tipo de conteúdo
 - não usa templates `.potx` externos nesta primeira versão
 
 ---

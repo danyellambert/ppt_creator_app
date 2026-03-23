@@ -35,6 +35,7 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
         )
     else:
         panel = renderer.add_panel(slide, image_left, image_top, image_width, image_height, fill_color=colors.surface, line_color=colors.line)
+        renderer.add_accent_bar(slide, image_left, image_top, image_width, 0.08, color=colors.line)
         placeholder = slide.shapes.add_shape(
             MSO_AUTO_SHAPE_TYPE.RECTANGLE,
             panel.left,
@@ -45,8 +46,30 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
         placeholder.fill.solid()
         placeholder.fill.fore_color.rgb = panel.fill.fore_color.rgb
         placeholder.line.fill.background()
-        box = renderer.textbox(slide, image_left + 0.55, image_top + 1.8, image_width - 1.1, 1.1)
-        renderer.write_paragraph(box.text_frame, slide_spec.image_caption or "Image placeholder", size=t.body_size, color=colors.muted, bold=True)
+        box = renderer.textbox(slide, image_left + 0.55, image_top + 1.55, image_width - 1.1, 1.45)
+        renderer.write_paragraph(
+            box.text_frame,
+            "Image unavailable" if slide_spec.image_path else "Image placeholder",
+            size=t.body_size,
+            color=colors.muted,
+            bold=True,
+            space_after=6,
+        )
+        renderer.write_paragraph(
+            box.text_frame,
+            slide_spec.image_caption or "Add a real image later or keep this area as a structured visual placeholder.",
+            size=t.small_size + 1,
+            color=colors.text,
+        )
+
+        if slide_spec.image_path:
+            path_box = renderer.textbox(slide, image_left + 0.55, image_top + 3.35, image_width - 1.1, 0.55)
+            renderer.write_paragraph(
+                path_box.text_frame,
+                f"Missing asset: {slide_spec.image_path}",
+                size=t.small_size,
+                color=colors.muted,
+            )
 
     text_box = renderer.textbox(slide, c.margin_x, 2.45, 5.4, 3.1)
     tf = text_box.text_frame

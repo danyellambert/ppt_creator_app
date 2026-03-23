@@ -8,6 +8,7 @@ from pptx.enum.shapes import MSO_AUTO_SHAPE_TYPE, MSO_CONNECTOR
 from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
 from pptx.util import Inches, Pt
 
+from ppt_creator.layouts import LAYOUT_RENDERERS
 from ppt_creator.schema import PresentationInput, PresentationMeta, Slide, SlideType
 from ppt_creator.theme import get_theme, rgb
 
@@ -57,18 +58,7 @@ class PresentationRenderer:
         index: int,
         total_slides: int,
     ) -> None:
-        from ppt_creator.layouts import bullets, cards, closing, image_text, metrics, section, title
-
-        layout_map = {
-            SlideType.TITLE: title.render,
-            SlideType.SECTION: section.render,
-            SlideType.BULLETS: bullets.render,
-            SlideType.CARDS: cards.render,
-            SlideType.METRICS: metrics.render,
-            SlideType.IMAGE_TEXT: image_text.render,
-            SlideType.CLOSING: closing.render,
-        }
-        layout_map[slide_spec.type](self, slide, slide_spec, meta, index, total_slides)
+        LAYOUT_RENDERERS[slide_spec.type](self, slide, slide_spec, meta, index, total_slides)
 
     def apply_background(self, slide: "PptxSlide") -> None:
         fill = slide.background.fill
