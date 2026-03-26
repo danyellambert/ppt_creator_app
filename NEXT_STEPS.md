@@ -248,7 +248,7 @@ Objetivo: aumentar utilidade prática para uso executivo real.
 - [x] two-column narrative slide
 - [x] FAQ / appendix slide
 - [x] summary slide final
-- cover variants
+- [x] cover variants
 
 ### Branding e configuração
 

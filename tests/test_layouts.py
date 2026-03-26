@@ -20,6 +20,7 @@ def build_layout_smoke_spec() -> PresentationInput:
                     "type": "title",
                     "title": "Title Slide",
                     "subtitle": "Smoke coverage",
+                    "layout_variant": "hero_cover",
                 },
                 {
                     "type": "section",
@@ -162,6 +163,11 @@ def test_layout_variants_render_without_crashing(tmp_path: Path) -> None:
             },
             "slides": [
                 {
+                    "type": "title",
+                    "title": "Hero Cover",
+                    "layout_variant": "hero_cover",
+                },
+                {
                     "type": "bullets",
                     "title": "Full Width Bullets",
                     "layout_variant": "full_width",
@@ -195,7 +201,7 @@ def test_layout_variants_render_without_crashing(tmp_path: Path) -> None:
 
     assert rendered.exists()
     presentation = Presentation(str(rendered))
-    assert len(presentation.slides) == 3
+    assert len(presentation.slides) == 4
 
 
 def test_new_layout_types_render_without_crashing(tmp_path: Path) -> None:

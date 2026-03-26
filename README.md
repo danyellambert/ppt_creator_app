@@ -104,6 +104,9 @@ Todos suportam `speaker_notes`.
 - `image_text`
   - `image_right` (padrão)
   - `image_left`
+- `title`
+  - `split_panel` (padrão)
+  - `hero_cover`
 
 Novos tipos executivos adicionados:
 

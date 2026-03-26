@@ -7,6 +7,7 @@ The format is inspired by Keep a Changelog, and the project aims to follow Seman
 ## [Unreleased]
 
 ### Added
+- title `hero_cover` variant for alternate executive cover styling
 - `two_column` slide type for side-by-side narrative framing
 - `table` slide type for executive data summaries
 - `faq` slide type for executive objections and appendix-style answers

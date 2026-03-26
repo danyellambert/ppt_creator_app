@@ -86,6 +86,22 @@ def test_layout_variant_is_normalized() -> None:
     assert spec.slides[0].layout_variant == "image_left"
 
 
+def test_title_layout_variant_is_accepted() -> None:
+    payload = {
+        "presentation": {"title": "Deck", "theme": "executive_premium_minimal"},
+        "slides": [
+            {
+                "type": "title",
+                "title": "Cover",
+                "layout_variant": "Hero Cover",
+            }
+        ],
+    }
+
+    spec = PresentationInput.model_validate(payload)
+    assert spec.slides[0].layout_variant == "hero_cover"
+
+
 def test_invalid_layout_variant_is_rejected() -> None:
     payload = {
         "presentation": {"title": "Deck", "theme": "executive_premium_minimal"},

@@ -80,6 +80,7 @@ class SlideType(str, Enum):
 
 
 LAYOUT_VARIANTS_BY_SLIDE_TYPE = {
+    SlideType.TITLE: {"split_panel", "hero_cover"},
     SlideType.BULLETS: {"insight_panel", "full_width"},
     SlideType.METRICS: {"standard", "compact"},
     SlideType.IMAGE_TEXT: {"image_right", "image_left"},
