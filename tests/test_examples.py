@@ -9,7 +9,9 @@ from ppt_creator.schema import PresentationInput
 
 
 def test_all_example_json_files_validate() -> None:
-    example_paths = sorted(Path("examples").glob("*.json"))
+    example_paths = sorted(
+        path for path in Path("examples").glob("*.json") if not path.name.startswith("briefing_")
+    )
     assert example_paths
 
     for example_path in example_paths:
@@ -19,7 +21,9 @@ def test_all_example_json_files_validate() -> None:
 
 
 def test_all_examples_render_successfully(tmp_path: Path) -> None:
-    example_paths = sorted(Path("examples").glob("*.json"))
+    example_paths = sorted(
+        path for path in Path("examples").glob("*.json") if not path.name.startswith("briefing_")
+    )
     renderer = PresentationRenderer(asset_root="examples")
 
     for example_path in example_paths:

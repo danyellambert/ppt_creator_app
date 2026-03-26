@@ -315,16 +315,16 @@ Qualquer camada de IA deve ser opcional.
 
 ### Possibilidades futuras
 
-- gerar JSON inicial a partir de briefing
-- expandir outline em slides estruturados
-- sugerir títulos, bullets e KPIs
+- [x] gerar JSON inicial a partir de briefing estruturado
+- [x] expandir outline em slides estruturados
+- [x] sugerir títulos, bullets e KPIs iniciais a partir do briefing
 - resumir texto longo em conteúdo executivo
 - sugerir imagens ou placeholders automáticos
 - revisar densidade de conteúdo por slide
 
 ### Arquitetura recomendada
 
-- manter um módulo separado, algo como `ppt_creator_ai/` ou `pipelines/`
+- [x] manter um módulo separado, algo como `ppt_creator_ai/` ou `pipelines/`
 - nunca misturar lógica de prompt com o renderizador base
 - tratar LLM como produtor de estrutura, não como renderizador
 

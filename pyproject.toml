@@ -21,7 +21,7 @@ dev = [
 ]
 
 [tool.setuptools.packages.find]
-include = ["ppt_creator*"]
+include = ["ppt_creator*", "ppt_creator_ai*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

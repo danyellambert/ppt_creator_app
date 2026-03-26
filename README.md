@@ -68,6 +68,8 @@ Por isso, os fluxos de qualidade da Fase 2 passaram a focar no escopo do subproj
 - `ppt_creator/`
 - `tests/`
 
+Existe agora também uma camada **opcional e separada** em `ppt_creator_ai/`, usada para transformar um briefing estruturado em JSON de apresentação. Ela não interfere no núcleo do renderizador.
+
 Além do tema base, o projeto agora também expõe temas prontos adicionais:
 
 - `executive_premium_minimal`
@@ -345,6 +347,14 @@ Domínios disponíveis:
 - `strategy`
 - `product`
 
+Gerar JSON inicial a partir de um briefing estruturado:
+
+```bash
+python -m ppt_creator_ai.cli generate examples/briefing_sales.json outputs/briefing_sales_deck.json
+```
+
+Esse fluxo pertence à camada opcional `ppt_creator_ai/` e foi mantido separado do renderizador principal.
+
 Os comandos da CLI agora também emitem logs mais claros com prefixos como:
 
 - `[INFO]`
@@ -510,3 +520,15 @@ Como o componente não está acoplado ao runtime de LLM, ele pode ser usado como
 - gráficos e tabelas executivas
 - sugestão automática de imagens
 - suporte opcional a template externo premium
+
+## Camada opcional de briefing estruturado
+
+Exemplo de input opcional em `examples/briefing_sales.json`.
+
+Essa camada tenta:
+
+- gerar um deck inicial a partir de briefing
+- expandir um outline em agenda e narrativa básica
+- montar slides estruturados de contexto, métricas, timeline, comparação, FAQ e summary
+
+Ela **não depende de LLM** nesta fase: é um gerador heurístico, útil como ponto de partida para pipelines futuros.
