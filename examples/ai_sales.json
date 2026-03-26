@@ -16,6 +16,21 @@
       "speaker_notes": "Open with the business framing: this is about scalable sales quality, not generic AI hype."
     },
     {
+      "type": "agenda",
+      "title": "Agenda",
+      "subtitle": "How the discussion will move",
+      "body": "This deck moves from pressure and timing into benefits, operating model, and executive takeaway.",
+      "bullets": [
+        "Why now",
+        "Operational friction",
+        "Executive benefits",
+        "Illustrative KPI impact",
+        "Operating model",
+        "Closing takeaway"
+      ],
+      "speaker_notes": "Use this slide to frame the flow before entering the main argument."
+    },
+    {
       "type": "section",
       "title": "Why now",
       "subtitle": "The economics finally support a focused deployment model",
@@ -107,6 +122,17 @@
       "quote": "The winning AI sales copilot is not the loudest one — it is the one that quietly improves the quality of execution every day.",
       "attribution": "Executive recommendation",
       "speaker_notes": "Close on discipline and clarity: consistent execution compounds."
+    },
+    {
+      "type": "summary",
+      "title": "Executive summary",
+      "body": "The most effective deployment is narrow, process-bound, and measured against real workflow outcomes rather than generic AI enthusiasm.",
+      "bullets": [
+        "Target a few high-value seller moments",
+        "Make outputs structured and reviewable",
+        "Measure productivity lift before expanding scope"
+      ],
+      "speaker_notes": "Reinforce the three most important recommendations in one place."
     }
   ]
 }

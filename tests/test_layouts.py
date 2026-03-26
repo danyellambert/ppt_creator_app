@@ -27,6 +27,12 @@ def build_layout_smoke_spec() -> PresentationInput:
                     "section_label": "Section",
                 },
                 {
+                    "type": "agenda",
+                    "title": "Agenda Slide",
+                    "body": "Today we focus on the few decisions that matter most.",
+                    "bullets": ["Context", "Options", "Risks", "Decision"],
+                },
+                {
                     "type": "bullets",
                     "title": "Bullets Slide",
                     "bullets": ["One", "Two", "Three"],
@@ -79,6 +85,12 @@ def build_layout_smoke_spec() -> PresentationInput:
                     ],
                 },
                 {
+                    "type": "summary",
+                    "title": "Summary Slide",
+                    "body": "The overall recommendation is to narrow the workflow, measure impact, and scale only after the process is stable.",
+                    "bullets": ["Keep scope tight", "Measure adoption", "Scale with discipline"],
+                },
+                {
                     "type": "closing",
                     "title": "Closing Slide",
                     "quote": "Stay structured.",
@@ -97,7 +109,7 @@ def test_all_layouts_render_without_crashing(tmp_path: Path) -> None:
 
     assert rendered.exists()
     presentation = Presentation(str(rendered))
-    assert len(presentation.slides) == 9
+    assert len(presentation.slides) == 11
 
 
 def test_missing_image_uses_placeholder_text(tmp_path: Path) -> None:
@@ -108,7 +120,7 @@ def test_missing_image_uses_placeholder_text(tmp_path: Path) -> None:
     rendered = renderer.render(spec, output)
     presentation = Presentation(str(rendered))
 
-    image_slide = presentation.slides[5]
+    image_slide = presentation.slides[6]
     texts = [shape.text for shape in image_slide.shapes if hasattr(shape, "text")]
     joined = "\n".join(texts)
 
@@ -192,6 +204,16 @@ def test_new_layout_types_render_without_crashing(tmp_path: Path) -> None:
                         },
                     ],
                 },
+                {
+                    "type": "agenda",
+                    "title": "Agenda",
+                    "bullets": ["Context", "Decision", "Next steps"],
+                },
+                {
+                    "type": "summary",
+                    "title": "Summary",
+                    "bullets": ["Stay focused", "Sequence the rollout"],
+                },
             ],
         }
     )
@@ -202,4 +224,4 @@ def test_new_layout_types_render_without_crashing(tmp_path: Path) -> None:
 
     assert rendered.exists()
     presentation = Presentation(str(rendered))
-    assert len(presentation.slides) == 2
+    assert len(presentation.slides) == 4

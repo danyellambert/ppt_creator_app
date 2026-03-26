@@ -62,12 +62,14 @@ def _normalize_hex_color(value: object, field_name: str) -> str | None | object:
 class SlideType(str, Enum):
     TITLE = "title"
     SECTION = "section"
+    AGENDA = "agenda"
     BULLETS = "bullets"
     CARDS = "cards"
     METRICS = "metrics"
     IMAGE_TEXT = "image_text"
     TIMELINE = "timeline"
     COMPARISON = "comparison"
+    SUMMARY = "summary"
     CLOSING = "closing"
 
 
@@ -273,14 +275,22 @@ class Slide(BaseModel):
         if self.type in {
             SlideType.TITLE,
             SlideType.SECTION,
+            SlideType.AGENDA,
             SlideType.BULLETS,
             SlideType.CARDS,
             SlideType.METRICS,
             SlideType.IMAGE_TEXT,
             SlideType.TIMELINE,
             SlideType.COMPARISON,
+            SlideType.SUMMARY,
         } and not self.title:
             raise ValueError(f"slide type '{self.type.value}' requires a title")
+
+        if self.type == SlideType.AGENDA and not self.bullets:
+            raise ValueError("agenda slide requires bullets")
+
+        if self.type == SlideType.AGENDA and len(self.bullets) > MAX_BULLETS_PER_SLIDE:
+            raise ValueError(f"agenda slide supports up to {MAX_BULLETS_PER_SLIDE} bullets")
 
         if self.type == SlideType.BULLETS and not (self.body or self.bullets):
             raise ValueError("bullets slide requires body or bullets")
@@ -313,6 +323,12 @@ class Slide(BaseModel):
 
         if self.type == SlideType.COMPARISON and len(self.comparison_columns) != 2:
             raise ValueError("comparison slide requires exactly 2 comparison_columns")
+
+        if self.type == SlideType.SUMMARY and not (self.body or self.bullets):
+            raise ValueError("summary slide requires body or bullets")
+
+        if self.type == SlideType.SUMMARY and len(self.bullets) > MAX_BULLETS_PER_SLIDE:
+            raise ValueError(f"summary slide supports up to {MAX_BULLETS_PER_SLIDE} bullets")
 
         if self.type == SlideType.CLOSING and not (self.quote or self.title):
             raise ValueError("closing slide requires quote or title")

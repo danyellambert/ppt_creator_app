@@ -78,12 +78,14 @@ Além do tema base, o projeto agora também expõe temas prontos adicionais:
 
 - `title`
 - `section`
+- `agenda`
 - `bullets`
 - `cards`
 - `metrics`
 - `image_text`
 - `timeline`
 - `comparison`
+- `summary`
 - `closing`
 
 Todos suportam `speaker_notes`.
@@ -106,6 +108,10 @@ Novos tipos executivos adicionados:
   - sequência visual de 2 a 5 etapas
 - `comparison`
   - comparação lado a lado entre dois estados, opções ou estratégias
+- `agenda`
+  - sequência de tópicos para orientar a discussão
+- `summary`
+  - síntese executiva com mensagem principal e key takeaways
 
 ---
 
@@ -328,7 +334,7 @@ python -m ppt_creator.cli render examples/ai_sales.json outputs/ai_sales.pptx
 Saída esperada:
 
 - arquivo `.pptx` real em `outputs/ai_sales.pptx`
-- deck com 7 slides
+- deck com 9 slides
 - notas do apresentador por slide
 
 Exemplos adicionais disponíveis:

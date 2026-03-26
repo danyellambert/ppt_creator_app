@@ -6,6 +6,7 @@ from collections.abc import Callable
 from typing import Any
 
 from ppt_creator.layouts import (
+    agenda,
     bullets,
     cards,
     closing,
@@ -13,6 +14,7 @@ from ppt_creator.layouts import (
     image_text,
     metrics,
     section,
+    summary,
     timeline,
     title,
 )
@@ -23,12 +25,14 @@ LayoutRenderer = Callable[[Any, Any, Any, Any, int, int], None]
 LAYOUT_RENDERERS: dict[SlideType, LayoutRenderer] = {
     SlideType.TITLE: title.render,
     SlideType.SECTION: section.render,
+    SlideType.AGENDA: agenda.render,
     SlideType.BULLETS: bullets.render,
     SlideType.CARDS: cards.render,
     SlideType.METRICS: metrics.render,
     SlideType.IMAGE_TEXT: image_text.render,
     SlideType.TIMELINE: timeline.render,
     SlideType.COMPARISON: comparison.render,
+    SlideType.SUMMARY: summary.render,
     SlideType.CLOSING: closing.render,
 }
 

@@ -7,6 +7,8 @@ The format is inspired by Keep a Changelog, and the project aims to follow Seman
 ## [Unreleased]
 
 ### Added
+- `agenda` slide type for discussion flow and meeting framing
+- `summary` slide type for executive recap and closing synthesis
 - `timeline` slide type for executive sequence storytelling
 - `comparison` slide type for side-by-side decision framing
 - branding metadata support (`client_name`, `footer_text`, `logo_path`)

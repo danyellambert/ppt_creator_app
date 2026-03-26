@@ -8,7 +8,7 @@ from ppt_creator.schema import PresentationInput
 def test_example_schema_is_valid() -> None:
     spec = PresentationInput.from_path("examples/ai_sales.json")
     assert spec.presentation.title == "AI copilots for sales teams"
-    assert len(spec.slides) == 7
+    assert len(spec.slides) == 9
 
 
 def test_cards_requires_exactly_three_cards() -> None:
@@ -161,6 +161,26 @@ def test_invalid_brand_color_is_rejected() -> None:
             "primary_color": "GGHHII",
         },
         "slides": [{"type": "title", "title": "Hello"}],
+    }
+
+    with pytest.raises(Exception):
+        PresentationInput.model_validate(payload)
+
+
+def test_agenda_slide_requires_bullets() -> None:
+    payload = {
+        "presentation": {"title": "Deck", "theme": "executive_premium_minimal"},
+        "slides": [{"type": "agenda", "title": "Agenda"}],
+    }
+
+    with pytest.raises(Exception):
+        PresentationInput.model_validate(payload)
+
+
+def test_summary_slide_requires_body_or_bullets() -> None:
+    payload = {
+        "presentation": {"title": "Deck", "theme": "executive_premium_minimal"},
+        "slides": [{"type": "summary", "title": "Summary"}],
     }
 
     with pytest.raises(Exception):

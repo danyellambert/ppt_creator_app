@@ -242,12 +242,12 @@ Objetivo: aumentar utilidade prática para uso executivo real.
 ### Funcionalidades candidatas
 
 - tabela executiva
-- agenda / roadmap slide
+- [x] agenda / roadmap slide
 - [x] timeline
 - [x] comparison slide
 - two-column narrative slide
 - FAQ / appendix slide
-- summary slide final
+- [x] summary slide final
 - cover variants
 
 ### Branding e configuração
