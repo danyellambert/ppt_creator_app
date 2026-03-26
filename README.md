@@ -23,6 +23,7 @@ Sem depender de PowerPoint, LibreOffice, Ollama, MLX, llama.cpp ou Transformers.
 ```text
 ppt_creator/
 ├── __init__.py
+├── api.py
 ├── cli.py
 ├── renderer.py
 ├── schema.py
@@ -332,6 +333,30 @@ Os comandos da CLI agora também emitem logs mais claros com prefixos como:
 - `[OK]`
 - `[WARN]`
 - `[ERROR]`
+
+## Modo API / serviço
+
+Também existe um modo HTTP simples para integrar o `ppt_creator` em outros fluxos:
+
+```bash
+python -m ppt_creator.api --host 127.0.0.1 --port 8787 --asset-root examples
+```
+
+Endpoints disponíveis:
+
+- `GET /health`
+- `GET /templates`
+- `POST /validate`
+- `POST /render`
+- `POST /template`
+
+Exemplo de validação por API:
+
+```bash
+curl -X POST http://127.0.0.1:8787/template \
+  -H 'Content-Type: application/json' \
+  -d '{"domain":"sales"}'
+```
 
 ---
 

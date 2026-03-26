@@ -7,6 +7,7 @@ The format is inspired by Keep a Changelog, and the project aims to follow Seman
 ## [Unreleased]
 
 ### Added
+- lightweight HTTP API/service mode with health, template, validate, and render endpoints
 - domain starter templates for `sales`, `consulting`, `strategy`, and `product`
 - CLI `template` command to generate starter JSON decks by domain
 - clearer CLI informational logs for validate/render/render-batch flows

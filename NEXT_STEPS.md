@@ -399,7 +399,7 @@ Ideias valiosas, mas não urgentes:
 - biblioteca de componentes visuais reutilizáveis
 - marketplace interno de temas/layouts
 - integração com workflow de propostas/comercial
-- modo API/serviço
+- [x] modo API/serviço
 - editor visual futuro para montar JSON com menos fricção
 
 ---

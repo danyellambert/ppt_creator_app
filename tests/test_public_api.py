@@ -44,3 +44,10 @@ def test_domain_templates_are_exposed() -> None:
     payload = ppt_creator.build_domain_template("sales")
     assert payload["presentation"]["theme"] == "dark_boardroom"
     assert len(payload["slides"]) >= 4
+
+
+def test_api_helpers_are_exposed() -> None:
+    assert ppt_creator.build_api_server is not None
+    assert ppt_creator.serve_api is not None
+    assert ppt_creator.validate_spec_payload is not None
+    assert ppt_creator.render_spec_payload is not None
