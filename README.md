@@ -30,11 +30,13 @@ ppt_creator/
 └── layouts/
     ├── __init__.py
     ├── bullets.py
+    ├── comparison.py
     ├── cards.py
     ├── closing.py
     ├── image_text.py
     ├── metrics.py
     ├── section.py
+    ├── timeline.py
     └── title.py
 ```
 
@@ -73,6 +75,8 @@ Por isso, os fluxos de qualidade da Fase 2 passaram a focar no escopo do subproj
 - `cards`
 - `metrics`
 - `image_text`
+- `timeline`
+- `comparison`
 - `closing`
 
 Todos suportam `speaker_notes`.
@@ -88,6 +92,13 @@ Todos suportam `speaker_notes`.
 - `image_text`
   - `image_right` (padrão)
   - `image_left`
+
+Novos tipos executivos adicionados:
+
+- `timeline`
+  - sequência visual de 2 a 5 etapas
+- `comparison`
+  - comparação lado a lado entre dois estados, opções ou estratégias
 
 ---
 
@@ -154,6 +165,33 @@ Exemplo de variante:
 }
 ```
 
+Exemplo de `timeline`:
+
+```json
+{
+  "type": "timeline",
+  "title": "90-day rollout",
+  "timeline_items": [
+    {"title": "Diagnose", "body": "Identify the highest-value workflow"},
+    {"title": "Pilot", "body": "Launch a constrained rollout"},
+    {"title": "Scale", "body": "Operationalize the successful pattern"}
+  ]
+}
+```
+
+Exemplo de `comparison`:
+
+```json
+{
+  "type": "comparison",
+  "title": "Before vs after",
+  "comparison_columns": [
+    {"title": "Before", "bullets": ["Manual prep", "Uneven quality"]},
+    {"title": "After", "bullets": ["Structured workflow", "Consistent quality"]}
+  ]
+}
+```
+
 ---
 
 ## Instalação local
@@ -205,6 +243,20 @@ Ou usando o helper:
 
 ```bash
 bash bin/render_ppt_creator.sh examples/ai_sales.json outputs/ai_sales.pptx
+```
+
+Dry run com relatório:
+
+```bash
+python -m ppt_creator.cli render examples/ai_sales.json outputs/ai_sales.pptx \
+  --dry-run --report-json outputs/ai_sales_report.json --check-assets
+```
+
+Renderização em lote:
+
+```bash
+python -m ppt_creator.cli render-batch examples outputs/batch \
+  --pattern "*.json" --report-json outputs/batch_report.json
 ```
 
 ---

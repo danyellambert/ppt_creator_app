@@ -7,6 +7,11 @@ The format is inspired by Keep a Changelog, and the project aims to follow Seman
 ## [Unreleased]
 
 ### Added
+- `timeline` slide type for executive sequence storytelling
+- `comparison` slide type for side-by-side decision framing
+- CLI dry-run mode with optional JSON reports
+- batch rendering command for whole directories of input JSON files
+- asset warning/report support for missing referenced images
 - Phase 2 productization assets:
   - `Makefile`
   - `CHANGELOG.md`

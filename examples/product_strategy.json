@@ -43,6 +43,29 @@
       ]
     },
     {
+      "type": "timeline",
+      "title": "90-day execution sequence",
+      "subtitle": "A tighter roadmap needs deliberate sequencing",
+      "eyebrow": "Delivery cadence",
+      "timeline_items": [
+        {
+          "title": "Stabilize the foundation",
+          "body": "Resolve the reliability gaps that keep slowing down roadmap confidence.",
+          "tag": "Month 1"
+        },
+        {
+          "title": "Concentrate adoption work",
+          "body": "Prioritize the workflow surfaces that create repeat usage in the core product loop.",
+          "tag": "Month 2"
+        },
+        {
+          "title": "Instrument decisions",
+          "body": "Improve visibility so leadership can judge product bets faster and with less ambiguity.",
+          "tag": "Month 3"
+        }
+      ]
+    },
+    {
       "type": "closing",
       "title": "Recommendation",
       "quote": "A strong roadmap is not a list of ideas — it is a sequence of deliberate choices that compounds over time."

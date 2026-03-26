@@ -40,3 +40,24 @@ def test_panel_content_box_uses_theme_padding() -> None:
 
     assert box.left == Inches(1.0 + padding)
     assert box.width == Inches(4.0 - (padding * 2))
+
+
+def test_collect_missing_assets_reports_missing_image() -> None:
+    spec = PresentationInput.model_validate(
+        {
+            "presentation": {"title": "Deck", "theme": "executive_premium_minimal"},
+            "slides": [
+                {
+                    "type": "image_text",
+                    "title": "Image",
+                    "body": "Body",
+                    "image_path": "missing-image.png",
+                }
+            ],
+        }
+    )
+    renderer = PresentationRenderer(asset_root="examples")
+
+    missing_assets = renderer.collect_missing_assets(spec)
+
+    assert missing_assets == ["slide 01 (Image): missing asset 'missing-image.png'"]

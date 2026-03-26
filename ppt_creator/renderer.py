@@ -354,6 +354,19 @@ class PresentationRenderer:
             candidate = self.asset_root / candidate
         return candidate if candidate.exists() else None
 
+    def collect_missing_assets(self, spec: PresentationInput) -> list[str]:
+        missing_assets: list[str] = []
+        for index, slide_spec in enumerate(spec.slides, start=1):
+            if not slide_spec.image_path:
+                continue
+
+            if self.resolve_asset(slide_spec.image_path) is None:
+                slide_label = slide_spec.title or slide_spec.type.value
+                missing_assets.append(
+                    f"slide {index:02d} ({slide_label}): missing asset '{slide_spec.image_path}'"
+                )
+        return missing_assets
+
 
 def render_presentation(
     spec: PresentationInput,

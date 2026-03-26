@@ -101,3 +101,37 @@ def test_invalid_layout_variant_is_rejected() -> None:
 
     with pytest.raises(Exception):
         PresentationInput.model_validate(payload)
+
+
+def test_timeline_slide_requires_at_least_two_items() -> None:
+    payload = {
+        "presentation": {"title": "Deck", "theme": "executive_premium_minimal"},
+        "slides": [
+            {
+                "type": "timeline",
+                "title": "Plan",
+                "timeline_items": [{"title": "Only one"}],
+            }
+        ],
+    }
+
+    with pytest.raises(Exception):
+        PresentationInput.model_validate(payload)
+
+
+def test_comparison_slide_requires_exactly_two_columns() -> None:
+    payload = {
+        "presentation": {"title": "Deck", "theme": "executive_premium_minimal"},
+        "slides": [
+            {
+                "type": "comparison",
+                "title": "Compare",
+                "comparison_columns": [
+                    {"title": "A", "body": "Alpha"},
+                ],
+            }
+        ],
+    }
+
+    with pytest.raises(Exception):
+        PresentationInput.model_validate(payload)

@@ -243,8 +243,8 @@ Objetivo: aumentar utilidade prática para uso executivo real.
 
 - tabela executiva
 - agenda / roadmap slide
-- timeline
-- comparison slide
+- [x] timeline
+- [x] comparison slide
 - two-column narrative slide
 - FAQ / appendix slide
 - summary slide final
@@ -283,11 +283,11 @@ Objetivo: preparar o projeto para ser embutido em fluxos maiores e uso recorrent
 
 ### Itens concretos
 
-- suportar renderização em lote
-- emitir logs mais claros
-- adicionar modo `--check` ou `--dry-run`
-- gerar relatório simples de renderização
-- validar assets ausentes com warnings úteis
+- [x] suportar renderização em lote
+- [ ] emitir logs mais claros
+- [x] adicionar modo `--check` ou `--dry-run`
+- [x] gerar relatório simples de renderização
+- [x] validar assets ausentes com warnings úteis
 - suportar diretórios de input/output configuráveis
 - permitir templates de deck por domínio
   - vendas

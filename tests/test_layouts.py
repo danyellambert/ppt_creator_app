@@ -56,6 +56,29 @@ def build_layout_smoke_spec() -> PresentationInput:
                     "image_caption": "Placeholder caption",
                 },
                 {
+                    "type": "timeline",
+                    "title": "Timeline Slide",
+                    "timeline_items": [
+                        {"title": "Discover", "body": "Frame the problem", "tag": "Week 1"},
+                        {"title": "Pilot", "body": "Run the first workflow", "tag": "Week 2"},
+                        {"title": "Scale", "body": "Operationalize the rollout", "tag": "Week 3"},
+                    ],
+                },
+                {
+                    "type": "comparison",
+                    "title": "Comparison Slide",
+                    "comparison_columns": [
+                        {
+                            "title": "Current state",
+                            "body": "Inconsistent execution and fragmented tooling.",
+                        },
+                        {
+                            "title": "Target state",
+                            "bullets": ["Clear workflow", "Structured outputs", "Measurable lift"],
+                        },
+                    ],
+                },
+                {
                     "type": "closing",
                     "title": "Closing Slide",
                     "quote": "Stay structured.",
@@ -74,7 +97,7 @@ def test_all_layouts_render_without_crashing(tmp_path: Path) -> None:
 
     assert rendered.exists()
     presentation = Presentation(str(rendered))
-    assert len(presentation.slides) == 7
+    assert len(presentation.slides) == 9
 
 
 def test_missing_image_uses_placeholder_text(tmp_path: Path) -> None:
@@ -136,3 +159,47 @@ def test_layout_variants_render_without_crashing(tmp_path: Path) -> None:
     assert rendered.exists()
     presentation = Presentation(str(rendered))
     assert len(presentation.slides) == 3
+
+
+def test_new_layout_types_render_without_crashing(tmp_path: Path) -> None:
+    spec = PresentationInput.model_validate(
+        {
+            "presentation": {
+                "title": "New Layout Deck",
+                "theme": "executive_premium_minimal",
+            },
+            "slides": [
+                {
+                    "type": "timeline",
+                    "title": "Rollout timeline",
+                    "timeline_items": [
+                        {"title": "Diagnose", "body": "Find the highest-value workflow"},
+                        {"title": "Deploy", "body": "Launch a controlled pilot"},
+                        {"title": "Measure", "body": "Track adoption and impact"},
+                    ],
+                },
+                {
+                    "type": "comparison",
+                    "title": "Before vs after",
+                    "comparison_columns": [
+                        {
+                            "title": "Before",
+                            "bullets": ["Manual prep", "Uneven quality"],
+                        },
+                        {
+                            "title": "After",
+                            "bullets": ["Structured workflow", "Better consistency"],
+                        },
+                    ],
+                },
+            ],
+        }
+    )
+    output = tmp_path / "new-layouts.pptx"
+
+    renderer = PresentationRenderer(asset_root="examples")
+    rendered = renderer.render(spec, output)
+
+    assert rendered.exists()
+    presentation = Presentation(str(rendered))
+    assert len(presentation.slides) == 2

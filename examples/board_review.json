@@ -53,6 +53,32 @@
       "image_caption": "Optional board visual placeholder"
     },
     {
+      "type": "comparison",
+      "title": "Operating trade-off",
+      "subtitle": "Board discipline requires seeing both the cost of drift and the benefit of focus",
+      "eyebrow": "Decision lens",
+      "comparison_columns": [
+        {
+          "title": "If execution drifts",
+          "body": "The company absorbs more operational noise and slower learning cycles.",
+          "bullets": [
+            "Hiring outpaces productivity",
+            "Resilience issues remain visible for too long"
+          ],
+          "footer": "Higher strategic drag"
+        },
+        {
+          "title": "If execution stays disciplined",
+          "body": "Leadership compounds confidence through clearer prioritization and better operating leverage.",
+          "bullets": [
+            "Capital stays aligned to compounding bets",
+            "Board reporting becomes more decision-useful"
+          ],
+          "footer": "Higher decision quality"
+        }
+      ]
+    },
+    {
       "type": "closing",
       "title": "Board takeaway",
       "quote": "The company is in a stronger position when performance discipline and strategic clarity move together."
