@@ -7,6 +7,9 @@ The format is inspired by Keep a Changelog, and the project aims to follow Seman
 ## [Unreleased]
 
 ### Added
+- `two_column` slide type for side-by-side narrative framing
+- `table` slide type for executive data summaries
+- `faq` slide type for executive objections and appendix-style answers
 - `agenda` slide type for discussion flow and meeting framing
 - `summary` slide type for executive recap and closing synthesis
 - `timeline` slide type for executive sequence storytelling

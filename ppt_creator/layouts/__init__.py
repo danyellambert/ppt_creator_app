@@ -11,12 +11,15 @@ from ppt_creator.layouts import (
     cards,
     closing,
     comparison,
+    faq,
     image_text,
     metrics,
     section,
     summary,
+    table,
     timeline,
     title,
+    two_column,
 )
 from ppt_creator.schema import SlideType
 
@@ -32,6 +35,9 @@ LAYOUT_RENDERERS: dict[SlideType, LayoutRenderer] = {
     SlideType.IMAGE_TEXT: image_text.render,
     SlideType.TIMELINE: timeline.render,
     SlideType.COMPARISON: comparison.render,
+    SlideType.TWO_COLUMN: two_column.render,
+    SlideType.TABLE: table.render,
+    SlideType.FAQ: faq.render,
     SlideType.SUMMARY: summary.render,
     SlideType.CLOSING: closing.render,
 }

@@ -19,7 +19,7 @@ def test_render_example_creates_pptx(tmp_path: Path) -> None:
 
     assert rendered.exists()
     presentation = Presentation(str(rendered))
-    assert len(presentation.slides) == 9
+    assert len(presentation.slides) == 10
 
 
 def test_renderer_requires_pptx_output_extension(tmp_path: Path) -> None:

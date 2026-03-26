@@ -10,6 +10,9 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 MAX_BULLETS_PER_SLIDE = 6
 MAX_METRICS_PER_SLIDE = 4
 MAX_TIMELINE_ITEMS = 5
+MAX_FAQ_ITEMS = 4
+MAX_TABLE_COLUMNS = 5
+MAX_TABLE_ROWS = 8
 
 LAYOUT_VARIANTS_BY_SLIDE_TYPE: dict["SlideType", set[str]] = {}
 
@@ -69,6 +72,9 @@ class SlideType(str, Enum):
     IMAGE_TEXT = "image_text"
     TIMELINE = "timeline"
     COMPARISON = "comparison"
+    TWO_COLUMN = "two_column"
+    TABLE = "table"
+    FAQ = "faq"
     SUMMARY = "summary"
     CLOSING = "closing"
 
@@ -226,9 +232,13 @@ class Slide(BaseModel):
     body: str | None = None
     bullets: list[str] = Field(default_factory=list)
     cards: list[CardItem] = Field(default_factory=list)
+    faq_items: list[CardItem] = Field(default_factory=list)
     metrics: list[MetricItem] = Field(default_factory=list)
     timeline_items: list[TimelineItem] = Field(default_factory=list)
     comparison_columns: list[ComparisonColumn] = Field(default_factory=list)
+    two_column_columns: list[ComparisonColumn] = Field(default_factory=list)
+    table_columns: list[str] = Field(default_factory=list)
+    table_rows: list[list[str]] = Field(default_factory=list)
     quote: str | None = None
     attribution: str | None = None
     section_label: str | None = None
@@ -270,6 +280,21 @@ class Slide(BaseModel):
     def clean_bullets(cls, bullets: list[str]) -> list[str]:
         return _clean_string_list(bullets, field_name="bullet")
 
+    @field_validator("table_columns")
+    @classmethod
+    def clean_table_columns(cls, columns: list[str]) -> list[str]:
+        return _clean_string_list(columns, field_name="table column")
+
+    @field_validator("table_rows")
+    @classmethod
+    def clean_table_rows(cls, rows: list[list[str]]) -> list[list[str]]:
+        cleaned_rows: list[list[str]] = []
+        for index, row in enumerate(rows, start=1):
+            if not isinstance(row, list):
+                raise ValueError(f"table row #{index} must be a list of strings")
+            cleaned_rows.append(_clean_string_list(row, field_name=f"table row #{index} cell"))
+        return cleaned_rows
+
     @model_validator(mode="after")
     def validate_by_type(self) -> "Slide":
         if self.type in {
@@ -282,6 +307,9 @@ class Slide(BaseModel):
             SlideType.IMAGE_TEXT,
             SlideType.TIMELINE,
             SlideType.COMPARISON,
+            SlideType.TWO_COLUMN,
+            SlideType.TABLE,
+            SlideType.FAQ,
             SlideType.SUMMARY,
         } and not self.title:
             raise ValueError(f"slide type '{self.type.value}' requires a title")
@@ -323,6 +351,34 @@ class Slide(BaseModel):
 
         if self.type == SlideType.COMPARISON and len(self.comparison_columns) != 2:
             raise ValueError("comparison slide requires exactly 2 comparison_columns")
+
+        if self.type == SlideType.TWO_COLUMN and len(self.two_column_columns) != 2:
+            raise ValueError("two_column slide requires exactly 2 two_column_columns")
+
+        if self.type == SlideType.TABLE and len(self.table_columns) < 2:
+            raise ValueError("table slide requires at least 2 table_columns")
+
+        if self.type == SlideType.TABLE and len(self.table_columns) > MAX_TABLE_COLUMNS:
+            raise ValueError(f"table slide supports up to {MAX_TABLE_COLUMNS} table_columns")
+
+        if self.type == SlideType.TABLE and not self.table_rows:
+            raise ValueError("table slide requires at least one table row")
+
+        if self.type == SlideType.TABLE and len(self.table_rows) > MAX_TABLE_ROWS:
+            raise ValueError(f"table slide supports up to {MAX_TABLE_ROWS} table rows")
+
+        if self.type == SlideType.TABLE:
+            for index, row in enumerate(self.table_rows, start=1):
+                if len(row) != len(self.table_columns):
+                    raise ValueError(
+                        f"table row #{index} must contain exactly {len(self.table_columns)} cells"
+                    )
+
+        if self.type == SlideType.FAQ and len(self.faq_items) < 2:
+            raise ValueError("faq slide requires at least 2 faq_items")
+
+        if self.type == SlideType.FAQ and len(self.faq_items) > MAX_FAQ_ITEMS:
+            raise ValueError(f"faq slide supports up to {MAX_FAQ_ITEMS} faq_items")
 
         if self.type == SlideType.SUMMARY and not (self.body or self.bullets):
             raise ValueError("summary slide requires body or bullets")

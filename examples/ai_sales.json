@@ -117,6 +117,26 @@
       "speaker_notes": "This slide should make the rollout feel contained and professional. The missing image is intentionally handled with a clean placeholder."
     },
     {
+      "type": "faq",
+      "title": "Executive FAQ",
+      "subtitle": "Questions leaders usually ask before scaling rollout",
+      "faq_items": [
+        {
+          "title": "Where should deployment start?",
+          "body": "Start with a narrow workflow that already has clear friction, clear ownership, and measurable outcomes."
+        },
+        {
+          "title": "How should success be measured?",
+          "body": "Measure a mix of workflow adoption, time recovered, and execution quality improvements."
+        },
+        {
+          "title": "What is the main implementation risk?",
+          "body": "Trying to broaden scope too early before the process and quality controls are stable."
+        }
+      ],
+      "speaker_notes": "Use this slide to pre-empt common objections and show operational discipline."
+    },
+    {
       "type": "closing",
       "title": "Closing thought",
       "quote": "The winning AI sales copilot is not the loudest one — it is the one that quietly improves the quality of execution every day.",

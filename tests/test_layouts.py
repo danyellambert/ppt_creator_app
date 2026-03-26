@@ -85,6 +85,31 @@ def build_layout_smoke_spec() -> PresentationInput:
                     ],
                 },
                 {
+                    "type": "two_column",
+                    "title": "Two Column Slide",
+                    "two_column_columns": [
+                        {"title": "Current narrative", "body": "Too many competing priorities obscure the core decision."},
+                        {"title": "Target narrative", "bullets": ["Sequence the work", "Clarify ownership", "Measure outcomes"]},
+                    ],
+                },
+                {
+                    "type": "table",
+                    "title": "Table Slide",
+                    "table_columns": ["Area", "Status", "Action"],
+                    "table_rows": [
+                        ["Pipeline", "Stable", "Maintain cadence"],
+                        ["Enablement", "Lagging", "Refresh assets"],
+                    ],
+                },
+                {
+                    "type": "faq",
+                    "title": "FAQ Slide",
+                    "faq_items": [
+                        {"title": "What changes first?", "body": "Start with the highest-friction workflow."},
+                        {"title": "How do we measure success?", "body": "Track adoption and operational lift."},
+                    ],
+                },
+                {
                     "type": "summary",
                     "title": "Summary Slide",
                     "body": "The overall recommendation is to narrow the workflow, measure impact, and scale only after the process is stable.",
@@ -109,7 +134,7 @@ def test_all_layouts_render_without_crashing(tmp_path: Path) -> None:
 
     assert rendered.exists()
     presentation = Presentation(str(rendered))
-    assert len(presentation.slides) == 11
+    assert len(presentation.slides) == 14
 
 
 def test_missing_image_uses_placeholder_text(tmp_path: Path) -> None:
@@ -210,6 +235,28 @@ def test_new_layout_types_render_without_crashing(tmp_path: Path) -> None:
                     "bullets": ["Context", "Decision", "Next steps"],
                 },
                 {
+                    "type": "two_column",
+                    "title": "Narrative",
+                    "two_column_columns": [
+                        {"title": "Before", "body": "The story is fragmented."},
+                        {"title": "After", "bullets": ["Clear message", "Clear owner"]},
+                    ],
+                },
+                {
+                    "type": "table",
+                    "title": "Executive table",
+                    "table_columns": ["Area", "Status"],
+                    "table_rows": [["Scope", "Tight"], ["Adoption", "Measured"]],
+                },
+                {
+                    "type": "faq",
+                    "title": "FAQ",
+                    "faq_items": [
+                        {"title": "Why now?", "body": "The workflow pressure is already here."},
+                        {"title": "What next?", "body": "Pilot, measure, then scale."},
+                    ],
+                },
+                {
                     "type": "summary",
                     "title": "Summary",
                     "bullets": ["Stay focused", "Sequence the rollout"],
@@ -224,4 +271,4 @@ def test_new_layout_types_render_without_crashing(tmp_path: Path) -> None:
 
     assert rendered.exists()
     presentation = Presentation(str(rendered))
-    assert len(presentation.slides) == 4
+    assert len(presentation.slides) == 7

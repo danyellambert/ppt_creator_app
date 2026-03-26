@@ -8,7 +8,7 @@ from ppt_creator.schema import PresentationInput
 def test_example_schema_is_valid() -> None:
     spec = PresentationInput.from_path("examples/ai_sales.json")
     assert spec.presentation.title == "AI copilots for sales teams"
-    assert len(spec.slides) == 9
+    assert len(spec.slides) == 10
 
 
 def test_cards_requires_exactly_three_cards() -> None:
@@ -181,6 +181,48 @@ def test_summary_slide_requires_body_or_bullets() -> None:
     payload = {
         "presentation": {"title": "Deck", "theme": "executive_premium_minimal"},
         "slides": [{"type": "summary", "title": "Summary"}],
+    }
+
+    with pytest.raises(Exception):
+        PresentationInput.model_validate(payload)
+
+
+def test_table_slide_requires_columns_and_rows() -> None:
+    payload = {
+        "presentation": {"title": "Deck", "theme": "executive_premium_minimal"},
+        "slides": [{"type": "table", "title": "Table", "table_columns": ["A", "B"]}],
+    }
+
+    with pytest.raises(Exception):
+        PresentationInput.model_validate(payload)
+
+
+def test_two_column_slide_requires_exactly_two_columns() -> None:
+    payload = {
+        "presentation": {"title": "Deck", "theme": "executive_premium_minimal"},
+        "slides": [
+            {
+                "type": "two_column",
+                "title": "Narrative",
+                "two_column_columns": [{"title": "Only one", "body": "Body"}],
+            }
+        ],
+    }
+
+    with pytest.raises(Exception):
+        PresentationInput.model_validate(payload)
+
+
+def test_faq_slide_requires_multiple_items() -> None:
+    payload = {
+        "presentation": {"title": "Deck", "theme": "executive_premium_minimal"},
+        "slides": [
+            {
+                "type": "faq",
+                "title": "FAQ",
+                "faq_items": [{"title": "Q1", "body": "A1"}],
+            }
+        ],
     }
 
     with pytest.raises(Exception):
