@@ -213,6 +213,41 @@ def test_table_slide_requires_columns_and_rows() -> None:
         PresentationInput.model_validate(payload)
 
 
+def test_chart_slide_requires_categories_and_series_lengths_to_match() -> None:
+    payload = {
+        "presentation": {"title": "Deck", "theme": "executive_premium_minimal"},
+        "slides": [
+            {
+                "type": "chart",
+                "title": "Chart",
+                "chart_categories": ["Q1", "Q2"],
+                "chart_series": [{"name": "Revenue", "values": [1.0]}],
+            }
+        ],
+    }
+
+    with pytest.raises(Exception):
+        PresentationInput.model_validate(payload)
+
+
+def test_chart_slide_accepts_layout_variant() -> None:
+    payload = {
+        "presentation": {"title": "Deck", "theme": "executive_premium_minimal"},
+        "slides": [
+            {
+                "type": "chart",
+                "title": "Chart",
+                "layout_variant": "bar",
+                "chart_categories": ["Q1", "Q2"],
+                "chart_series": [{"name": "Revenue", "values": [1.0, 2.0]}],
+            }
+        ],
+    }
+
+    spec = PresentationInput.model_validate(payload)
+    assert spec.slides[0].layout_variant == "bar"
+
+
 def test_two_column_slide_requires_exactly_two_columns() -> None:
     payload = {
         "presentation": {"title": "Deck", "theme": "executive_premium_minimal"},

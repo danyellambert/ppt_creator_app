@@ -56,6 +56,12 @@ def build_layout_smoke_spec() -> PresentationInput:
                     ],
                 },
                 {
+                    "type": "chart",
+                    "title": "Chart Slide",
+                    "chart_categories": ["Q1", "Q2", "Q3"],
+                    "chart_series": [{"name": "Revenue", "values": [2.1, 3.0, 4.4]}],
+                },
+                {
                     "type": "image_text",
                     "title": "Image Slide",
                     "body": "Body copy",
@@ -135,7 +141,7 @@ def test_all_layouts_render_without_crashing(tmp_path: Path) -> None:
 
     assert rendered.exists()
     presentation = Presentation(str(rendered))
-    assert len(presentation.slides) == 14
+    assert len(presentation.slides) == 15
 
 
 def test_missing_image_uses_placeholder_text(tmp_path: Path) -> None:
@@ -146,7 +152,7 @@ def test_missing_image_uses_placeholder_text(tmp_path: Path) -> None:
     rendered = renderer.render(spec, output)
     presentation = Presentation(str(rendered))
 
-    image_slide = presentation.slides[6]
+    image_slide = presentation.slides[7]
     texts = [shape.text for shape in image_slide.shapes if hasattr(shape, "text")]
     joined = "\n".join(texts)
 
@@ -185,6 +191,13 @@ def test_layout_variants_render_without_crashing(tmp_path: Path) -> None:
                     ],
                 },
                 {
+                    "type": "chart",
+                    "title": "Bar Chart",
+                    "layout_variant": "bar",
+                    "chart_categories": ["A", "B", "C"],
+                    "chart_series": [{"name": "Series", "values": [3, 2, 4]}],
+                },
+                {
                     "type": "image_text",
                     "title": "Image Left",
                     "layout_variant": "image_left",
@@ -201,7 +214,7 @@ def test_layout_variants_render_without_crashing(tmp_path: Path) -> None:
 
     assert rendered.exists()
     presentation = Presentation(str(rendered))
-    assert len(presentation.slides) == 4
+    assert len(presentation.slides) == 5
 
 
 def test_new_layout_types_render_without_crashing(tmp_path: Path) -> None:
@@ -234,6 +247,13 @@ def test_new_layout_types_render_without_crashing(tmp_path: Path) -> None:
                             "bullets": ["Structured workflow", "Better consistency"],
                         },
                     ],
+                },
+                {
+                    "type": "chart",
+                    "title": "Trend",
+                    "layout_variant": "line",
+                    "chart_categories": ["Jan", "Feb", "Mar"],
+                    "chart_series": [{"name": "Adoption", "values": [1, 3, 5]}],
                 },
                 {
                     "type": "agenda",
@@ -277,4 +297,4 @@ def test_new_layout_types_render_without_crashing(tmp_path: Path) -> None:
 
     assert rendered.exists()
     presentation = Presentation(str(rendered))
-    assert len(presentation.slides) == 7
+    assert len(presentation.slides) == 8

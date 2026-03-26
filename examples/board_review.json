@@ -43,6 +43,20 @@
       ]
     },
     {
+      "type": "chart",
+      "title": "Quarterly revenue progression",
+      "subtitle": "Illustrative revenue trend over the last four quarters",
+      "eyebrow": "Trend view",
+      "layout_variant": "column",
+      "chart_categories": ["Q1", "Q2", "Q3", "Q4"],
+      "chart_series": [
+        {
+          "name": "Revenue ($M)",
+          "values": [10.8, 11.9, 13.1, 14.2]
+        }
+      ]
+    },
+    {
       "type": "image_text",
       "title": "Risk lens",
       "layout_variant": "image_left",

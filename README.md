@@ -32,6 +32,7 @@ ppt_creator/
 └── layouts/
     ├── __init__.py
     ├── bullets.py
+    ├── chart.py
     ├── comparison.py
     ├── cards.py
     ├── closing.py
@@ -84,6 +85,7 @@ Além do tema base, o projeto agora também expõe temas prontos adicionais:
 - `bullets`
 - `cards`
 - `metrics`
+- `chart`
 - `image_text`
 - `timeline`
 - `comparison`
@@ -114,6 +116,8 @@ Novos tipos executivos adicionados:
 
 - `timeline`
   - sequência visual de 2 a 5 etapas
+- `chart`
+  - gráfico simples gerado por dados estruturados
 - `comparison`
   - comparação lado a lado entre dois estados, opções ou estratégias
 - `two_column`
@@ -206,6 +210,20 @@ Exemplo de `timeline`:
     {"title": "Diagnose", "body": "Identify the highest-value workflow"},
     {"title": "Pilot", "body": "Launch a constrained rollout"},
     {"title": "Scale", "body": "Operationalize the successful pattern"}
+  ]
+}
+```
+
+Exemplo de `chart`:
+
+```json
+{
+  "type": "chart",
+  "title": "Revenue trend",
+  "layout_variant": "column",
+  "chart_categories": ["Q1", "Q2", "Q3", "Q4"],
+  "chart_series": [
+    {"name": "Revenue", "values": [10.8, 11.9, 13.1, 14.2]}
   ]
 }
 ```
@@ -464,7 +482,7 @@ Como o componente não está acoplado ao runtime de LLM, ele pode ser usado como
 
 ## Limitações atuais
 
-- sem gráficos nativos ainda
+- gráficos simples suportados, mas ainda sem visualização avançada/múltiplas configurações analíticas
 - sem geração automática de conteúdo por LLM
 - imagens são opcionais e não passam por tratamento avançado de crop/layout inteligente
 - imagens ausentes usam um placeholder estruturado, mas ainda sem fallback visual avançado por tipo de conteúdo

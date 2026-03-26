@@ -301,6 +301,24 @@ class PresentationRenderer:
         shape.line.width = Pt(self.theme.components.panel_border_width_pt)
         return shape
 
+    def add_chart_panel(
+        self,
+        slide: "PptxSlide",
+        left: float,
+        top: float,
+        width: float,
+        height: float,
+    ):
+        return self.add_panel(
+            slide,
+            left,
+            top,
+            width,
+            height,
+            fill_color=self.theme.colors.surface,
+            line_color=self.theme.colors.line,
+        )
+
     def add_accent_bar(self, slide: "PptxSlide", left: float, top: float, width: float, height: float, *, color: str):
         shape = slide.shapes.add_shape(
             MSO_AUTO_SHAPE_TYPE.RECTANGLE,

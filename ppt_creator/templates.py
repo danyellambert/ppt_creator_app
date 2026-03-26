@@ -36,6 +36,15 @@ DOMAIN_TEMPLATES: dict[str, dict[str, object]] = {
                 ],
             },
             {
+                "type": "chart",
+                "title": "Quarterly revenue trend",
+                "layout_variant": "column",
+                "chart_categories": ["Q1", "Q2", "Q3", "Q4"],
+                "chart_series": [
+                    {"name": "Revenue", "values": [5.2, 6.1, 7.4, 8.4]},
+                ],
+            },
+            {
                 "type": "summary",
                 "title": "Executive summary",
                 "bullets": [
@@ -160,6 +169,15 @@ DOMAIN_TEMPLATES: dict[str, dict[str, object]] = {
                 "table_rows": [
                     ["Core workflow", "Healthy", "Sustain investment"],
                     ["New bets", "Mixed", "Reduce parallel scope"],
+                ],
+            },
+            {
+                "type": "chart",
+                "title": "Adoption trend",
+                "layout_variant": "line",
+                "chart_categories": ["Jan", "Feb", "Mar", "Apr"],
+                "chart_series": [
+                    {"name": "Active teams", "values": [12, 16, 21, 29]},
                 ],
             },
             {

@@ -394,7 +394,7 @@ Ideias valiosas, mas não urgentes:
 
 - exportar preview PNG por slide
 - gerar thumbnails automáticos do deck
-- suportar gráficos simples gerados por dados
+- [x] suportar gráficos simples gerados por dados
 - suportar tabelas executivas com estilo consistente
 - biblioteca de componentes visuais reutilizáveis
 - marketplace interno de temas/layouts

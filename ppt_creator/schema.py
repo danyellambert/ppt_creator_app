@@ -13,6 +13,8 @@ MAX_TIMELINE_ITEMS = 5
 MAX_FAQ_ITEMS = 4
 MAX_TABLE_COLUMNS = 5
 MAX_TABLE_ROWS = 8
+MAX_CHART_SERIES = 4
+MAX_CHART_CATEGORIES = 8
 
 LAYOUT_VARIANTS_BY_SLIDE_TYPE: dict["SlideType", set[str]] = {}
 
@@ -69,6 +71,7 @@ class SlideType(str, Enum):
     BULLETS = "bullets"
     CARDS = "cards"
     METRICS = "metrics"
+    CHART = "chart"
     IMAGE_TEXT = "image_text"
     TIMELINE = "timeline"
     COMPARISON = "comparison"
@@ -82,6 +85,7 @@ class SlideType(str, Enum):
 LAYOUT_VARIANTS_BY_SLIDE_TYPE = {
     SlideType.TITLE: {"split_panel", "hero_cover"},
     SlideType.BULLETS: {"insight_panel", "full_width"},
+    SlideType.CHART: {"column", "bar", "line"},
     SlideType.METRICS: {"standard", "compact"},
     SlideType.IMAGE_TEXT: {"image_right", "image_left"},
 }
@@ -122,6 +126,23 @@ class MetricItem(BaseModel):
     @classmethod
     def clean_optional_fields(cls, value: object) -> str | None | object:
         return _clean_optional_text(value)
+
+
+class ChartSeriesItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    values: list[float] = Field(min_length=1)
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def clean_name(cls, value: object) -> str | object:
+        return _clean_required_text(value, "name")
+
+    @field_validator("values")
+    @classmethod
+    def validate_values(cls, values: list[float]) -> list[float]:
+        return values
 
 
 class TimelineItem(BaseModel):
@@ -235,6 +256,8 @@ class Slide(BaseModel):
     cards: list[CardItem] = Field(default_factory=list)
     faq_items: list[CardItem] = Field(default_factory=list)
     metrics: list[MetricItem] = Field(default_factory=list)
+    chart_categories: list[str] = Field(default_factory=list)
+    chart_series: list[ChartSeriesItem] = Field(default_factory=list)
     timeline_items: list[TimelineItem] = Field(default_factory=list)
     comparison_columns: list[ComparisonColumn] = Field(default_factory=list)
     two_column_columns: list[ComparisonColumn] = Field(default_factory=list)
@@ -281,6 +304,11 @@ class Slide(BaseModel):
     def clean_bullets(cls, bullets: list[str]) -> list[str]:
         return _clean_string_list(bullets, field_name="bullet")
 
+    @field_validator("chart_categories")
+    @classmethod
+    def clean_chart_categories(cls, categories: list[str]) -> list[str]:
+        return _clean_string_list(categories, field_name="chart category")
+
     @field_validator("table_columns")
     @classmethod
     def clean_table_columns(cls, columns: list[str]) -> list[str]:
@@ -305,6 +333,7 @@ class Slide(BaseModel):
             SlideType.BULLETS,
             SlideType.CARDS,
             SlideType.METRICS,
+            SlideType.CHART,
             SlideType.IMAGE_TEXT,
             SlideType.TIMELINE,
             SlideType.COMPARISON,
@@ -335,6 +364,25 @@ class Slide(BaseModel):
 
         if self.type == SlideType.METRICS and len(self.metrics) > MAX_METRICS_PER_SLIDE:
             raise ValueError(f"metrics slide supports up to {MAX_METRICS_PER_SLIDE} metrics")
+
+        if self.type == SlideType.CHART and len(self.chart_categories) < 2:
+            raise ValueError("chart slide requires at least 2 chart_categories")
+
+        if self.type == SlideType.CHART and len(self.chart_categories) > MAX_CHART_CATEGORIES:
+            raise ValueError(f"chart slide supports up to {MAX_CHART_CATEGORIES} chart_categories")
+
+        if self.type == SlideType.CHART and not self.chart_series:
+            raise ValueError("chart slide requires at least one chart_series item")
+
+        if self.type == SlideType.CHART and len(self.chart_series) > MAX_CHART_SERIES:
+            raise ValueError(f"chart slide supports up to {MAX_CHART_SERIES} chart_series items")
+
+        if self.type == SlideType.CHART:
+            for series in self.chart_series:
+                if len(series.values) != len(self.chart_categories):
+                    raise ValueError(
+                        "each chart series must contain the same number of values as chart_categories"
+                    )
 
         if self.type == SlideType.IMAGE_TEXT and not (self.body or self.bullets):
             raise ValueError("image_text slide requires body or bullets")
