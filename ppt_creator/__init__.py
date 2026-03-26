@@ -12,7 +12,10 @@ from ppt_creator.schema import (
     TimelineItem,
 )
 from ppt_creator.theme import (
+    CONSULTING_CLEAN,
+    DARK_BOARDROOM,
     EXECUTIVE_PREMIUM_MINIMAL,
+    STARTUP_MINIMAL,
     CanvasTokens,
     ColorTokens,
     ComponentTokens,
@@ -21,6 +24,7 @@ from ppt_creator.theme import (
     Theme,
     TypographyTokens,
     get_theme,
+    theme_display_name,
 )
 
 __version__ = "0.1.0"
@@ -33,6 +37,8 @@ __all__ = [
     "__version__",
     "CardItem",
     "ComparisonColumn",
+    "CONSULTING_CLEAN",
+    "DARK_BOARDROOM",
     "EXECUTIVE_PREMIUM_MINIMAL",
     "MetricItem",
     "PresentationInput",
@@ -44,6 +50,8 @@ __all__ = [
     "Theme",
     "TimelineItem",
     "TypographyTokens",
+    "STARTUP_MINIMAL",
     "get_theme",
     "render_presentation",
+    "theme_display_name",
 ]

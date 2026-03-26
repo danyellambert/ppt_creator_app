@@ -135,3 +135,33 @@ def test_comparison_slide_requires_exactly_two_columns() -> None:
 
     with pytest.raises(Exception):
         PresentationInput.model_validate(payload)
+
+
+def test_brand_colors_are_normalized() -> None:
+    payload = {
+        "presentation": {
+            "title": "Deck",
+            "theme": "consulting_clean",
+            "primary_color": "#112233",
+            "secondary_color": "abcDEF",
+        },
+        "slides": [{"type": "title", "title": "Hello"}],
+    }
+
+    spec = PresentationInput.model_validate(payload)
+    assert spec.presentation.primary_color == "112233"
+    assert spec.presentation.secondary_color == "ABCDEF"
+
+
+def test_invalid_brand_color_is_rejected() -> None:
+    payload = {
+        "presentation": {
+            "title": "Deck",
+            "theme": "executive_premium_minimal",
+            "primary_color": "GGHHII",
+        },
+        "slides": [{"type": "title", "title": "Hello"}],
+    }
+
+    with pytest.raises(Exception):
+        PresentationInput.model_validate(payload)

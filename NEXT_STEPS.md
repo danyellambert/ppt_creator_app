@@ -253,16 +253,16 @@ Objetivo: aumentar utilidade prática para uso executivo real.
 ### Branding e configuração
 
 - permitir configuração simples por JSON ou arquivo de tema:
-  - cor principal
-  - cor secundária
-  - logo opcional
-  - nome do cliente
-  - rodapé customizado
+  - [x] cor principal
+  - [x] cor secundária
+  - [x] logo opcional
+  - [x] nome do cliente
+  - [x] rodapé customizado
 - preparar suporte a múltiplos temas:
-  - `executive_premium_minimal`
-  - `consulting_clean`
-  - `dark_boardroom`
-  - `startup_minimal` (se fizer sentido no futuro)
+  - [x] `executive_premium_minimal`
+  - [x] `consulting_clean`
+  - [x] `dark_boardroom`
+  - [x] `startup_minimal`
 
 ### Resultado esperado
 

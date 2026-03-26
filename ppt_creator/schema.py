@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from enum import Enum
 from pathlib import Path
 
@@ -42,6 +43,20 @@ def _clean_string_list(values: list[str], *, field_name: str) -> list[str]:
             raise ValueError(f"{field_name} #{index} cannot be empty")
         cleaned.append(normalized)
     return cleaned
+
+
+def _normalize_hex_color(value: object, field_name: str) -> str | None | object:
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        return value
+
+    normalized = value.strip().lstrip("#").upper()
+    if not normalized:
+        return None
+    if not re.fullmatch(r"[0-9A-F]{6}", normalized):
+        raise ValueError(f"{field_name} must be a 6-digit hex color")
+    return normalized
 
 
 class SlideType(str, Enum):
@@ -158,16 +173,34 @@ class PresentationMeta(BaseModel):
     author: str | None = None
     date: str | None = None
     theme: str = "executive_premium_minimal"
+    client_name: str | None = None
+    footer_text: str | None = None
+    logo_path: str | None = None
+    primary_color: str | None = None
+    secondary_color: str | None = None
 
     @field_validator("title", mode="before")
     @classmethod
     def clean_title(cls, value: object) -> str | object:
         return _clean_required_text(value, "title")
 
-    @field_validator("subtitle", "author", "date", mode="before")
+    @field_validator(
+        "subtitle",
+        "author",
+        "date",
+        "client_name",
+        "footer_text",
+        "logo_path",
+        mode="before",
+    )
     @classmethod
     def clean_optional_fields(cls, value: object) -> str | None | object:
         return _clean_optional_text(value)
+
+    @field_validator("primary_color", "secondary_color", mode="before")
+    @classmethod
+    def normalize_brand_colors(cls, value: object, info) -> str | None | object:
+        return _normalize_hex_color(value, info.field_name)
 
     @field_validator("theme", mode="before")
     @classmethod

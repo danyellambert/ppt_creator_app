@@ -65,6 +65,13 @@ Por isso, os fluxos de qualidade da Fase 2 passaram a focar no escopo do subproj
 - `ppt_creator/`
 - `tests/`
 
+Além do tema base, o projeto agora também expõe temas prontos adicionais:
+
+- `executive_premium_minimal`
+- `consulting_clean`
+- `dark_boardroom`
+- `startup_minimal`
+
 ---
 
 ## Tipos de slide suportados
@@ -137,9 +144,13 @@ Estrutura de alto nível:
   "presentation": {
     "title": "AI copilots for sales teams",
     "subtitle": "Executive strategy deck",
+    "client_name": "Acme Corp",
     "author": "Your Name",
     "date": "2026-03-22",
-    "theme": "executive_premium_minimal"
+    "theme": "executive_premium_minimal",
+    "footer_text": "Acme Corp • Executive Review",
+    "primary_color": "14263F",
+    "secondary_color": "B08B5B"
   },
   "slides": [
     {
@@ -192,6 +203,16 @@ Exemplo de `comparison`:
 }
 ```
 
+Campos adicionais de branding disponíveis em `presentation`:
+
+- `client_name`
+- `footer_text`
+- `logo_path`
+- `primary_color`
+- `secondary_color`
+
+`primary_color` e `secondary_color` aceitam hex de 6 dígitos e permitem adaptar o tema sem criar um tema novo do zero.
+
 ---
 
 ## Instalação local
@@ -237,6 +258,20 @@ Renderizar um deck:
 
 ```bash
 python -m ppt_creator.cli render examples/ai_sales.json outputs/ai_sales.pptx
+```
+
+Forçar outro tema pronto:
+
+```bash
+python -m ppt_creator.cli render examples/product_strategy.json outputs/product_strategy.pptx \
+  --theme consulting_clean
+```
+
+Aplicar override de branding por cor:
+
+```bash
+python -m ppt_creator.cli render examples/ai_sales.json outputs/ai_sales_branded.pptx \
+  --primary-color 112233 --secondary-color AABBCC
 ```
 
 Ou usando o helper:
@@ -367,7 +402,6 @@ Como o componente não está acoplado ao runtime de LLM, ele pode ser usado como
 
 - sem gráficos nativos ainda
 - sem geração automática de conteúdo por LLM
-- sem múltiplos temas prontos além do tema base
 - imagens são opcionais e não passam por tratamento avançado de crop/layout inteligente
 - imagens ausentes usam um placeholder estruturado, mas ainda sem fallback visual avançado por tipo de conteúdo
 - não usa templates `.potx` externos nesta primeira versão
@@ -377,7 +411,7 @@ Como o componente não está acoplado ao runtime de LLM, ele pode ser usado como
 ## Próximos passos possíveis
 
 - integração opcional com LLM para gerar JSON
-- múltiplos temas visuais
+- mais temas visuais e branding mais avançado
 - gráficos e tabelas executivas
 - sugestão automática de imagens
 - suporte opcional a template externo premium

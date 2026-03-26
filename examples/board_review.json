@@ -2,9 +2,11 @@
   "presentation": {
     "title": "Quarterly board review",
     "subtitle": "Executive summary deck",
+    "client_name": "Aurelia Systems",
     "author": "PPT Creator",
     "date": "2026-03-23",
-    "theme": "executive_premium_minimal"
+    "footer_text": "Aurelia Systems • Board Materials",
+    "theme": "dark_boardroom"
   },
   "slides": [
     {

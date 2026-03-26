@@ -1,10 +1,24 @@
 from __future__ import annotations
 
+from pptx.util import Inches
+
+from ppt_creator.theme import theme_display_name
+
 
 def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
     g = renderer.theme.grid
     t = renderer.theme.typography
     colors = renderer.theme.colors
+
+    logo_asset = renderer.resolve_brand_logo(meta)
+    if logo_asset:
+        slide.shapes.add_picture(
+            str(logo_asset),
+            Inches(g.side_panel_left + 1.0),
+            Inches(0.55),
+            width=Inches(2.75),
+            height=Inches(0.48),
+        )
 
     renderer.add_accent_bar(slide, g.content_left, 0.72, 0.1, 1.15, color=colors.accent)
 
@@ -44,6 +58,9 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
     tf = meta_box.text_frame
     renderer.write_paragraph(tf, "DECK", size=t.eyebrow_size, color=colors.accent, bold=True, space_after=8)
     renderer.write_paragraph(tf, meta.title, size=t.body_size + 1, color=colors.navy, bold=True, space_after=12)
+    if meta.client_name:
+        renderer.write_paragraph(tf, "Client", size=t.small_size, color=colors.muted, bold=True, space_after=2)
+        renderer.write_paragraph(tf, meta.client_name, size=t.body_size - 1, color=colors.text, space_after=10)
     if meta.author:
         renderer.write_paragraph(tf, "Author", size=t.small_size, color=colors.muted, bold=True, space_after=2)
         renderer.write_paragraph(tf, meta.author, size=t.body_size - 1, color=colors.text, space_after=10)
@@ -51,4 +68,4 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
         renderer.write_paragraph(tf, "Date", size=t.small_size, color=colors.muted, bold=True, space_after=2)
         renderer.write_paragraph(tf, meta.date, size=t.body_size - 1, color=colors.text, space_after=10)
     renderer.write_paragraph(tf, "Theme", size=t.small_size, color=colors.muted, bold=True, space_after=2)
-    renderer.write_paragraph(tf, "Executive Premium Minimal", size=t.body_size - 1, color=colors.text)
+    renderer.write_paragraph(tf, theme_display_name(renderer.theme.name), size=t.body_size - 1, color=colors.text)

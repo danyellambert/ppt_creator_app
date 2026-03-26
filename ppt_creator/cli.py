@@ -20,6 +20,11 @@ def build_parser() -> argparse.ArgumentParser:
     render_parser.add_argument("output_pptx", help="Destination .pptx path")
     render_parser.add_argument("--theme", help="Override the theme declared in the JSON")
     render_parser.add_argument("--asset-root", help="Base directory for resolving relative image paths")
+    render_parser.add_argument("--primary-color", help="Override the primary theme color with a 6-digit hex value")
+    render_parser.add_argument(
+        "--secondary-color",
+        help="Override the secondary/accent theme color with a 6-digit hex value",
+    )
     render_parser.add_argument(
         "--dry-run",
         action="store_true",
@@ -51,6 +56,11 @@ def build_parser() -> argparse.ArgumentParser:
     batch_parser.add_argument("--pattern", default="*.json", help="Glob pattern for input files")
     batch_parser.add_argument("--theme", help="Override the theme declared in each JSON")
     batch_parser.add_argument("--asset-root", help="Base directory for resolving relative image paths")
+    batch_parser.add_argument("--primary-color", help="Override the primary theme color with a 6-digit hex value")
+    batch_parser.add_argument(
+        "--secondary-color",
+        help="Override the secondary/accent theme color with a 6-digit hex value",
+    )
     batch_parser.add_argument(
         "--dry-run",
         action="store_true",
@@ -160,6 +170,8 @@ def render_one(
     *,
     theme_name: str | None = None,
     asset_root: str | None = None,
+    primary_color: str | None = None,
+    secondary_color: str | None = None,
     dry_run: bool = False,
     check_assets: bool = False,
 ) -> dict[str, object]:
@@ -169,6 +181,8 @@ def render_one(
     renderer = PresentationRenderer(
         theme_name=effective_theme,
         asset_root=resolve_asset_root(input_path, asset_root),
+        primary_color=primary_color,
+        secondary_color=secondary_color,
     )
     output_path = renderer.validate_output_path(output_pptx)
     missing_assets = renderer.collect_missing_assets(spec)
@@ -245,6 +259,8 @@ def main(argv: list[str] | None = None) -> int:
                         output_path,
                         theme_name=args.theme,
                         asset_root=args.asset_root,
+                        primary_color=args.primary_color,
+                        secondary_color=args.secondary_color,
                         dry_run=args.dry_run,
                         check_assets=args.check_assets,
                     )
@@ -275,6 +291,8 @@ def main(argv: list[str] | None = None) -> int:
             args.output_pptx,
             theme_name=args.theme,
             asset_root=args.asset_root,
+            primary_color=args.primary_color,
+            secondary_color=args.secondary_color,
             dry_run=args.dry_run,
             check_assets=args.check_assets,
         )

@@ -63,3 +63,26 @@ def test_cli_render_batch_generates_output_and_report(tmp_path: Path) -> None:
     assert result == 0
     assert (output_dir / "product_strategy.pptx").exists()
     assert report_path.exists()
+
+
+def test_cli_render_dry_run_accepts_theme_color_overrides(tmp_path: Path, capsys) -> None:
+    output = tmp_path / "brand_override.pptx"
+    result = main(
+        [
+            "render",
+            "examples/ai_sales.json",
+            str(output),
+            "--dry-run",
+            "--theme",
+            "dark_boardroom",
+            "--primary-color",
+            "112233",
+            "--secondary-color",
+            "AABBCC",
+        ]
+    )
+    captured = capsys.readouterr()
+
+    assert result == 0
+    assert not output.exists()
+    assert "Dry run" in captured.out

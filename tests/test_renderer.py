@@ -61,3 +61,21 @@ def test_collect_missing_assets_reports_missing_image() -> None:
     missing_assets = renderer.collect_missing_assets(spec)
 
     assert missing_assets == ["slide 01 (Image): missing asset 'missing-image.png'"]
+
+
+def test_collect_missing_assets_reports_missing_brand_logo() -> None:
+    spec = PresentationInput.model_validate(
+        {
+            "presentation": {
+                "title": "Deck",
+                "theme": "executive_premium_minimal",
+                "logo_path": "missing-logo.png",
+            },
+            "slides": [{"type": "title", "title": "Hello"}],
+        }
+    )
+    renderer = PresentationRenderer(asset_root="examples")
+
+    missing_assets = renderer.collect_missing_assets(spec)
+
+    assert missing_assets == ["presentation branding: missing asset 'missing-logo.png'"]

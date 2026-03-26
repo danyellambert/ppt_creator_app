@@ -2,9 +2,13 @@
   "presentation": {
     "title": "Product strategy priorities",
     "subtitle": "Executive portfolio view",
+    "client_name": "Northstar Product Group",
     "author": "PPT Creator",
     "date": "2026-03-23",
-    "theme": "executive_premium_minimal"
+    "footer_text": "Northstar Product Group • Strategy Review",
+    "theme": "consulting_clean",
+    "primary_color": "17324A",
+    "secondary_color": "7C97AF"
   },
   "slides": [
     {

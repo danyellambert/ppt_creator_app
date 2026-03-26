@@ -18,13 +18,29 @@ if TYPE_CHECKING:
 
 
 class PresentationRenderer:
-    def __init__(self, theme_name: str | None = None, asset_root: str | Path | None = None):
+    def __init__(
+        self,
+        theme_name: str | None = None,
+        asset_root: str | Path | None = None,
+        primary_color: str | None = None,
+        secondary_color: str | None = None,
+    ):
         self.requested_theme_name = theme_name
-        self.theme = get_theme(theme_name)
+        self.requested_primary_color = primary_color
+        self.requested_secondary_color = secondary_color
+        self.theme = get_theme(
+            theme_name,
+            primary_color=primary_color,
+            secondary_color=secondary_color,
+        )
         self.asset_root = Path(asset_root or ".").resolve()
 
     def render(self, spec: PresentationInput, output_path: str | Path) -> Path:
-        self.theme = get_theme(self.requested_theme_name or spec.presentation.theme or self.theme.name)
+        self.theme = get_theme(
+            self.requested_theme_name or spec.presentation.theme or self.theme.name,
+            primary_color=self.requested_primary_color or spec.presentation.primary_color,
+            secondary_color=self.requested_secondary_color or spec.presentation.secondary_color,
+        )
         destination = self.validate_output_path(output_path)
         presentation = Presentation()
         presentation.slide_width = Inches(self.theme.canvas.width)
@@ -300,7 +316,7 @@ class PresentationRenderer:
 
     def add_footer(self, slide: "PptxSlide", meta: PresentationMeta, index: int, total_slides: int) -> None:
         grid = self.theme.grid
-        left_text = meta.author or meta.title
+        left_text = meta.footer_text or meta.client_name or meta.author or meta.title
         if meta.date:
             left_text = f"{left_text}  •  {meta.date}" if left_text else meta.date
 
@@ -354,8 +370,16 @@ class PresentationRenderer:
             candidate = self.asset_root / candidate
         return candidate if candidate.exists() else None
 
+    def resolve_brand_logo(self, meta: PresentationMeta) -> Path | None:
+        return self.resolve_asset(meta.logo_path)
+
     def collect_missing_assets(self, spec: PresentationInput) -> list[str]:
         missing_assets: list[str] = []
+        if spec.presentation.logo_path and self.resolve_brand_logo(spec.presentation) is None:
+            missing_assets.append(
+                f"presentation branding: missing asset '{spec.presentation.logo_path}'"
+            )
+
         for index, slide_spec in enumerate(spec.slides, start=1):
             if not slide_spec.image_path:
                 continue
@@ -374,6 +398,13 @@ def render_presentation(
     *,
     theme_name: str | None = None,
     asset_root: str | Path | None = None,
+    primary_color: str | None = None,
+    secondary_color: str | None = None,
 ) -> Path:
-    renderer = PresentationRenderer(theme_name=theme_name, asset_root=asset_root)
+    renderer = PresentationRenderer(
+        theme_name=theme_name,
+        asset_root=asset_root,
+        primary_color=primary_color,
+        secondary_color=secondary_color,
+    )
     return renderer.render(spec, output_path)
