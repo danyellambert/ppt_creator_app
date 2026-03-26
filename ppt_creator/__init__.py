@@ -1,6 +1,13 @@
 """Public API for the reusable JSON-to-PPTX creator."""
 
-from ppt_creator.api import build_api_server, render_spec_payload, serve_api, validate_spec_payload
+from ppt_creator.api import (
+    build_api_server,
+    preview_spec_payload,
+    render_spec_payload,
+    serve_api,
+    validate_spec_payload,
+)
+from ppt_creator.preview import PreviewRenderer, render_previews
 from ppt_creator.renderer import PresentationRenderer, render_presentation
 from ppt_creator.schema import (
     CardItem,
@@ -57,6 +64,9 @@ __all__ = [
     "build_domain_template",
     "get_theme",
     "list_template_domains",
+    "PreviewRenderer",
+    "preview_spec_payload",
+    "render_previews",
     "render_spec_payload",
     "render_presentation",
     "serve_api",

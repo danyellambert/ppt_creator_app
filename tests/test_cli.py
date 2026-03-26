@@ -119,3 +119,28 @@ def test_cli_template_accepts_theme_override(tmp_path: Path) -> None:
     assert result == 0
     spec = PresentationInput.from_path(output)
     assert spec.presentation.theme == "consulting_clean"
+
+
+def test_cli_preview_generates_pngs_and_thumbnail_sheet(tmp_path: Path, capsys) -> None:
+    output_dir = tmp_path / "preview_output"
+    report_path = tmp_path / "preview_report.json"
+
+    result = main(
+        [
+            "preview",
+            "examples/ai_sales.json",
+            str(output_dir),
+            "--basename",
+            "ai-sales-preview",
+            "--report-json",
+            str(report_path),
+        ]
+    )
+    captured = capsys.readouterr()
+
+    assert result == 0
+    assert report_path.exists()
+    assert "Generated previews" in captured.out
+    generated_pngs = sorted(output_dir.glob("*.png"))
+    assert len(generated_pngs) == 11
+    assert any(path.name.endswith("-thumbnails.png") for path in generated_pngs)

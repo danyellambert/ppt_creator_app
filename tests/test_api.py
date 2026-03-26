@@ -76,6 +76,20 @@ def test_api_validate_render_and_template_endpoints(tmp_path: Path) -> None:
         )
         assert status == 200
         assert template_payload["template"]["presentation"]["theme"] == "consulting_clean"
+
+        preview_dir = tmp_path / "api_previews"
+        status, preview_payload = _request_json(
+            f"{base_url}/preview",
+            {
+                "spec": spec_payload,
+                "output_dir": str(preview_dir),
+                "basename": "api-preview",
+            },
+            method="POST",
+        )
+        assert status == 200
+        assert preview_payload["result"]["preview_count"] == len(spec_payload["slides"])
+        assert Path(preview_payload["result"]["thumbnail_sheet"]).exists()
     finally:
         server.shutdown()
         server.server_close()

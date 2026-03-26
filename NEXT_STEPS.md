@@ -392,8 +392,8 @@ Você pode considerar que o projeto chegou num nível muito forte quando:
 
 Ideias valiosas, mas não urgentes:
 
-- exportar preview PNG por slide
-- gerar thumbnails automáticos do deck
+- [x] exportar preview PNG por slide
+- [x] gerar thumbnails automáticos do deck
 - [x] suportar gráficos simples gerados por dados
 - suportar tabelas executivas com estilo consistente
 - biblioteca de componentes visuais reutilizáveis

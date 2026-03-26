@@ -352,6 +352,18 @@ Os comandos da CLI agora também emitem logs mais claros com prefixos como:
 - `[WARN]`
 - `[ERROR]`
 
+Gerar previews PNG por slide e uma folha de thumbnails:
+
+```bash
+python -m ppt_creator.cli preview examples/ai_sales.json outputs/previews \
+  --basename ai-sales-preview
+```
+
+Esse comando gera:
+
+- um `.png` por slide
+- uma folha `*-thumbnails.png` com miniaturas do deck
+
 ## Modo API / serviço
 
 Também existe um modo HTTP simples para integrar o `ppt_creator` em outros fluxos:
@@ -364,6 +376,7 @@ Endpoints disponíveis:
 
 - `GET /health`
 - `GET /templates`
+- `POST /preview`
 - `POST /validate`
 - `POST /render`
 - `POST /template`

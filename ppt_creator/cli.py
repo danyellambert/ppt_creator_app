@@ -7,6 +7,7 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
+from ppt_creator.preview import render_previews
 from ppt_creator.renderer import PresentationRenderer
 from ppt_creator.schema import PresentationInput
 from ppt_creator.templates import build_domain_template, list_template_domains
@@ -37,6 +38,22 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Warn when referenced image assets cannot be resolved",
     )
+
+    preview_parser = subparsers.add_parser(
+        "preview",
+        help="Generate PNG slide previews and a thumbnail sheet from a JSON file",
+    )
+    preview_parser.add_argument("input_json", help="Path to the structured JSON input")
+    preview_parser.add_argument("output_dir", help="Directory where PNG previews will be written")
+    preview_parser.add_argument("--theme", help="Override the theme declared in the JSON")
+    preview_parser.add_argument("--asset-root", help="Base directory for resolving relative image paths")
+    preview_parser.add_argument("--primary-color", help="Override the primary theme color with a 6-digit hex value")
+    preview_parser.add_argument(
+        "--secondary-color",
+        help="Override the secondary/accent theme color with a 6-digit hex value",
+    )
+    preview_parser.add_argument("--basename", help="Optional base name for generated preview files")
+    preview_parser.add_argument("--report-json", help="Optional path to write a JSON preview report")
 
     validate_parser = subparsers.add_parser("validate", help="Validate JSON without rendering")
     validate_parser.add_argument("input_json", help="Path to the structured JSON input")
@@ -158,6 +175,25 @@ def build_report(
     }
 
 
+def build_preview_report(
+    *,
+    input_path: Path,
+    spec: PresentationInput,
+    output_dir: Path,
+    theme_name: str,
+    result: dict[str, object],
+) -> dict[str, object]:
+    return {
+        "mode": "preview",
+        "input_path": str(input_path),
+        "output_dir": str(output_dir),
+        "presentation_title": spec.presentation.title,
+        "theme": theme_name,
+        "slide_count": len(spec.slides),
+        **result,
+    }
+
+
 def validate_one(
     input_json: str | Path,
     *,
@@ -256,6 +292,48 @@ def render_one(
     )
 
 
+def preview_one(
+    input_json: str | Path,
+    output_dir: str | Path,
+    *,
+    theme_name: str | None = None,
+    asset_root: str | None = None,
+    primary_color: str | None = None,
+    secondary_color: str | None = None,
+    basename: str | None = None,
+) -> dict[str, object]:
+    input_path = Path(input_json)
+    print_info(f"Loading input: {input_path}")
+    spec = PresentationInput.from_path(input_path)
+    effective_theme = theme_name or spec.presentation.theme
+    resolved_asset_root = resolve_asset_root(input_path, asset_root)
+    output_path = Path(output_dir)
+
+    print_info(f"Resolved theme: {effective_theme}")
+    print_info(f"Asset root: {resolved_asset_root}")
+    print_info(f"Preview output directory: {output_path}")
+
+    result = render_previews(
+        spec,
+        output_path,
+        theme_name=effective_theme,
+        asset_root=resolved_asset_root,
+        primary_color=primary_color,
+        secondary_color=secondary_color,
+        basename=basename,
+    )
+    print(
+        f"[OK] Generated previews: {result['preview_count']} slide image(s) + thumbnail sheet"
+    )
+    return build_preview_report(
+        input_path=input_path,
+        spec=spec,
+        output_dir=output_path,
+        theme_name=effective_theme,
+        result=result,
+    )
+
+
 def collect_batch_inputs(input_dir: str | Path, pattern: str) -> tuple[Path, list[Path]]:
     root = Path(input_dir)
     if not root.exists():
@@ -299,6 +377,20 @@ def main(argv: list[str] | None = None) -> int:
                 args.input_json,
                 asset_root=args.asset_root,
                 check_assets=args.check_assets,
+            )
+            if args.report_json:
+                write_report(args.report_json, report)
+            return 0
+
+        if args.command == "preview":
+            report = preview_one(
+                args.input_json,
+                args.output_dir,
+                theme_name=args.theme,
+                asset_root=args.asset_root,
+                primary_color=args.primary_color,
+                secondary_color=args.secondary_color,
+                basename=args.basename,
             )
             if args.report_json:
                 write_report(args.report_json, report)

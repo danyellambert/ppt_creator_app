@@ -8,6 +8,7 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
+from ppt_creator.preview import render_previews
 from ppt_creator.renderer import PresentationRenderer
 from ppt_creator.schema import PresentationInput
 from ppt_creator.templates import build_domain_template, list_template_domains
@@ -115,6 +116,29 @@ def render_spec_payload(
     }
 
 
+def preview_spec_payload(
+    spec_payload: dict[str, object],
+    *,
+    output_dir: str | Path,
+    theme_name: str | None = None,
+    asset_root: str | Path | None = None,
+    primary_color: str | None = None,
+    secondary_color: str | None = None,
+    basename: str | None = None,
+) -> dict[str, object]:
+    spec = PresentationInput.model_validate(spec_payload)
+    effective_theme = theme_name or spec.presentation.theme
+    return render_previews(
+        spec,
+        output_dir,
+        theme_name=effective_theme,
+        asset_root=_resolve_service_asset_root(asset_root),
+        primary_color=primary_color,
+        secondary_color=secondary_color,
+        basename=basename,
+    )
+
+
 def build_api_server(
     host: str = "127.0.0.1",
     port: int = 8787,
@@ -217,6 +241,22 @@ class PptCreatorAPIHandler(BaseHTTPRequestHandler):
                     secondary_color=str(payload["secondary_color"]) if payload.get("secondary_color") else None,
                     dry_run=bool(payload.get("dry_run", False)),
                     check_assets=bool(payload.get("check_assets", False)),
+                )
+                self._json_response(HTTPStatus.OK, {"result": result})
+                return
+
+            if self.path == "/preview":
+                if "output_dir" not in payload:
+                    raise APIRequestError("'output_dir' is required for /preview")
+                spec_payload = _extract_spec_payload(payload)
+                result = preview_spec_payload(
+                    spec_payload,
+                    output_dir=str(payload["output_dir"]),
+                    theme_name=str(payload["theme_name"]) if payload.get("theme_name") else None,
+                    asset_root=payload.get("asset_root") or default_asset_root,
+                    primary_color=str(payload["primary_color"]) if payload.get("primary_color") else None,
+                    secondary_color=str(payload["secondary_color"]) if payload.get("secondary_color") else None,
+                    basename=str(payload["basename"]) if payload.get("basename") else None,
                 )
                 self._json_response(HTTPStatus.OK, {"result": result})
                 return

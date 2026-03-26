@@ -9,6 +9,7 @@ description = "Reusable JSON-to-PPTX creator with an Executive Premium Minimal t
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+  "Pillow>=10.0,<11.0",
   "python-pptx>=0.6.23,<1.0.0",
   "pydantic>=2.6,<3.0",
 ]
