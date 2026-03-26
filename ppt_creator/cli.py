@@ -9,6 +9,7 @@ from pydantic import ValidationError
 
 from ppt_creator.renderer import PresentationRenderer
 from ppt_creator.schema import PresentationInput
+from ppt_creator.templates import build_domain_template, list_template_domains
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -47,6 +48,14 @@ def build_parser() -> argparse.ArgumentParser:
     )
     validate_parser.add_argument("--report-json", help="Optional path to write a JSON validation report")
 
+    template_parser = subparsers.add_parser(
+        "template",
+        help="Generate a starter JSON template for a deck domain",
+    )
+    template_parser.add_argument("domain", choices=list_template_domains(), help="Template domain to generate")
+    template_parser.add_argument("output_json", help="Destination .json path")
+    template_parser.add_argument("--theme", help="Override the default theme used by the template")
+
     batch_parser = subparsers.add_parser(
         "render-batch",
         help="Render all matching JSON files from a directory into an output directory",
@@ -83,6 +92,10 @@ def print_warning(message: str) -> None:
     print(f"[WARN] {message}", file=sys.stderr)
 
 
+def print_info(message: str) -> None:
+    print(f"[INFO] {message}")
+
+
 def format_validation_error(exc: ValidationError) -> list[str]:
     lines = ["Invalid presentation JSON."]
     for error in exc.errors():
@@ -105,6 +118,19 @@ def write_report(path: str | Path, payload: dict[str, object]) -> None:
     report_path = Path(path)
     report_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+
+def write_json_payload(path: str | Path, payload: dict[str, object]) -> None:
+    output_path = Path(path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+
+def validate_json_output_path(output_json: str | Path) -> Path:
+    destination = Path(output_json)
+    if destination.suffix.lower() != ".json":
+        raise ValueError(f"Template output path must end with .json: {destination}")
+    return destination
 
 
 def build_report(
@@ -139,19 +165,25 @@ def validate_one(
     check_assets: bool = False,
 ) -> dict[str, object]:
     input_path = Path(input_json)
+    print_info(f"Loading input: {input_path}")
     spec = PresentationInput.from_path(input_path)
     theme_name = spec.presentation.theme
+    print_info(f"Detected theme: {theme_name}")
     missing_assets: list[str] = []
 
     if check_assets:
+        resolved_asset_root = resolve_asset_root(input_path, asset_root)
+        print_info(f"Checking assets from: {resolved_asset_root}")
         renderer = PresentationRenderer(
             theme_name=theme_name,
-            asset_root=resolve_asset_root(input_path, asset_root),
+            asset_root=resolved_asset_root,
         )
         missing_assets = renderer.collect_missing_assets(spec)
         emit_missing_asset_warnings(missing_assets)
+        if not missing_assets:
+            print_info("Asset check complete: no missing assets")
 
-    print(f"[OK] Valid JSON: {input_path}")
+    print(f"[OK] Valid JSON: {input_path} ({len(spec.slides)} slides)")
     return build_report(
         mode="validate",
         input_path=input_path,
@@ -176,19 +208,26 @@ def render_one(
     check_assets: bool = False,
 ) -> dict[str, object]:
     input_path = Path(input_json)
+    print_info(f"Loading input: {input_path}")
     spec = PresentationInput.from_path(input_path)
     effective_theme = theme_name or spec.presentation.theme
+    resolved_asset_root = resolve_asset_root(input_path, asset_root)
+    print_info(f"Resolved theme: {effective_theme}")
+    print_info(f"Asset root: {resolved_asset_root}")
     renderer = PresentationRenderer(
         theme_name=effective_theme,
-        asset_root=resolve_asset_root(input_path, asset_root),
+        asset_root=resolved_asset_root,
         primary_color=primary_color,
         secondary_color=secondary_color,
     )
     output_path = renderer.validate_output_path(output_pptx)
+    print_info(f"Planned output: {output_path}")
     missing_assets = renderer.collect_missing_assets(spec)
 
     if check_assets and missing_assets:
         emit_missing_asset_warnings(missing_assets)
+    elif check_assets:
+        print_info("Asset check complete: no missing assets")
 
     if dry_run:
         print(f"[OK] Dry run: {input_path} -> {output_path} ({len(spec.slides)} slides)")
@@ -204,7 +243,7 @@ def render_one(
         )
 
     rendered_output = renderer.render(spec, output_path)
-    print(f"[OK] Generated deck: {rendered_output}")
+    print(f"[OK] Generated deck: {rendered_output} ({len(spec.slides)} slides)")
     return build_report(
         mode="render",
         input_path=input_path,
@@ -230,6 +269,26 @@ def collect_batch_inputs(input_dir: str | Path, pattern: str) -> tuple[Path, lis
     return root, input_paths
 
 
+def generate_template(
+    domain: str,
+    output_json: str | Path,
+    *,
+    theme_name: str | None = None,
+) -> dict[str, object]:
+    output_path = validate_json_output_path(output_json)
+    print_info(f"Generating template for domain: {domain}")
+    payload = build_domain_template(domain, theme_name=theme_name)
+    write_json_payload(output_path, payload)
+    print(f"[OK] Generated template: {output_path} ({len(payload['slides'])} slides)")
+    return {
+        "mode": "template",
+        "domain": domain,
+        "output_path": str(output_path),
+        "theme": payload["presentation"]["theme"],
+        "slide_count": len(payload["slides"]),
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -245,14 +304,22 @@ def main(argv: list[str] | None = None) -> int:
                 write_report(args.report_json, report)
             return 0
 
+        if args.command == "template":
+            generate_template(args.domain, args.output_json, theme_name=args.theme)
+            return 0
+
         if args.command == "render-batch":
             input_root, input_paths = collect_batch_inputs(args.input_dir, args.pattern)
             output_root = Path(args.output_dir)
+            print_info(f"Batch input directory: {input_root}")
+            print_info(f"Batch output directory: {output_root}")
+            print_info(f"Matched files: {len(input_paths)}")
             results: list[dict[str, object]] = []
 
-            for input_path in input_paths:
+            for batch_index, input_path in enumerate(input_paths, start=1):
                 relative_path = input_path.relative_to(input_root)
                 output_path = output_root / relative_path.with_suffix(".pptx")
+                print_info(f"[{batch_index}/{len(input_paths)}] Processing {input_path.name}")
                 results.append(
                     render_one(
                         input_path,

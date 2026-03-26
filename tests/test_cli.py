@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from ppt_creator.cli import main
+from ppt_creator.schema import PresentationInput
 
 
 def test_cli_render_generates_file(tmp_path: Path) -> None:
@@ -32,6 +33,15 @@ def test_cli_returns_error_for_invalid_output_extension(tmp_path: Path, capsys) 
 def test_cli_validate_second_example() -> None:
     result = main(["validate", "examples/product_strategy.json"])
     assert result == 0
+
+
+def test_cli_validate_emits_informational_logs(capsys) -> None:
+    result = main(["validate", "examples/product_strategy.json"])
+    captured = capsys.readouterr()
+
+    assert result == 0
+    assert "[INFO] Loading input:" in captured.out
+    assert "[OK] Valid JSON:" in captured.out
 
 
 def test_cli_render_dry_run_does_not_create_file(tmp_path: Path, capsys) -> None:
@@ -86,3 +96,26 @@ def test_cli_render_dry_run_accepts_theme_color_overrides(tmp_path: Path, capsys
     assert result == 0
     assert not output.exists()
     assert "Dry run" in captured.out
+
+
+def test_cli_template_generates_domain_json(tmp_path: Path, capsys) -> None:
+    output = tmp_path / "sales_template.json"
+    result = main(["template", "sales", str(output)])
+    captured = capsys.readouterr()
+
+    assert result == 0
+    assert output.exists()
+    assert "Generated template" in captured.out
+
+    spec = PresentationInput.from_path(output)
+    assert spec.presentation.title == "Sales operating review"
+    assert len(spec.slides) >= 4
+
+
+def test_cli_template_accepts_theme_override(tmp_path: Path) -> None:
+    output = tmp_path / "strategy_template.json"
+    result = main(["template", "strategy", str(output), "--theme", "consulting_clean"])
+
+    assert result == 0
+    spec = PresentationInput.from_path(output)
+    assert spec.presentation.theme == "consulting_clean"

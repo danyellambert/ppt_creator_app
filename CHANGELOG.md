@@ -7,6 +7,9 @@ The format is inspired by Keep a Changelog, and the project aims to follow Seman
 ## [Unreleased]
 
 ### Added
+- domain starter templates for `sales`, `consulting`, `strategy`, and `product`
+- CLI `template` command to generate starter JSON decks by domain
+- clearer CLI informational logs for validate/render/render-batch flows
 - title `hero_cover` variant for alternate executive cover styling
 - `two_column` slide type for side-by-side narrative framing
 - `table` slide type for executive data summaries

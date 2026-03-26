@@ -11,6 +11,7 @@ from ppt_creator.schema import (
     SlideType,
     TimelineItem,
 )
+from ppt_creator.templates import build_domain_template, list_template_domains
 from ppt_creator.theme import (
     CONSULTING_CLEAN,
     DARK_BOARDROOM,
@@ -51,7 +52,9 @@ __all__ = [
     "TimelineItem",
     "TypographyTokens",
     "STARTUP_MINIMAL",
+    "build_domain_template",
     "get_theme",
+    "list_template_domains",
     "render_presentation",
     "theme_display_name",
 ]

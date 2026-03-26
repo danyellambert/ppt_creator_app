@@ -26,6 +26,7 @@ ppt_creator/
 ├── cli.py
 ├── renderer.py
 ├── schema.py
+├── templates.py
 ├── theme.py
 └── layouts/
     ├── __init__.py
@@ -311,6 +312,26 @@ Renderização em lote:
 python -m ppt_creator.cli render-batch examples outputs/batch \
   --pattern "*.json" --report-json outputs/batch_report.json
 ```
+
+Gerar um template inicial por domínio:
+
+```bash
+python -m ppt_creator.cli template sales outputs/sales_template.json
+```
+
+Domínios disponíveis:
+
+- `sales`
+- `consulting`
+- `strategy`
+- `product`
+
+Os comandos da CLI agora também emitem logs mais claros com prefixos como:
+
+- `[INFO]`
+- `[OK]`
+- `[WARN]`
+- `[ERROR]`
 
 ---
 

@@ -36,3 +36,11 @@ def test_theme_overrides_apply_custom_brand_colors() -> None:
     assert theme.colors.navy == "112233"
     assert theme.colors.accent == "ABCDEF"
     assert ppt_creator.theme_display_name(theme.name) == "Consulting Clean"
+
+
+def test_domain_templates_are_exposed() -> None:
+    assert ppt_creator.list_template_domains() == ["consulting", "product", "sales", "strategy"]
+
+    payload = ppt_creator.build_domain_template("sales")
+    assert payload["presentation"]["theme"] == "dark_boardroom"
+    assert len(payload["slides"]) >= 4
