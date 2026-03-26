@@ -27,3 +27,8 @@ def test_cli_returns_error_for_invalid_output_extension(tmp_path: Path, capsys) 
 
     assert result == 2
     assert "must end with .pptx" in captured.err
+
+
+def test_cli_validate_second_example() -> None:
+    result = main(["validate", "examples/product_strategy.json"])
+    assert result == 0

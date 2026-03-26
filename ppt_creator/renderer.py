@@ -9,7 +9,7 @@ from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
 from pptx.util import Inches, Pt
 
 from ppt_creator.layouts import LAYOUT_RENDERERS
-from ppt_creator.schema import PresentationInput, PresentationMeta, Slide, SlideType
+from ppt_creator.schema import PresentationInput, PresentationMeta, Slide
 from ppt_creator.theme import get_theme, rgb
 
 if TYPE_CHECKING:

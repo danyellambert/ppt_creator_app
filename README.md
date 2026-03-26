@@ -46,6 +46,23 @@ Separação principal:
 - `layouts/`: implementação isolada por tipo de slide
 - `cli.py`: interface de linha de comando
 
+### Escopo do subprojeto
+
+O `ppt_creator` é um componente **independente** dentro deste repositório.
+
+Isso significa que:
+
+- ele não depende de `transformers`
+- ele não depende de Ollama, MLX ou llama.cpp
+- ele não depende de nenhum modelo específico, incluindo PPTAgent
+- o coração dele continua sendo: **JSON estruturado -> `.pptx`**
+
+O repositório ainda contém scripts legados do playground geral de modelos, como `scripts/run_transformers.py`, mas esses arquivos **não fazem parte do núcleo do `ppt_creator`**.
+Por isso, os fluxos de qualidade da Fase 2 passaram a focar no escopo do subprojeto:
+
+- `ppt_creator/`
+- `tests/`
+
 ---
 
 ## Tipos de slide suportados
@@ -227,6 +244,17 @@ Saída esperada:
 - deck com 7 slides
 - notas do apresentador por slide
 
+Exemplos adicionais disponíveis:
+
+- `examples/product_strategy.json`
+- `examples/board_review.json`
+
+Você também pode renderizar todos com:
+
+```bash
+make render-all-examples
+```
+
 ---
 
 ## Testes
@@ -242,6 +270,31 @@ Os testes cobrem:
 - validação do schema
 - renderização mínima de `.pptx`
 - execução simples da CLI
+- validação e renderização de todos os exemplos em `examples/`
+
+---
+
+## Productização e DX
+
+O projeto agora também inclui:
+
+- `CHANGELOG.md`
+- `Makefile`
+- workflow de CI em `.github/workflows/ci.yml`
+- configuração de lint/format com Ruff no `pyproject.toml`
+
+Importante: a lint/CI desta camada foi configurada para validar o **subprojeto de PPT**, e não todos os scripts legados do playground.
+
+Comandos úteis:
+
+```bash
+make install-dev
+make lint
+make test
+make validate-example
+make render-example
+make render-all-examples
+```
 
 ---
 

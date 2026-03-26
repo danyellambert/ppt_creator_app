@@ -2,7 +2,6 @@ from __future__ import annotations
 
 
 def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
-    c = renderer.theme.canvas
     g = renderer.theme.grid
     t = renderer.theme.typography
     colors = renderer.theme.colors

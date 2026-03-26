@@ -4,7 +4,6 @@ from __future__ import annotations
 def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
     c = renderer.theme.canvas
     t = renderer.theme.typography
-    spacing = renderer.theme.spacing
     components = renderer.theme.components
     colors = renderer.theme.colors
     variant = renderer.resolve_layout_variant(slide_spec, "insight_panel")

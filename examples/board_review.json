@@ -1,0 +1,61 @@
+{
+  "presentation": {
+    "title": "Quarterly board review",
+    "subtitle": "Executive summary deck",
+    "author": "PPT Creator",
+    "date": "2026-03-23",
+    "theme": "executive_premium_minimal"
+  },
+  "slides": [
+    {
+      "type": "title",
+      "title": "Quarterly board review",
+      "subtitle": "Performance, priorities, and next-quarter risks",
+      "eyebrow": "Board materials"
+    },
+    {
+      "type": "metrics",
+      "title": "Headline metrics",
+      "layout_variant": "compact",
+      "metrics": [
+        {
+          "value": "$14.2M",
+          "label": "ARR",
+          "trend": "+18% YoY"
+        },
+        {
+          "value": "116%",
+          "label": "net revenue retention",
+          "trend": "Above plan"
+        },
+        {
+          "value": "13.4",
+          "label": "months runway",
+          "trend": "Stable"
+        },
+        {
+          "value": "2",
+          "label": "priority risks",
+          "trend": "Actively managed"
+        }
+      ]
+    },
+    {
+      "type": "image_text",
+      "title": "Risk lens",
+      "layout_variant": "image_left",
+      "body": "The next quarter depends on disciplined execution in go-to-market productivity and infrastructure resilience.",
+      "bullets": [
+        "Hiring pace must stay aligned to actual productivity gains.",
+        "Platform resilience remains a board-level confidence topic.",
+        "Capital allocation should continue to favor compounding bets."
+      ],
+      "image_caption": "Optional board visual placeholder"
+    },
+    {
+      "type": "closing",
+      "title": "Board takeaway",
+      "quote": "The company is in a stronger position when performance discipline and strategic clarity move together."
+    }
+  ]
+}

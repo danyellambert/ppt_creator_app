@@ -6,7 +6,6 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-
 MAX_BULLETS_PER_SLIDE = 6
 MAX_METRICS_PER_SLIDE = 4
 

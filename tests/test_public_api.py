@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import ppt_creator
-
 from ppt_creator.layouts import LAYOUT_RENDERERS
 
 

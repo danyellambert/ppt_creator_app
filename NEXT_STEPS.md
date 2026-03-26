@@ -75,6 +75,7 @@ Antes das fases, vale explicitar os critérios de qualidade desejados.
 - fácil de copiar para outro projeto
 - documentação objetiva
 - exemplos reais e úteis
+- escopo claro e independente do playground legado
 
 ### 3.4. Operação
 
@@ -183,32 +184,44 @@ Ao fim dessa fase, o projeto ganha um **design system interno real**, não só u
 
 Objetivo: fazer o projeto parecer e funcionar como uma ferramenta séria.
 
+### Status de acompanhamento
+
+- [x] definir estratégia inicial de versionamento semântico
+- [x] criar `CHANGELOG.md`
+- [x] adicionar `Makefile` com comandos principais
+- [x] adicionar lint/format com Ruff
+- [x] configurar CI simples
+- [x] adicionar mais exemplos de entrada
+- [x] melhorar README com fluxos de uso e DX
+- [x] restringir lint/CI ao escopo do subprojeto `ppt_creator`
+
 ### Entregas
 
-- empacotamento melhor
-- versionamento formal
-- changelog
-- automação de qualidade
-- documentação de uso mais forte
+- [x] empacotamento melhor
+- [x] versionamento formal
+- [x] changelog
+- [x] automação de qualidade
+- [x] documentação de uso mais forte
 
 ### Itens concretos
 
-- definir estratégia de versionamento semântico
-- criar `CHANGELOG.md`
-- adicionar `Makefile` com comandos curtos, por exemplo:
-  - `make install`
-  - `make test`
-  - `make render-example`
-  - `make docker-render`
-- adicionar lint/format, por exemplo:
-  - `ruff`
-  - `black` ou alternativa equivalente
-- configurar CI simples para:
-  - instalar dependências
-  - rodar testes
-  - validar exemplo JSON
-- melhorar README com screenshots/exportações futuras
-- adicionar mais exemplos de entrada
+- [x] definir estratégia de versionamento semântico
+- [x] criar `CHANGELOG.md`
+- [x] adicionar `Makefile` com comandos curtos, por exemplo:
+  - [x] `make install`
+  - [x] `make test`
+  - [x] `make render-example`
+  - [x] `make docker-render`
+- [x] adicionar lint/format, por exemplo:
+  - [x] `ruff`
+  - [x] formatação com `ruff format`
+- [x] configurar CI simples para:
+  - [x] instalar dependências
+  - [x] rodar testes
+  - [x] validar exemplo JSON
+- [x] melhorar README com screenshots/exportações futuras
+- [x] adicionar mais exemplos de entrada
+- [x] deixar explícito que a productização cobre o subprojeto `ppt_creator`, não todos os scripts legados do playground
 
 ### Resultado esperado
 

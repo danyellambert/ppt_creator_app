@@ -5,7 +5,6 @@ import argparse
 import os
 import sys
 import time
-from pathlib import Path
 
 
 def pick_device() -> tuple[str, object | None]:
@@ -29,7 +28,7 @@ def main() -> int:
 
     try:
         import torch
-        from transformers import AutoTokenizer, AutoModelForCausalLM
+        from transformers import AutoModelForCausalLM, AutoTokenizer
     except Exception as exc:
         print(f"[ERROR] Failed to import required packages: {exc}", file=sys.stderr)
         return 1
