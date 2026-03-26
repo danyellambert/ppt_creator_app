@@ -355,6 +355,19 @@ python -m ppt_creator_ai.cli generate examples/briefing_sales.json outputs/brief
 
 Esse fluxo pertence à camada opcional `ppt_creator_ai/` e foi mantido separado do renderizador principal.
 
+Se você quiser também um relatório heurístico com:
+
+- resumo executivo em bullets
+- sugestões de imagens/placeholders
+- revisão de densidade dos slides gerados
+
+rode:
+
+```bash
+python -m ppt_creator_ai.cli generate examples/briefing_sales.json outputs/briefing_sales_deck.json \
+  --analysis-json outputs/briefing_sales_analysis.json
+```
+
 Os comandos da CLI agora também emitem logs mais claros com prefixos como:
 
 - `[INFO]`
@@ -530,5 +543,8 @@ Essa camada tenta:
 - gerar um deck inicial a partir de briefing
 - expandir um outline em agenda e narrativa básica
 - montar slides estruturados de contexto, métricas, timeline, comparação, FAQ e summary
+- resumir texto mais longo em bullets executivos
+- sugerir direções de imagem / placeholder automaticamente
+- revisar densidade do deck gerado para sinalizar slides potencialmente carregados
 
 Ela **não depende de LLM** nesta fase: é um gerador heurístico, útil como ponto de partida para pipelines futuros.

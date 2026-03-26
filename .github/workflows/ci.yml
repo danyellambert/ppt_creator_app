@@ -23,10 +23,15 @@ jobs:
           python -m pip install -e ".[dev]"
 
       - name: Lint
-        run: python -m ruff check ppt_creator tests
+        run: python -m ruff check ppt_creator ppt_creator_ai tests
 
       - name: Run tests
         run: python -m pytest -q
 
       - name: Validate main example
         run: python -m ppt_creator.cli validate examples/ai_sales.json
+
+      - name: Generate briefing example
+        run: |
+          python -m ppt_creator_ai.cli generate examples/briefing_sales.json outputs/briefing_sales_ci.json \
+            --analysis-json outputs/briefing_sales_ci_analysis.json

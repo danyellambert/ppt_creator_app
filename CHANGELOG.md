@@ -8,6 +8,7 @@ The format is inspired by Keep a Changelog, and the project aims to follow Seman
 
 ### Added
 - optional `ppt_creator_ai` layer to generate deck JSON from structured briefing input
+- heuristic briefing analysis with executive summaries, image suggestions, and density review
 - PNG slide preview generation plus thumbnail contact sheets
 - `chart` slide type for simple data-driven charts
 - lightweight HTTP API/service mode with health, template, validate, and render endpoints

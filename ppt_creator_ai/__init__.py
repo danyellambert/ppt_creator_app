@@ -6,8 +6,12 @@ from ppt_creator_ai.briefing import (
     BriefingMetric,
     BriefingMilestone,
     BriefingOption,
+    build_briefing_analysis,
     generate_presentation_input_from_briefing,
     generate_presentation_payload_from_briefing,
+    review_presentation_density,
+    suggest_image_queries_from_briefing,
+    summarize_text_to_executive_bullets,
 )
 
 __all__ = [
@@ -16,6 +20,10 @@ __all__ = [
     "BriefingMetric",
     "BriefingMilestone",
     "BriefingOption",
+    "build_briefing_analysis",
     "generate_presentation_input_from_briefing",
     "generate_presentation_payload_from_briefing",
+    "review_presentation_density",
+    "suggest_image_queries_from_briefing",
+    "summarize_text_to_executive_bullets",
 ]

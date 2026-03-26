@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -34,6 +35,29 @@ def _clean_string_list(values: list[str], *, field_name: str) -> list[str]:
             raise ValueError(f"{field_name} #{index} cannot be empty")
         cleaned.append(normalized)
     return cleaned
+
+
+def summarize_text_to_executive_bullets(
+    text: str | None,
+    *,
+    max_bullets: int = 3,
+    max_words: int = 14,
+) -> list[str]:
+    if not text:
+        return []
+
+    segments = [segment.strip() for segment in re.split(r"[\n\.\?!;]+", text) if segment.strip()]
+    bullets: list[str] = []
+    for segment in segments:
+        words = segment.split()
+        shortened = " ".join(words[:max_words]).strip()
+        if len(words) > max_words:
+            shortened += "..."
+        if shortened and shortened not in bullets:
+            bullets.append(shortened)
+        if len(bullets) >= max_bullets:
+            break
+    return bullets
 
 
 class BriefingMetric(BaseModel):
@@ -200,6 +224,42 @@ class BriefingInput(BaseModel):
         return cls.model_validate(json.loads(json_path.read_text(encoding="utf-8")))
 
 
+def suggest_image_queries_from_briefing(
+    briefing: BriefingInput,
+    *,
+    max_suggestions: int = 4,
+) -> list[str]:
+    suggestions: list[str] = []
+
+    def add_suggestion(value: str | None) -> None:
+        if not value:
+            return
+        cleaned = value.strip()
+        if cleaned and cleaned not in suggestions:
+            suggestions.append(cleaned)
+
+    add_suggestion(f"{briefing.title} executive presentation background")
+
+    title_lower = briefing.title.lower()
+    if "sales" in title_lower or "revenue" in title_lower:
+        add_suggestion("sales leadership dashboard and pipeline review")
+    if "product" in title_lower:
+        add_suggestion("product strategy roadmap workshop")
+    if "strategy" in title_lower:
+        add_suggestion("executive strategy offsite discussion")
+
+    if briefing.metrics:
+        add_suggestion("executive KPI dashboard with growth trend lines")
+    if briefing.milestones:
+        add_suggestion("program roadmap timeline and milestone workshop")
+    if len(briefing.options) == 2:
+        add_suggestion("decision workshop with comparison whiteboard")
+    if briefing.audience:
+        add_suggestion(f"{briefing.audience} leadership meeting")
+
+    return suggestions[:max_suggestions]
+
+
 def _infer_agenda(briefing: BriefingInput) -> list[str]:
     if briefing.outline:
         return briefing.outline[:6]
@@ -219,12 +279,99 @@ def _infer_agenda(briefing: BriefingInput) -> list[str]:
     return agenda[:6]
 
 
+def review_presentation_density(spec: PresentationInput) -> dict[str, object]:
+    warnings: list[str] = []
+    slide_reviews: list[dict[str, object]] = []
+
+    for index, slide in enumerate(spec.slides, start=1):
+        issues: list[str] = []
+        body_len = len(slide.body or "")
+
+        if slide.type.value in {"agenda", "bullets", "summary", "image_text"}:
+            if len(slide.bullets) > 5:
+                issues.append("too many bullets for an executive slide")
+            if body_len > 260:
+                issues.append("body text is likely too dense")
+
+        if slide.type.value == "timeline" and len(slide.timeline_items) > 4:
+            issues.append("timeline may be visually dense")
+
+        if slide.type.value in {"comparison", "two_column"}:
+            columns = slide.comparison_columns or slide.two_column_columns
+            for column in columns:
+                if len(column.bullets) > 3:
+                    issues.append(f"column '{column.title}' has too many bullets")
+
+        if slide.type.value == "table":
+            if len(slide.table_rows) > 6:
+                issues.append("table has many rows for a single slide")
+            if len(slide.table_columns) > 4:
+                issues.append("table has many columns for executive readability")
+
+        if slide.type.value == "faq" and len(slide.faq_items) > 3:
+            issues.append("faq may be too crowded")
+
+        if slide.type.value == "chart" and len(slide.chart_categories) > 6:
+            issues.append("chart has many categories for a clean executive view")
+
+        slide_reviews.append(
+            {
+                "slide_number": index,
+                "slide_type": slide.type.value,
+                "title": slide.title or slide.type.value,
+                "issues": issues,
+            }
+        )
+        for issue in issues:
+            warnings.append(f"slide {index:02d} ({slide.title or slide.type.value}): {issue}")
+
+    return {
+        "status": "review" if warnings else "ok",
+        "warning_count": len(warnings),
+        "warnings": warnings,
+        "slides": slide_reviews,
+    }
+
+
+def build_briefing_analysis(
+    briefing: BriefingInput,
+    *,
+    theme_name: str | None = None,
+) -> dict[str, object]:
+    spec = generate_presentation_input_from_briefing(briefing, theme_name=theme_name)
+    summary_source = " ".join(
+        filter(
+            None,
+            [
+                briefing.objective,
+                briefing.context,
+                *briefing.key_messages[:3],
+                *briefing.recommendations[:3],
+            ],
+        )
+    )
+
+    return {
+        "briefing_title": briefing.title,
+        "theme": spec.presentation.theme,
+        "generated_slide_count": len(spec.slides),
+        "executive_summary_bullets": briefing.recommendations[:3]
+        or summarize_text_to_executive_bullets(summary_source, max_bullets=3),
+        "image_suggestions": suggest_image_queries_from_briefing(briefing),
+        "density_review": review_presentation_density(spec),
+    }
+
+
 def generate_presentation_payload_from_briefing(
     briefing: BriefingInput,
     *,
     theme_name: str | None = None,
 ) -> dict[str, object]:
     effective_theme = theme_name or briefing.theme
+    derived_context_bullets = summarize_text_to_executive_bullets(
+        " ".join(filter(None, [briefing.objective, briefing.context])),
+        max_bullets=4,
+    )
     slides: list[dict[str, object]] = [
         {
             "type": "title",
@@ -247,7 +394,7 @@ def generate_presentation_payload_from_briefing(
             }
         )
 
-    context_bullets = briefing.key_messages[:6]
+    context_bullets = (briefing.key_messages[:6] or derived_context_bullets[:6])
     if briefing.objective or briefing.context or context_bullets:
         slides.append(
             {
@@ -309,7 +456,7 @@ def generate_presentation_payload_from_briefing(
             }
         )
 
-    summary_bullets = (briefing.recommendations or briefing.key_messages)[:6]
+    summary_bullets = (briefing.recommendations or briefing.key_messages or derived_context_bullets)[:6]
     if summary_bullets or briefing.context:
         slides.append(
             {

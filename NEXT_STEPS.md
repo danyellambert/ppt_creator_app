@@ -318,9 +318,9 @@ Qualquer camada de IA deve ser opcional.
 - [x] gerar JSON inicial a partir de briefing estruturado
 - [x] expandir outline em slides estruturados
 - [x] sugerir títulos, bullets e KPIs iniciais a partir do briefing
-- resumir texto longo em conteúdo executivo
-- sugerir imagens ou placeholders automáticos
-- revisar densidade de conteúdo por slide
+- [x] resumir texto longo em conteúdo executivo
+- [x] sugerir imagens ou placeholders automáticos
+- [x] revisar densidade de conteúdo por slide
 
 ### Arquitetura recomendada
 
