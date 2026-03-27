@@ -419,6 +419,8 @@ brew install llama.cpp
 
 O provider local agora força modo **não conversacional** (`--no-conversation`) e `--simple-io` para evitar que o `llama-cli` fique preso esperando input interativo no final da geração. Se quiser guardar a saída bruta do modelo para debug:
 
+Ele também passa a **preferir `llama-completion`** quando esse binário estiver disponível, porque algumas instalações locais do `llama.cpp` aceitam melhor o fluxo one-shot nele do que no `llama-cli`.
+
 ```bash
 export PPT_CREATOR_AI_RAW_OUTPUT_PATH=outputs/pptagent_raw_output.txt
 ```

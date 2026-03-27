@@ -9,11 +9,20 @@ from pathlib import Path
 from ppt_creator.schema import PresentationInput
 from ppt_creator_ai.briefing import (
     BriefingInput,
+    generate_presentation_payload_from_briefing,
     review_presentation_density,
     suggest_image_queries_from_briefing,
     summarize_text_to_executive_bullets,
 )
 from ppt_creator_ai.providers.base import BriefingGenerationResult
+
+
+def _normalize_process_output(value: str | bytes | None) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    return value
 
 
 class PPTAgentLocalProvider:
@@ -52,6 +61,21 @@ class PPTAgentLocalProvider:
 
         raise FileNotFoundError(f"No GGUF model matched: {requested}")
 
+    def resolve_runtime_binary(self) -> str:
+        explicit = os.environ.get("PPT_CREATOR_AI_RUNTIME")
+        if explicit:
+            resolved = shutil.which(explicit)
+            if resolved is None:
+                raise RuntimeError(f"Requested runtime '{explicit}' was not found in PATH")
+            return resolved
+
+        for candidate in ("llama-completion", "llama-cli"):
+            resolved = shutil.which(candidate)
+            if resolved is not None:
+                return resolved
+
+        raise RuntimeError("Neither llama-completion nor llama-cli was found in PATH. Install llama.cpp first.")
+
     def build_prompt(self, briefing: BriefingInput, *, theme_name: str | None = None) -> str:
         effective_theme = theme_name or briefing.theme
         briefing_payload = briefing.model_dump(mode="json")
@@ -67,9 +91,304 @@ class PPTAgentLocalProvider:
             "Return a single JSON object now."
         )
 
+    def build_presentation_meta(
+        self,
+        presentation_payload: dict[str, object],
+        briefing: BriefingInput,
+        *,
+        theme_name: str | None = None,
+        title_slide_data: dict[str, object] | None = None,
+    ) -> dict[str, object]:
+        title_data = title_slide_data or {}
+        client_name = (
+            presentation_payload.get("client_name")
+            or title_data.get("client_name")
+            or briefing.client_name
+        )
+        return {
+            "title": presentation_payload.get("title") or title_data.get("title") or briefing.title,
+            "subtitle": presentation_payload.get("subtitle") or title_data.get("subtitle") or briefing.subtitle,
+            "author": presentation_payload.get("author") or title_data.get("author") or briefing.author,
+            "date": presentation_payload.get("date") or title_data.get("date") or briefing.date,
+            "theme": theme_name or briefing.theme,
+            "client_name": client_name,
+            "footer_text": presentation_payload.get("footer_text")
+            or (f"{client_name} • Briefing deck" if client_name else None),
+        }
+
+    def normalize_slide_payload(
+        self,
+        slide_payload: dict[str, object],
+        briefing: BriefingInput,
+    ) -> dict[str, object]:
+        if "type" in slide_payload and "data" not in slide_payload:
+            return dict(slide_payload)
+
+        slide_kind = str(slide_payload.get("slide") or slide_payload.get("type") or "").strip().lower()
+        slide_kind = slide_kind.replace("-", "_").replace(" ", "_")
+        data = slide_payload.get("data") if isinstance(slide_payload.get("data"), dict) else slide_payload
+
+        content = data.get("content") or data.get("body")
+        fallback_bullets = summarize_text_to_executive_bullets(
+            content if isinstance(content, str) else None,
+            max_bullets=4,
+            max_words=10,
+        )
+
+        def bullets_slide(title: str | None) -> dict[str, object]:
+            return {
+                "type": "bullets",
+                "title": title or "Key points",
+                "body": content if isinstance(content, str) else None,
+                "bullets": fallback_bullets,
+            }
+
+        if slide_kind == "title":
+            return {
+                "type": "title",
+                "title": data.get("title"),
+                "subtitle": data.get("subtitle"),
+                "body": data.get("body"),
+            }
+
+        if slide_kind == "section":
+            title = data.get("section") or data.get("title") or "Section"
+            content = data.get("content") or data.get("body")
+            if content:
+                return {
+                    "type": "bullets",
+                    "title": title,
+                    "body": content,
+                }
+            return {
+                "type": "section",
+                "title": title,
+                "section_label": "Section",
+            }
+
+        if slide_kind == "agenda":
+            return {
+                "type": "agenda",
+                "title": data.get("title") or "Agenda",
+                "bullets": data.get("bullets") or data.get("items") or fallback_bullets or briefing.outline[:6],
+            }
+
+        if slide_kind == "bullets":
+            return {
+                "type": "bullets",
+                "title": data.get("title") or "Key points",
+                "body": content if isinstance(content, str) else None,
+                "bullets": data.get("bullets") or fallback_bullets,
+            }
+
+        if slide_kind == "cards":
+            cards = data.get("cards") or []
+            if cards:
+                return {
+                    "type": "cards",
+                    "title": data.get("title") or "Cards",
+                    "cards": cards,
+                }
+            return {
+                **bullets_slide(data.get("title") or "Cards"),
+            }
+
+        if slide_kind == "metrics":
+            metrics = data.get("metrics") or [metric.model_dump(mode="json") for metric in briefing.metrics[:4]]
+            if metrics:
+                return {
+                    "type": "metrics",
+                    "title": data.get("title") or "Headline metrics",
+                    "metrics": metrics,
+                }
+            return {
+                **bullets_slide(data.get("title") or "Headline metrics"),
+            }
+
+        if slide_kind == "chart":
+            chart_categories = data.get("chart_categories") or data.get("categories") or []
+            chart_series = data.get("chart_series") or data.get("series") or []
+            if chart_categories and chart_series:
+                return {
+                    "type": "chart",
+                    "title": data.get("title") or "Chart",
+                    "chart_categories": chart_categories,
+                    "chart_series": chart_series,
+                }
+            return {
+                **bullets_slide(data.get("title") or "Chart"),
+            }
+
+        if slide_kind == "image_text":
+            return {
+                "type": "image_text",
+                "title": data.get("title") or "Image",
+                "body": content if isinstance(content, str) else None,
+                "bullets": data.get("bullets") or fallback_bullets,
+                "image_path": data.get("image_path"),
+                "image_caption": data.get("image_caption") or data.get("caption"),
+            }
+
+        if slide_kind in {"timeline", "milestones"}:
+            raw_items = data.get("timeline_items") or data.get("milestones") or [
+                milestone.model_dump(mode="json") for milestone in briefing.milestones[:5]
+            ]
+            timeline_items = [
+                {
+                    "title": item.get("title"),
+                    "body": item.get("body") or item.get("detail"),
+                    "tag": item.get("tag") or item.get("phase"),
+                    "footer": item.get("footer"),
+                }
+                for item in raw_items
+                if isinstance(item, dict)
+            ]
+            if len(timeline_items) < 2:
+                return bullets_slide(data.get("title") or "Execution timeline")
+            return {
+                "type": "timeline",
+                "title": data.get("title") or "Execution timeline",
+                "timeline_items": timeline_items,
+            }
+
+        if slide_kind == "comparison":
+            comparison_columns = data.get("comparison_columns") or data.get("columns") or [
+                option.model_dump(mode="json") for option in briefing.options[:2]
+            ]
+            if len(comparison_columns) != 2:
+                return bullets_slide(data.get("title") or "Comparison")
+            return {
+                "type": "comparison",
+                "title": data.get("title") or "Comparison",
+                "comparison_columns": comparison_columns,
+            }
+
+        if slide_kind == "two_column":
+            two_column_columns = data.get("two_column_columns") or data.get("columns") or [
+                option.model_dump(mode="json") for option in briefing.options[:2]
+            ]
+            if len(two_column_columns) != 2:
+                return bullets_slide(data.get("title") or "Two column")
+            return {
+                "type": "two_column",
+                "title": data.get("title") or "Two column",
+                "two_column_columns": two_column_columns,
+            }
+
+        if slide_kind == "table":
+            table_columns = data.get("table_columns") or data.get("columns") or []
+            table_rows = data.get("table_rows") or data.get("rows") or []
+            if (not table_columns or not table_rows) and briefing.metrics:
+                table_columns = ["Metric", "Value", "Trend"]
+                table_rows = [
+                    [metric.label, metric.value, metric.trend or ""]
+                    for metric in briefing.metrics[:6]
+                ]
+            if len(table_columns) < 2 or not table_rows:
+                return bullets_slide(data.get("title") or "Table")
+            return {
+                "type": "table",
+                "title": data.get("title") or "Table",
+                "table_columns": table_columns,
+                "table_rows": table_rows,
+            }
+
+        if slide_kind in {"faq", "faqs"}:
+            raw_items = data.get("faq_items") or data.get("faqs") or [
+                {"question": faq.question, "answer": faq.answer}
+                for faq in briefing.faqs[:4]
+            ]
+            faq_items = [
+                {
+                    "title": item.get("title") or item.get("question"),
+                    "body": item.get("body") or item.get("answer"),
+                }
+                for item in raw_items
+                if isinstance(item, dict)
+            ]
+            if len(faq_items) < 2:
+                return bullets_slide(data.get("title") or "Executive FAQ")
+            return {
+                "type": "faq",
+                "title": data.get("title") or "Executive FAQ",
+                "faq_items": faq_items,
+            }
+
+        if slide_kind == "summary":
+            return {
+                "type": "summary",
+                "title": data.get("title") or "Executive summary",
+                "body": data.get("content") or data.get("body"),
+                "bullets": data.get("bullets") or [],
+            }
+
+        if slide_kind == "closing":
+            return {
+                "type": "closing",
+                "title": data.get("title") or "Closing thought",
+                "quote": data.get("closing_quote") or data.get("quote") or data.get("content"),
+            }
+
+        raise ValueError(f"Unsupported slide payload from local model: {slide_kind or 'unknown'}")
+
+    def normalize_generated_payload(
+        self,
+        payload: dict[str, object],
+        briefing: BriefingInput,
+        *,
+        theme_name: str | None = None,
+    ) -> dict[str, object]:
+        if "presentation" in payload and "slides" in payload:
+            presentation_payload = payload.get("presentation")
+            slides_payload = payload.get("slides")
+        elif isinstance(payload.get("presentation"), dict) and isinstance(payload["presentation"].get("slides"), list):
+            presentation_payload = payload.get("presentation")
+            slides_payload = payload["presentation"].get("slides")
+        else:
+            raise ValueError("Model output did not contain a recognizable presentation/slides payload")
+
+        presentation_dict = presentation_payload if isinstance(presentation_payload, dict) else {}
+        slides_list = slides_payload if isinstance(slides_payload, list) else []
+        title_slide_data = next(
+            (
+                item.get("data")
+                for item in slides_list
+                if isinstance(item, dict)
+                and str(item.get("slide") or item.get("type") or "").strip().lower().replace("-", "_") == "title"
+                and isinstance(item.get("data"), dict)
+            ),
+            None,
+        )
+
+        normalized_slides = [
+            self.normalize_slide_payload(item, briefing)
+            for item in slides_list
+            if isinstance(item, dict)
+        ]
+        if not normalized_slides or normalized_slides[0].get("type") != "title":
+            normalized_slides.insert(
+                0,
+                {
+                    "type": "title",
+                    "title": briefing.title,
+                    "subtitle": briefing.subtitle,
+                    "body": briefing.objective,
+                },
+            )
+
+        return {
+            "presentation": self.build_presentation_meta(
+                presentation_dict,
+                briefing,
+                theme_name=theme_name,
+                title_slide_data=title_slide_data,
+            ),
+            "slides": normalized_slides,
+        }
+
     def run_model(self, model_path: Path, prompt: str) -> str:
-        if shutil.which("llama-cli") is None:
-            raise RuntimeError("llama-cli was not found in PATH. Install llama.cpp first.")
+        runtime_binary = self.resolve_runtime_binary()
+        runtime_name = Path(runtime_binary).name
 
         ctx_size = os.environ.get("PPT_CREATOR_AI_CTX_SIZE", "8192")
         max_tokens = os.environ.get("PPT_CREATOR_AI_MAX_TOKENS", "1800")
@@ -79,7 +398,7 @@ class PPTAgentLocalProvider:
         raw_output_path = os.environ.get("PPT_CREATOR_AI_RAW_OUTPUT_PATH")
 
         command = [
-            "llama-cli",
+            runtime_binary,
             "-m",
             str(model_path),
             "-c",
@@ -90,11 +409,15 @@ class PPTAgentLocalProvider:
             max_tokens,
             "--temp",
             temperature,
-            "--no-conversation",
             "--simple-io",
             "-p",
             prompt,
         ]
+
+        if runtime_name == "llama-completion":
+            command.insert(-3, "-no-cnv")
+        else:
+            command.insert(-3, "--single-turn")
         try:
             completed = subprocess.run(
                 command,
@@ -105,18 +428,26 @@ class PPTAgentLocalProvider:
                 timeout=timeout_seconds,
             )
         except subprocess.TimeoutExpired as exc:
-            partial_output = ((exc.stdout or "") + (f"\n{exc.stderr}" if exc.stderr else "")).strip()
+            partial_stdout = _normalize_process_output(exc.stdout)
+            partial_stderr = _normalize_process_output(exc.stderr)
+            partial_output = (partial_stdout + (f"\n{partial_stderr}" if partial_stderr else "")).strip()
             if raw_output_path:
-                Path(raw_output_path).write_text(partial_output + "\n", encoding="utf-8")
+                raw_output_file = Path(raw_output_path)
+                raw_output_file.parent.mkdir(parents=True, exist_ok=True)
+                raw_output_file.write_text(partial_output + "\n", encoding="utf-8")
             raise RuntimeError(
-                "llama-cli timed out before finishing. This often means the model is too slow or entered an unexpected mode. "
+                f"{runtime_name} timed out before finishing. This often means the model is too slow or entered an unexpected mode. "
                 f"Increase PPT_CREATOR_AI_TIMEOUT_SECONDS if needed. Partial output: {partial_output[:400]}"
             ) from exc
-        output = (completed.stdout or "") + (f"\n{completed.stderr}" if completed.stderr else "")
+        output_stdout = _normalize_process_output(completed.stdout)
+        output_stderr = _normalize_process_output(completed.stderr)
+        output = output_stdout + (f"\n{output_stderr}" if output_stderr else "")
         if raw_output_path:
-            Path(raw_output_path).write_text(output + "\n", encoding="utf-8")
+            raw_output_file = Path(raw_output_path)
+            raw_output_file.parent.mkdir(parents=True, exist_ok=True)
+            raw_output_file.write_text(output + "\n", encoding="utf-8")
         if completed.returncode != 0:
-            raise RuntimeError(f"llama-cli failed with exit code {completed.returncode}: {output.strip()}")
+            raise RuntimeError(f"{runtime_name} failed with exit code {completed.returncode}: {output.strip()}")
         return output
 
     def extract_json_payload(self, text: str) -> dict[str, object]:
@@ -128,7 +459,12 @@ class PPTAgentLocalProvider:
                 candidate, _ = decoder.raw_decode(text[index:])
             except json.JSONDecodeError:
                 continue
-            if isinstance(candidate, dict) and "presentation" in candidate and "slides" in candidate:
+            if not isinstance(candidate, dict) or "presentation" not in candidate:
+                continue
+            if "slides" in candidate:
+                return candidate
+            presentation_payload = candidate.get("presentation")
+            if isinstance(presentation_payload, dict) and "slides" in presentation_payload:
                 return candidate
         raise ValueError("Could not extract presentation JSON from model output")
 
@@ -142,7 +478,12 @@ class PPTAgentLocalProvider:
         prompt = self.build_prompt(briefing, theme_name=theme_name)
         raw_output = self.run_model(model_path, prompt)
         payload = self.extract_json_payload(raw_output)
-        spec = PresentationInput.model_validate(payload)
+        normalized_payload = self.normalize_generated_payload(payload, briefing, theme_name=theme_name)
+        try:
+            spec = PresentationInput.model_validate(normalized_payload)
+        except Exception:
+            fallback_payload = generate_presentation_payload_from_briefing(briefing, theme_name=theme_name)
+            spec = PresentationInput.model_validate(fallback_payload)
         normalized_payload = spec.model_dump(mode="json")
 
         summary_source = " ".join(

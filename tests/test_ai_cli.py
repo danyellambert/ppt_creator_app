@@ -107,7 +107,7 @@ def test_local_provider_timeout_surfaces_clear_error(monkeypatch) -> None:
     provider = get_provider("pptagent_local")
 
     def _timeout(*args, **kwargs):
-        raise subprocess.TimeoutExpired(cmd=["llama-cli"], timeout=1, output="partial json", stderr="")
+        raise subprocess.TimeoutExpired(cmd=["llama-cli"], timeout=1, output=b"partial json", stderr=b"")
 
     monkeypatch.setattr(subprocess, "run", _timeout)
     monkeypatch.setattr("shutil.which", lambda name: "/usr/local/bin/llama-cli")
@@ -118,3 +118,95 @@ def test_local_provider_timeout_surfaces_clear_error(monkeypatch) -> None:
         assert "timed out" in str(exc)
     else:
         raise AssertionError("Expected RuntimeError when llama-cli times out")
+
+
+def test_local_provider_prefers_llama_completion_for_one_shot(monkeypatch) -> None:
+    provider = get_provider("pptagent_local")
+    captured: dict[str, object] = {}
+
+    class _Completed:
+        returncode = 0
+        stdout = "{}"
+        stderr = ""
+
+    def _which(name: str):
+        if name == "llama-completion":
+            return "/opt/homebrew/bin/llama-completion"
+        if name == "llama-cli":
+            return "/opt/homebrew/bin/llama-cli"
+        return None
+
+    def _run(command, **kwargs):
+        captured["command"] = command
+        return _Completed()
+
+    monkeypatch.setattr("shutil.which", _which)
+    monkeypatch.setattr(subprocess, "run", _run)
+
+    provider.run_model(Path("/tmp/fake.gguf"), "prompt")
+
+    command = captured["command"]
+    assert command[0].endswith("llama-completion")
+    assert "-no-cnv" in command
+    assert "--simple-io" in command
+
+
+def test_local_provider_normalizes_pptagent_style_payload() -> None:
+    provider = get_provider("pptagent_local")
+
+    raw_payload = {
+        "presentation": {
+            "slides": [
+                {
+                    "slide": "title",
+                    "data": {
+                        "title": "AI copilots for sales teams",
+                        "subtitle": "Briefing to Executive Narrative",
+                        "client_name": "Acme Revenue Team",
+                        "author": "PPT Creator AI",
+                        "date": "2026-03-26",
+                    },
+                },
+                {
+                    "slide": "section",
+                    "data": {
+                        "section": "Situation Overview",
+                        "content": "Commercial teams want measurable productivity lift.",
+                    },
+                },
+                {
+                    "slide": "milestones",
+                    "data": {
+                        "milestones": [
+                            {"title": "Diagnose", "detail": "Find the workflow", "phase": "Month 1"},
+                            {"title": "Pilot", "detail": "Run the pilot", "phase": "Month 2"},
+                        ]
+                    },
+                },
+                {
+                    "slide": "faq",
+                    "data": {
+                        "faqs": [
+                            {"question": "Where do we start?", "answer": "Start narrow."},
+                            {"question": "How do we measure success?", "answer": "Track lift."},
+                        ]
+                    },
+                },
+                {
+                    "slide": "closing",
+                    "data": {"closing_quote": "Stay structured."},
+                },
+            ]
+        }
+    }
+
+    from ppt_creator_ai.briefing import BriefingInput
+
+    briefing_input = BriefingInput.from_path("examples/briefing_sales.json")
+    normalized = provider.normalize_generated_payload(raw_payload, briefing_input)
+
+    spec = PresentationInput.model_validate(normalized)
+    assert spec.presentation.title == "AI copilots for sales teams"
+    assert any(slide.type.value == "timeline" for slide in spec.slides)
+    assert any(slide.type.value == "faq" for slide in spec.slides)
+    assert any(slide.type.value == "bullets" for slide in spec.slides)

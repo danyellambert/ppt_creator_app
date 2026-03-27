@@ -8,6 +8,7 @@ The format is inspired by Keep a Changelog, and the project aims to follow Seman
 
 ### Added
 - non-interactive llama.cpp execution hardening for the local `pptagent_local` provider, with timeout and optional raw-output capture
+- normalization of PPTAgent-style local payloads into the project's canonical presentation schema so locally generated JSON can be validated and rendered even when the model returns an alternate slide structure
 - optional office-aware preview backend selection with automatic fallback to synthetic previews
 - initial layout primitive helpers for panel inner bounds and stacked vertical regions
 - initial application of layout primitives to comparison, faq, cards, and two-column slides
