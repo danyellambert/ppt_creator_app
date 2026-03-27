@@ -125,6 +125,8 @@ def preview_spec_payload(
     primary_color: str | None = None,
     secondary_color: str | None = None,
     basename: str | None = None,
+    debug_grid: bool = False,
+    debug_safe_areas: bool = False,
 ) -> dict[str, object]:
     spec = PresentationInput.model_validate(spec_payload)
     effective_theme = theme_name or spec.presentation.theme
@@ -136,6 +138,8 @@ def preview_spec_payload(
         primary_color=primary_color,
         secondary_color=secondary_color,
         basename=basename,
+        debug_grid=debug_grid,
+        debug_safe_areas=debug_safe_areas,
     )
 
 
@@ -257,6 +261,8 @@ class PptCreatorAPIHandler(BaseHTTPRequestHandler):
                     primary_color=str(payload["primary_color"]) if payload.get("primary_color") else None,
                     secondary_color=str(payload["secondary_color"]) if payload.get("secondary_color") else None,
                     basename=str(payload["basename"]) if payload.get("basename") else None,
+                    debug_grid=bool(payload.get("debug_grid", False)),
+                    debug_safe_areas=bool(payload.get("debug_safe_areas", False)),
                 )
                 self._json_response(HTTPStatus.OK, {"result": result})
                 return

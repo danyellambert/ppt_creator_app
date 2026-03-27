@@ -141,6 +141,24 @@ def test_cli_preview_generates_pngs_and_thumbnail_sheet(tmp_path: Path, capsys) 
     assert result == 0
     assert report_path.exists()
     assert "Generated previews" in captured.out
+    report = report_path.read_text(encoding="utf-8")
+    assert "quality_review" in report
     generated_pngs = sorted(output_dir.glob("*.png"))
     assert len(generated_pngs) == 11
     assert any(path.name.endswith("-thumbnails.png") for path in generated_pngs)
+
+
+def test_cli_preview_accepts_debug_overlays(tmp_path: Path) -> None:
+    output_dir = tmp_path / "preview_debug_output"
+    result = main(
+        [
+            "preview",
+            "examples/ai_sales.json",
+            str(output_dir),
+            "--debug-grid",
+            "--debug-safe-areas",
+        ]
+    )
+
+    assert result == 0
+    assert sorted(output_dir.glob("*.png"))

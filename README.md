@@ -386,6 +386,20 @@ Esse comando gera:
 
 - um `.png` por slide
 - uma folha `*-thumbnails.png` com miniaturas do deck
+- um relatório heurístico de qualidade dentro do `--report-json`, quando usado
+
+Você também pode ativar overlays de debug para inspecionar alinhamento e áreas seguras:
+
+```bash
+python -m ppt_creator.cli preview examples/ai_sales.json outputs/previews \
+  --basename ai-sales-preview --debug-grid --debug-safe-areas
+```
+
+Isso ajuda a diagnosticar:
+
+- safe areas
+- header/body anchors
+- linhas-guia de composição
 
 ## Modo API / serviço
 
@@ -548,3 +562,14 @@ Essa camada tenta:
 - revisar densidade do deck gerado para sinalizar slides potencialmente carregados
 
 Ela **não depende de LLM** nesta fase: é um gerador heurístico, útil como ponto de partida para pipelines futuros.
+
+## Evolução visual e QA
+
+O projeto agora também começou a ganhar uma primeira camada de QA visual heurística no pipeline de previews:
+
+- thumbnail sheet mais legível e organizado
+- identificação visual de slide número/título/tipo
+- overlays de debug opcionais
+- revisão heurística de densidade e risco visual no relatório de preview
+
+O próximo passo mais importante continua sendo evoluir de preview sintético para preview fiel ao `.pptx` real.

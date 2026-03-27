@@ -178,6 +178,23 @@ Objetivo: elevar muito a qualidade visual e tornar o tema realmente reutilizáve
 
 Ao fim dessa fase, o projeto ganha um **design system interno real**, não só um conjunto de layouts isolados.
 
+### Próximo aprofundamento recomendado de design/layout
+
+Mesmo com a Fase 1 concluída, ainda há uma camada importante de refinamento visual a perseguir para o projeto atingir nível realmente premium:
+
+- [ ] substituir coordenadas mais rígidas por primitives de layout e constraints semânticas
+- [ ] criar stacks/rows/columns reutilizáveis para reduzir desalinhamentos entre layouts
+- [ ] adicionar auto-fit tipográfico e controle de overflow por bloco
+- [ ] balancear melhor colunas, cards e painéis quando o conteúdo variar
+- [ ] formalizar baseline vertical e anchors consistentes por tipo de slide
+- [ ] revisar visualmente, slide a slide, os layouts `title`, `metrics`, `comparison`, `table`, `faq`, `summary` e `closing`
+
+Esses itens são os que mais atacam problemas como:
+
+- formas mal posicionadas
+- espaçamentos inconsistentes
+- sensação de slide “quase pronto, mas não totalmente polido”
+
 ---
 
 ## Fase 2 — Productização e experiência de desenvolvedor
@@ -295,6 +312,23 @@ Objetivo: preparar o projeto para ser embutido em fluxos maiores e uso recorrent
   - [x] estratégia
   - [x] produto
 
+### Novo bloco prioritário de pipeline visual
+
+Como a qualidade percebida do deck depende muito da inspeção visual, existe um novo sub-bloco de alta prioridade dentro da robustez operacional:
+
+- [x] melhorar a folha de thumbnails com composição mais legível e metadados por slide
+- [x] adicionar overlays opcionais de debug para grid e safe areas no preview sintético
+- [x] adicionar uma primeira revisão heurística de qualidade visual no relatório de preview
+- [ ] gerar preview a partir do `.pptx` real em vez de uma reconstrução paralela em Pillow
+- [ ] adicionar regressão visual baseada em previews reais/golden files
+- [ ] criar detectores mais fortes de colisão, overflow e clipping
+
+Racional:
+
+- thumbnails e previews hoje ainda são úteis, mas não totalmente fiéis ao slide final
+- QA visual precisa virar parte oficial do pipeline
+- isso reduz retrabalho manual e ajuda a diagnosticar desalinhamentos mais cedo
+
 ### Resultado esperado
 
 Ao fim dessa fase, o projeto fica pronto para funcionar como **bloco de infraestrutura** dentro de outros sistemas.
@@ -321,12 +355,18 @@ Qualquer camada de IA deve ser opcional.
 - [x] resumir texto longo em conteúdo executivo
 - [x] sugerir imagens ou placeholders automáticos
 - [x] revisar densidade de conteúdo por slide
+- [ ] integrar provedores reais de LLM de forma opcional (`OpenAI`, `Anthropic`, `Ollama`, etc.)
+- [ ] usar LLM para revisão iterativa de narrativa após o primeiro deck ser gerado
+- [ ] usar LLM para reescrever títulos, subtitles e summaries em tom mais executivo
+- [ ] usar LLM para crítica slide a slide combinando briefing + QA visual
 
 ### Arquitetura recomendada
 
 - [x] manter um módulo separado, algo como `ppt_creator_ai/` ou `pipelines/`
 - nunca misturar lógica de prompt com o renderizador base
 - tratar LLM como produtor de estrutura, não como renderizador
+- [ ] criar interface de provider para alternar entre LLMs locais e remotos
+- [ ] manter um loop: briefing -> estrutura -> render -> QA -> revisão opcional -> nova iteração
 
 ### Resultado esperado
 
@@ -401,6 +441,56 @@ Ideias valiosas, mas não urgentes:
 - integração com workflow de propostas/comercial
 - [x] modo API/serviço
 - editor visual futuro para montar JSON com menos fricção
+
+## 8.1. Plano exaustivo de melhoria com máximo impacto
+
+Se a meta for perseguir o nível “deck quase pronto sem retoque manual”, a ordem recomendada de máximo impacto é:
+
+### Prioridade 1 — Fidelidade de preview e QA visual
+
+- [ ] preview gerado a partir do `.pptx`/PDF real
+- [x] thumbnail sheet mais forte para inspeção visual
+- [x] overlays de debug para analisar composição
+- [x] revisão heurística inicial de qualidade
+- [ ] comparação visual automática entre versões
+
+### Prioridade 2 — Refatoração do motor de layout
+
+- [ ] primitives de layout (`stack`, `grid`, `two-column`, `panel row`)
+- [ ] constraints semânticas em vez de posições excessivamente rígidas
+- [ ] auto-fit real de texto por caixa
+- [ ] balanceamento automático de alturas e colunas
+- [ ] prevenção mais forte de overflow visual
+
+### Prioridade 3 — Polimento visual por layout
+
+- [ ] revisão detalhada de `title`
+- [ ] revisão detalhada de `metrics`
+- [ ] revisão detalhada de `comparison` e `two_column`
+- [ ] revisão detalhada de `table`
+- [ ] revisão detalhada de `faq`
+- [ ] revisão detalhada de `summary` e `closing`
+
+### Prioridade 4 — Pipeline de imagens e placeholders
+
+- [ ] crop mais inteligente
+- [ ] placeholders mais premium e contextuais
+- [ ] sugestões de imagem por tipo de slide, não só por briefing geral
+- [ ] biblioteca básica de assets e estilos visuais
+
+### Prioridade 5 — LLM opcional de conteúdo e revisão
+
+- [ ] provider layer para múltiplas LLMs
+- [ ] geração de outline e narrativa a partir de briefing livre
+- [ ] reescrita executiva de conteúdo fraco
+- [ ] revisão iterativa do deck após renderização e QA
+
+### Prioridade 6 — Produto / experiência de uso
+
+- [ ] editor visual leve
+- [ ] playground local para gerar/editar/re-renderizar decks
+- [ ] perfis de público (board, consulting, sales, product)
+- [ ] integração com workflows comerciais e operacionais
 
 ---
 

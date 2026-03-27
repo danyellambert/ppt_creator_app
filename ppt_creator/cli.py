@@ -53,6 +53,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="Override the secondary/accent theme color with a 6-digit hex value",
     )
     preview_parser.add_argument("--basename", help="Optional base name for generated preview files")
+    preview_parser.add_argument(
+        "--debug-grid",
+        action="store_true",
+        help="Overlay layout guide lines on preview images",
+    )
+    preview_parser.add_argument(
+        "--debug-safe-areas",
+        action="store_true",
+        help="Overlay safe-area bounds on preview images",
+    )
     preview_parser.add_argument("--report-json", help="Optional path to write a JSON preview report")
 
     validate_parser = subparsers.add_parser("validate", help="Validate JSON without rendering")
@@ -301,6 +311,8 @@ def preview_one(
     primary_color: str | None = None,
     secondary_color: str | None = None,
     basename: str | None = None,
+    debug_grid: bool = False,
+    debug_safe_areas: bool = False,
 ) -> dict[str, object]:
     input_path = Path(input_json)
     print_info(f"Loading input: {input_path}")
@@ -321,10 +333,16 @@ def preview_one(
         primary_color=primary_color,
         secondary_color=secondary_color,
         basename=basename,
+        debug_grid=debug_grid,
+        debug_safe_areas=debug_safe_areas,
     )
     print(
         f"[OK] Generated previews: {result['preview_count']} slide image(s) + thumbnail sheet"
     )
+    if result["quality_review"]["warning_count"]:
+        print_info(
+            f"Preview quality review flagged {result['quality_review']['warning_count']} issue(s)"
+        )
     return build_preview_report(
         input_path=input_path,
         spec=spec,
@@ -391,6 +409,8 @@ def main(argv: list[str] | None = None) -> int:
                 primary_color=args.primary_color,
                 secondary_color=args.secondary_color,
                 basename=args.basename,
+                debug_grid=args.debug_grid,
+                debug_safe_areas=args.debug_safe_areas,
             )
             if args.report_json:
                 write_report(args.report_json, report)

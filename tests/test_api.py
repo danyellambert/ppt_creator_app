@@ -84,11 +84,14 @@ def test_api_validate_render_and_template_endpoints(tmp_path: Path) -> None:
                 "spec": spec_payload,
                 "output_dir": str(preview_dir),
                 "basename": "api-preview",
+                "debug_grid": True,
+                "debug_safe_areas": True,
             },
             method="POST",
         )
         assert status == 200
         assert preview_payload["result"]["preview_count"] == len(spec_payload["slides"])
+        assert preview_payload["result"]["quality_review"]["status"] in {"ok", "review"}
         assert Path(preview_payload["result"]["thumbnail_sheet"]).exists()
     finally:
         server.shutdown()

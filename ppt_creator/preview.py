@@ -12,6 +12,7 @@ PREVIEW_WIDTH = 1280
 PREVIEW_HEIGHT = 720
 THUMBNAIL_WIDTH = 320
 THUMBNAIL_HEIGHT = 180
+CONTACT_SHEET_COLUMNS = 3
 
 
 def _rgb_tuple(hex_value: str) -> tuple[int, int, int]:
@@ -22,6 +23,12 @@ def _rgb_tuple(hex_value: str) -> tuple[int, int, int]:
 def _safe_basename(value: str) -> str:
     normalized = re.sub(r"[^a-z0-9]+", "_", value.lower()).strip("_")
     return normalized or "deck_preview"
+
+
+def _truncate_text(value: str, *, max_chars: int) -> str:
+    if len(value) <= max_chars:
+        return value
+    return value[: max_chars - 3].rstrip() + "..."
 
 
 def _load_font(size: int, *, bold: bool = False) -> ImageFont.ImageFont:
@@ -64,11 +71,15 @@ class PreviewRenderer:
         asset_root: str | Path | None = None,
         primary_color: str | None = None,
         secondary_color: str | None = None,
+        debug_grid: bool = False,
+        debug_safe_areas: bool = False,
     ):
         self.requested_theme_name = theme_name
         self.requested_primary_color = primary_color
         self.requested_secondary_color = secondary_color
         self.asset_root = Path(asset_root or ".").resolve()
+        self.debug_grid = debug_grid
+        self.debug_safe_areas = debug_safe_areas
         self.theme = get_theme(theme_name, primary_color=primary_color, secondary_color=secondary_color)
 
     def render(self, spec: PresentationInput, output_dir: str | Path, *, basename: str | None = None) -> dict[str, object]:
@@ -90,7 +101,7 @@ class PreviewRenderer:
             preview_paths.append(str(preview_path))
 
         contact_sheet_path = destination / f"{base}-thumbnails.png"
-        self.render_contact_sheet(preview_paths, contact_sheet_path)
+        self.render_contact_sheet(spec.presentation, spec.slides, preview_paths, contact_sheet_path)
 
         return {
             "mode": "preview",
@@ -98,6 +109,9 @@ class PreviewRenderer:
             "preview_count": len(preview_paths),
             "previews": preview_paths,
             "thumbnail_sheet": str(contact_sheet_path),
+            "quality_review": self.build_preview_quality_review(spec),
+            "debug_grid": self.debug_grid,
+            "debug_safe_areas": self.debug_safe_areas,
         }
 
     def render_slide(self, meta: PresentationMeta, slide_spec: Slide, index: int, total_slides: int) -> Image.Image:
@@ -124,33 +138,203 @@ class PreviewRenderer:
         }
         renderers[slide_spec.type](draw, image, slide_spec, meta)
         self._render_footer(draw, meta, index, total_slides)
+        if self.debug_safe_areas or self.debug_grid:
+            self._render_debug_overlay(draw)
         return image
 
-    def render_contact_sheet(self, preview_paths: list[str], output_path: str | Path) -> Path:
-        columns = 3
+    def render_contact_sheet(
+        self,
+        meta: PresentationMeta,
+        slides: list[Slide],
+        preview_paths: list[str],
+        output_path: str | Path,
+    ) -> Path:
+        columns = min(CONTACT_SHEET_COLUMNS, max(1, len(preview_paths)))
         rows = (len(preview_paths) + columns - 1) // columns
+        card_width = THUMBNAIL_WIDTH + 40
+        card_height = THUMBNAIL_HEIGHT + 68
+        header_height = 108
+        margin = 28
+        gutter = 24
+
         sheet = Image.new(
             "RGB",
-            (columns * (THUMBNAIL_WIDTH + 24) + 24, rows * (THUMBNAIL_HEIGHT + 40) + 24),
+            (
+                margin * 2 + columns * card_width + (columns - 1) * gutter,
+                header_height + margin + rows * card_height + max(rows - 1, 0) * gutter + margin,
+            ),
             _rgb_tuple(self.theme.colors.background),
         )
         draw = ImageDraw.Draw(sheet)
-        title_font = _load_font(18, bold=True)
+        title_font = _load_font(26, bold=True)
+        subtitle_font = _load_font(16)
+        card_title_font = _load_font(16, bold=True)
+        card_meta_font = _load_font(13)
+
+        draw.text((margin, 28), meta.title, fill=_rgb_tuple(self.theme.colors.navy), font=title_font)
+        subtitle = meta.subtitle or meta.footer_text or meta.client_name or "Preview contact sheet"
+        draw.text(
+            (margin, 64),
+            f"{subtitle} • {len(preview_paths)} slide(s)",
+            fill=_rgb_tuple(self.theme.colors.muted),
+            font=subtitle_font,
+        )
+        draw.line(
+            (margin, header_height - 10, sheet.width - margin, header_height - 10),
+            fill=_rgb_tuple(self.theme.colors.line),
+            width=2,
+        )
 
         for idx, preview_path in enumerate(preview_paths):
             image = Image.open(preview_path).convert("RGB")
             image.thumbnail((THUMBNAIL_WIDTH, THUMBNAIL_HEIGHT))
             row = idx // columns
             col = idx % columns
-            x = 24 + col * (THUMBNAIL_WIDTH + 24)
-            y = 24 + row * (THUMBNAIL_HEIGHT + 40)
-            sheet.paste(image, (x, y))
-            draw.text((x, y + THUMBNAIL_HEIGHT + 8), Path(preview_path).stem, fill=_rgb_tuple(self.theme.colors.text), font=title_font)
+            x = margin + col * (card_width + gutter)
+            y = header_height + row * (card_height + gutter)
+
+            shadow_box = (x + 4, y + 6, x + card_width + 4, y + card_height + 6)
+            draw.rounded_rectangle(shadow_box, radius=20, fill=(232, 235, 240))
+            card_box = (x, y, x + card_width, y + card_height)
+            draw.rounded_rectangle(
+                card_box,
+                radius=20,
+                fill=_rgb_tuple(self.theme.colors.surface),
+                outline=_rgb_tuple(self.theme.colors.line),
+                width=2,
+            )
+
+            image_x = x + (card_width - image.width) // 2
+            image_y = y + 18
+            sheet.paste(image, (image_x, image_y))
+
+            badge_box = (x + 16, y + 14, x + 58, y + 40)
+            draw.rounded_rectangle(badge_box, radius=12, fill=_rgb_tuple(self.theme.colors.accent))
+            draw.text((x + 28, y + 19), f"{idx + 1:02d}", fill=_rgb_tuple(self.theme.colors.surface), font=card_meta_font)
+
+            slide_title = _truncate_text(slides[idx].title or slides[idx].type.value, max_chars=28)
+            slide_type = slides[idx].type.value.replace("_", " ")
+            draw.text((x + 16, y + THUMBNAIL_HEIGHT + 24), slide_title, fill=_rgb_tuple(self.theme.colors.navy), font=card_title_font)
+            draw.text((x + 16, y + THUMBNAIL_HEIGHT + 46), slide_type, fill=_rgb_tuple(self.theme.colors.muted), font=card_meta_font)
 
         destination = Path(output_path)
         destination.parent.mkdir(parents=True, exist_ok=True)
         sheet.save(destination)
         return destination
+
+    def _x(self, value_in_inches: float) -> int:
+        return int((value_in_inches / self.theme.canvas.width) * PREVIEW_WIDTH)
+
+    def _y(self, value_in_inches: float) -> int:
+        return int((value_in_inches / self.theme.canvas.height) * PREVIEW_HEIGHT)
+
+    def _render_debug_overlay(self, draw: ImageDraw.ImageDraw) -> None:
+        grid = self.theme.grid
+        canvas = self.theme.canvas
+
+        if self.debug_safe_areas:
+            safe_box = (
+                self._x(grid.content_left),
+                self._y(canvas.margin_top),
+                self._x(grid.content_right),
+                self._y(canvas.height - canvas.margin_bottom),
+            )
+            draw.rounded_rectangle(safe_box, radius=10, outline=(89, 124, 250), width=3)
+            draw.line(
+                (
+                    self._x(grid.content_left),
+                    self._y(grid.footer_line_y),
+                    self._x(grid.content_right),
+                    self._y(grid.footer_line_y),
+                ),
+                fill=(89, 124, 250),
+                width=2,
+            )
+
+        if self.debug_grid:
+            debug_lines = [
+                ("header_top", self._y(grid.header_top)),
+                ("title_top", self._y(grid.title_top)),
+                ("body_top", self._y(grid.body_top)),
+            ]
+            for label, y in debug_lines:
+                draw.line((40, y, PREVIEW_WIDTH - 40, y), fill=(91, 167, 120), width=1)
+                draw.text((44, y - 16), label, fill=(91, 167, 120), font=_load_font(12))
+
+            x_guides = [
+                ("content_left", self._x(grid.content_left)),
+                ("content_right", self._x(grid.content_right)),
+                ("side_panel_left", self._x(grid.side_panel_left)),
+                ("image_left", self._x(grid.image_left)),
+            ]
+            for label, x in x_guides:
+                draw.line((x, 30, x, PREVIEW_HEIGHT - 30), fill=(91, 167, 120), width=1)
+                draw.text((x + 6, 34), label, fill=(91, 167, 120), font=_load_font(12))
+
+    def build_preview_quality_review(self, spec: PresentationInput) -> dict[str, object]:
+        warnings: list[str] = []
+        slide_reviews: list[dict[str, object]] = []
+
+        for index, slide in enumerate(spec.slides, start=1):
+            issues: list[str] = []
+            title = slide.title or slide.type.value
+
+            if len(title) > 68:
+                issues.append("title may be too long for a clean visual hierarchy")
+            if slide.subtitle and len(slide.subtitle) > 120:
+                issues.append("subtitle may be too long for the current layout")
+            if slide.body and len(slide.body) > 260:
+                issues.append("body text may be too dense")
+
+            if slide.type.value in {"agenda", "bullets", "summary", "image_text"} and len(slide.bullets) > 5:
+                issues.append("too many bullets for executive readability")
+
+            if slide.type.value == "cards":
+                for card in slide.cards:
+                    if len(card.body) > 150:
+                        issues.append(f"card '{card.title}' may be too verbose")
+
+            if slide.type.value in {"comparison", "two_column"}:
+                columns = slide.comparison_columns or slide.two_column_columns
+                for column in columns:
+                    if len(column.bullets) > 3:
+                        issues.append(f"column '{column.title}' has many bullets")
+                    if column.body and len(column.body) > 150:
+                        issues.append(f"column '{column.title}' body may be too dense")
+
+            if slide.type.value == "table":
+                if len(slide.table_rows) > 6:
+                    issues.append("table may have too many rows")
+                if len(slide.table_columns) > 4:
+                    issues.append("table may have too many columns")
+
+            if slide.type.value == "faq" and len(slide.faq_items) > 3:
+                issues.append("faq may be visually crowded")
+
+            if slide.type.value == "chart" and len(slide.chart_categories) > 6:
+                issues.append("chart has many categories for a clean executive view")
+
+            if slide.image_path and self.resolve_asset(slide.image_path) is None:
+                issues.append("image asset is missing and will use placeholder")
+
+            slide_reviews.append(
+                {
+                    "slide_number": index,
+                    "title": title,
+                    "slide_type": slide.type.value,
+                    "issues": issues,
+                    "status": "review" if issues else "ok",
+                }
+            )
+            for issue in issues:
+                warnings.append(f"slide {index:02d} ({title}): {issue}")
+
+        return {
+            "status": "review" if warnings else "ok",
+            "warning_count": len(warnings),
+            "warnings": warnings,
+            "slides": slide_reviews,
+        }
 
     def _render_heading(self, draw: ImageDraw.ImageDraw, slide_spec: Slide, *, eyebrow_default: str | None = None) -> int:
         colors = self.theme.colors
@@ -503,11 +687,15 @@ def render_previews(
     primary_color: str | None = None,
     secondary_color: str | None = None,
     basename: str | None = None,
+    debug_grid: bool = False,
+    debug_safe_areas: bool = False,
 ) -> dict[str, object]:
     renderer = PreviewRenderer(
         theme_name=theme_name,
         asset_root=asset_root,
         primary_color=primary_color,
         secondary_color=secondary_color,
+        debug_grid=debug_grid,
+        debug_safe_areas=debug_safe_areas,
     )
     return renderer.render(spec, output_dir, basename=basename)
