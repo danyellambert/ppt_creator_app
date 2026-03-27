@@ -44,69 +44,51 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
             color=accent,
         )
 
-        content_left = left + 0.28
-        content_width = panel_width - 0.56
-        cursor_top = top + 0.22
-
-        if column.tag:
-            tag_box = renderer.textbox(slide, content_left, cursor_top, content_width, 0.2)
-            renderer.write_paragraph(
-                tag_box.text_frame,
-                column.tag,
-                size=t.small_size,
-                color=colors.muted,
-                bold=True,
-            )
-            renderer.fit_text_frame(tag_box.text_frame, max_size=t.small_size, bold=True)
-            cursor_top += 0.26
-
-        title_box = renderer.textbox(slide, content_left, cursor_top, content_width, 0.42)
-        renderer.write_paragraph(
-            title_box.text_frame,
-            column.title,
-            size=t.body_size + 1,
-            color=colors.navy,
-            bold=True,
+        content_left, content_top, content_width, content_height = renderer.panel_inner_bounds(
+            left=left,
+            top=top,
+            width=panel_width,
+            height=height,
+            padding=0.28,
         )
-        renderer.fit_text_frame(title_box.text_frame, max_size=t.body_size + 1, bold=True)
-        cursor_top += 0.48
 
+        regions: list[dict[str, float | str]] = []
+        if column.tag:
+            regions.append({"kind": "tag", "height": 0.20})
+        regions.append({"kind": "title", "height": 0.42})
         if column.body:
-            body_height = 0.82 if column.bullets else 1.48
-            body_box = renderer.textbox(slide, content_left, cursor_top, content_width, body_height)
-            renderer.write_paragraph(
-                body_box.text_frame,
-                column.body,
-                size=t.body_size - 1,
-                color=colors.text,
-            )
-            renderer.fit_text_frame(body_box.text_frame, max_size=t.body_size - 1)
-            cursor_top += body_height + 0.12
-
-        footer_height = 0.24 if column.footer else 0.0
-        available_bottom = top + height - 0.30 - footer_height
-        bullets_height = max(0.44, available_bottom - cursor_top)
-
+            regions.append({"kind": "body", "height": 0.82 if column.bullets else 1.48})
         if column.bullets:
-            bullets_box = renderer.textbox(slide, content_left, cursor_top, content_width, bullets_height)
-            tf = bullets_box.text_frame
-            for bullet in column.bullets:
-                renderer.write_paragraph(
-                    tf,
-                    f"• {bullet}",
-                    size=t.small_size + 1,
-                    color=colors.text,
-                    space_after=6,
-                )
-            renderer.fit_text_frame(tf, max_size=t.small_size + 1)
-
+            regions.append({"kind": "bullets", "min_height": 0.44, "flex": 1.0})
         if column.footer:
-            footer_box = renderer.textbox(slide, content_left, top + height - 0.34, content_width, 0.22)
-            renderer.write_paragraph(
-                footer_box.text_frame,
-                column.footer,
-                size=t.small_size,
-                color=accent,
-                bold=True,
-            )
-            renderer.fit_text_frame(footer_box.text_frame, max_size=t.small_size, bold=True)
+            regions.append({"kind": "footer", "height": 0.22})
+
+        for region, (region_top, region_height) in renderer.stack_vertical_regions(
+            top=content_top,
+            height=content_height,
+            regions=regions,
+            gap=0.06,
+        ):
+            kind = region["kind"]
+            if kind == "tag":
+                tag_box = renderer.textbox(slide, content_left, region_top, content_width, region_height)
+                renderer.write_paragraph(tag_box.text_frame, column.tag or "", size=t.small_size, color=colors.muted, bold=True)
+                renderer.fit_text_frame(tag_box.text_frame, max_size=t.small_size, bold=True)
+            elif kind == "title":
+                title_box = renderer.textbox(slide, content_left, region_top, content_width, region_height)
+                renderer.write_paragraph(title_box.text_frame, column.title, size=t.body_size + 1, color=colors.navy, bold=True)
+                renderer.fit_text_frame(title_box.text_frame, max_size=t.body_size + 1, bold=True)
+            elif kind == "body":
+                body_box = renderer.textbox(slide, content_left, region_top, content_width, region_height)
+                renderer.write_paragraph(body_box.text_frame, column.body or "", size=t.body_size - 1, color=colors.text)
+                renderer.fit_text_frame(body_box.text_frame, max_size=t.body_size - 1)
+            elif kind == "bullets":
+                bullets_box = renderer.textbox(slide, content_left, region_top, content_width, region_height)
+                tf = bullets_box.text_frame
+                for bullet in column.bullets:
+                    renderer.write_paragraph(tf, f"• {bullet}", size=t.small_size + 1, color=colors.text, space_after=6)
+                renderer.fit_text_frame(tf, max_size=t.small_size + 1)
+            elif kind == "footer":
+                footer_box = renderer.textbox(slide, content_left, region_top, content_width, region_height)
+                renderer.write_paragraph(footer_box.text_frame, column.footer or "", size=t.small_size, color=accent, bold=True)
+                renderer.fit_text_frame(footer_box.text_frame, max_size=t.small_size, bold=True)

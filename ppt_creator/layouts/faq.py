@@ -48,21 +48,39 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
             color=colors.accent if idx % 2 else colors.navy,
         )
 
-        title_box = renderer.textbox(slide, left + 0.22, top + 0.22, panel_width - 0.44, 0.28)
-        renderer.write_paragraph(
-            title_box.text_frame,
-            item.title,
-            size=t.small_size + 2,
-            color=colors.navy,
-            bold=True,
+        content_left, content_top, content_width, content_height = renderer.panel_inner_bounds(
+            left=left,
+            top=top,
+            width=panel_width,
+            height=panel_height,
+            padding=0.22,
         )
-        renderer.fit_text_frame(title_box.text_frame, max_size=t.small_size + 2, bold=True)
 
-        body_box = renderer.textbox(slide, left + 0.22, top + 0.56, panel_width - 0.44, 0.68)
-        renderer.write_paragraph(
-            body_box.text_frame,
-            item.body,
-            size=t.small_size + 1,
-            color=colors.text,
-        )
-        renderer.fit_text_frame(body_box.text_frame, max_size=t.small_size + 1)
+        for region, (region_top, region_height) in renderer.stack_vertical_regions(
+            top=content_top,
+            height=content_height,
+            regions=[
+                {"kind": "title", "height": 0.28},
+                {"kind": "body", "min_height": 0.68, "flex": 1.0},
+            ],
+            gap=0.06,
+        ):
+            if region["kind"] == "title":
+                title_box = renderer.textbox(slide, content_left, region_top, content_width, region_height)
+                renderer.write_paragraph(
+                    title_box.text_frame,
+                    item.title,
+                    size=t.small_size + 2,
+                    color=colors.navy,
+                    bold=True,
+                )
+                renderer.fit_text_frame(title_box.text_frame, max_size=t.small_size + 2, bold=True)
+            else:
+                body_box = renderer.textbox(slide, content_left, region_top, content_width, region_height)
+                renderer.write_paragraph(
+                    body_box.text_frame,
+                    item.body,
+                    size=t.small_size + 1,
+                    color=colors.text,
+                )
+                renderer.fit_text_frame(body_box.text_frame, max_size=t.small_size + 1)

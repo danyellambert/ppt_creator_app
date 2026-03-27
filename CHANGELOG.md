@@ -7,6 +7,8 @@ The format is inspired by Keep a Changelog, and the project aims to follow Seman
 ## [Unreleased]
 
 ### Added
+- initial layout primitive helpers for panel inner bounds and stacked vertical regions
+- initial application of layout primitives to comparison, faq, cards, and two-column slides
 - initial typographic auto-fit for critical homogeneous text boxes in rendered slides
 - expanded initial auto-fit coverage to agenda, metrics, faq, table, and image-text layouts
 - dedicated heuristic `review` flow in CLI/API for deck QA

@@ -636,4 +636,18 @@ Essa cobertura inicial agora já alcança também mais layouts executivos com ma
 - `table`
 - `image_text`
 
+Também começou a entrar uma base bem inicial de **layout primitives** dentro do renderizador, com utilitários para:
+
+- calcular bounds internos de painéis de forma consistente
+- distribuir regiões verticais dentro de painéis compostos
+
+Essa base já começou a ser aplicada em layouts compostos mais exigentes, como:
+
+- `comparison`
+- `faq`
+- `cards`
+- `two_column`
+
+Isso ainda não é um layout engine completo, mas já é o primeiro passo para sair de coordenadas excessivamente rígidas e caminhar para composição mais resiliente.
+
 O próximo passo mais importante continua sendo evoluir de preview sintético para preview fiel ao `.pptx` real.

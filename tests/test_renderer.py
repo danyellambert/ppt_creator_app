@@ -99,3 +99,22 @@ def test_fit_text_frame_reduces_font_size_for_tight_box() -> None:
     run = shape.text_frame.paragraphs[0].runs[0]
     assert run.font.size is not None
     assert run.font.size.pt <= 28
+
+
+def test_stack_vertical_regions_distributes_flexible_space() -> None:
+    renderer = PresentationRenderer(asset_root="examples")
+
+    regions = renderer.stack_vertical_regions(
+        top=1.0,
+        height=2.0,
+        regions=[
+            {"kind": "title", "height": 0.3},
+            {"kind": "body", "min_height": 0.4, "flex": 1.0},
+            {"kind": "footer", "height": 0.2},
+        ],
+        gap=0.1,
+    )
+
+    assert len(regions) == 3
+    body_bounds = regions[1][1]
+    assert body_bounds[1] > 0.4

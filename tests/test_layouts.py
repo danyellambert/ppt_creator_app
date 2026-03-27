@@ -372,6 +372,43 @@ def test_long_content_layouts_render_with_initial_autofit(tmp_path: Path) -> Non
                     "image_path": "missing-image.png",
                     "image_caption": "A deliberately long placeholder caption describing the intended image and how it supports the business narrative.",
                 },
+                {
+                    "type": "cards",
+                    "title": "Cards stress case",
+                    "cards": [
+                        {
+                            "title": "A longer card title that should remain visually stable",
+                            "body": "This card body is intentionally verbose so the renderer needs to reduce type size and keep the panel composition balanced across cards.",
+                            "footer": "Important footer note",
+                        },
+                        {
+                            "title": "Second card with long narrative",
+                            "body": "Another long card body used to exercise the first generation of stacked panel primitives in executive card layouts.",
+                        },
+                        {
+                            "title": "Third card",
+                            "body": "Still intentionally long for stress testing the layout behavior under denser content conditions.",
+                        },
+                    ],
+                },
+                {
+                    "type": "two_column",
+                    "title": "Two column stress case",
+                    "two_column_columns": [
+                        {
+                            "title": "Current narrative under pressure",
+                            "body": "This body text is deliberately long so the renderer needs to distribute vertical space more intelligently.",
+                            "bullets": [long_bullet, long_bullet],
+                            "footer": "Current state footer",
+                        },
+                        {
+                            "title": "Target narrative under pressure",
+                            "body": "A second long body helps validate that both columns keep a more coherent composition.",
+                            "bullets": [long_bullet, long_bullet],
+                            "footer": "Target state footer",
+                        },
+                    ],
+                },
             ],
         }
     )
@@ -382,4 +419,4 @@ def test_long_content_layouts_render_with_initial_autofit(tmp_path: Path) -> Non
 
     assert rendered.exists()
     presentation = Presentation(str(rendered))
-    assert len(presentation.slides) == 5
+    assert len(presentation.slides) == 7

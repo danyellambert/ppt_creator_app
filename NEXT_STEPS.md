@@ -183,6 +183,9 @@ Ao fim dessa fase, o projeto ganha um **design system interno real**, não só u
 Mesmo com a Fase 1 concluída, ainda há uma camada importante de refinamento visual a perseguir para o projeto atingir nível realmente premium:
 
 - [ ] substituir coordenadas mais rígidas por primitives de layout e constraints semânticas
+  - [x] primeira primitive utilitária para bounds internos de painéis e distribuição vertical de regiões
+  - [x] primeira aplicação dessas primitives em layouts compostos (`comparison`, `faq`, `cards`, `two_column`)
+  - [ ] expandir primitives para stacks/rows/columns semânticos de uso geral
 - [ ] criar stacks/rows/columns reutilizáveis para reduzir desalinhamentos entre layouts
 - [ ] adicionar auto-fit tipográfico e controle de overflow por bloco
   - [x] primeira camada de auto-fit em títulos, subtitles e caixas homogêneas críticas
@@ -463,6 +466,9 @@ Se a meta for perseguir o nível “deck quase pronto sem retoque manual”, a o
 ### Prioridade 2 — Refatoração do motor de layout
 
 - [ ] primitives de layout (`stack`, `grid`, `two-column`, `panel row`)
+  - [x] primeira base utilitária para inner bounds e distribuição vertical de regiões
+  - [x] primeira aplicação em layouts compostos já existentes
+  - [ ] consolidar primitives reutilizáveis de mais alto nível
 - [ ] constraints semânticas em vez de posições excessivamente rígidas
 - [ ] auto-fit real de texto por caixa
   - [x] primeira camada aplicada em caixas homogêneas críticas

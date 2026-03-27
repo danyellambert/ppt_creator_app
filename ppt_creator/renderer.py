@@ -206,6 +206,50 @@ class PresentationRenderer:
         pad = padding if padding is not None else self.theme.components.panel_padding
         return self.textbox(slide, left + pad, top + pad, width - (pad * 2), height - (pad * 2))
 
+    def panel_inner_bounds(
+        self,
+        *,
+        left: float,
+        top: float,
+        width: float,
+        height: float,
+        padding: float | None = None,
+    ) -> tuple[float, float, float, float]:
+        pad = padding if padding is not None else self.theme.components.panel_padding
+        return left + pad, top + pad, width - (pad * 2), height - (pad * 2)
+
+    def stack_vertical_regions(
+        self,
+        *,
+        top: float,
+        height: float,
+        regions: list[dict[str, float | str]],
+        gap: float,
+    ) -> list[tuple[dict[str, float | str], tuple[float, float]]]:
+        if not regions:
+            return []
+
+        base_heights: list[float] = []
+        flex_total = 0.0
+        for region in regions:
+            base_height = float(region.get("height") or region.get("min_height") or 0.0)
+            base_heights.append(base_height)
+            flex_total += float(region.get("flex") or 0.0)
+
+        gap_total = gap * max(0, len(regions) - 1)
+        remaining = max(0.0, height - sum(base_heights) - gap_total)
+
+        bounds: list[tuple[dict[str, float | str], tuple[float, float]]] = []
+        cursor_top = top
+        for region, base_height in zip(regions, base_heights, strict=True):
+            extra = 0.0
+            if flex_total > 0 and float(region.get("flex") or 0.0) > 0:
+                extra = remaining * (float(region.get("flex") or 0.0) / flex_total)
+            region_height = base_height + extra
+            bounds.append((region, (cursor_top, region_height)))
+            cursor_top += region_height + gap
+        return bounds
+
     def add_quote_block(
         self,
         slide: "PptxSlide",
