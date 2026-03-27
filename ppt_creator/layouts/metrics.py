@@ -32,13 +32,28 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
     value_size = t.metric_value_size if variant == "standard" else t.metric_value_size - 4
     label_size = t.metric_label_size + 1 if variant == "standard" else t.metric_label_size
     detail_size = t.small_size + 1 if variant == "standard" else t.small_size
+    metric_flexes = renderer.normalize_content_flexes(
+        [
+            renderer.estimate_content_weight(
+                title=metric.label,
+                body=metric.detail,
+                footer=metric.trend,
+            )
+            for metric in metrics
+        ],
+        min_flex=0.95,
+        max_flex=1.25,
+    )
 
     metric_columns = renderer.build_columns(
         left=left,
         width=total_width,
         gap=gap,
-        count=len(metrics),
         min_width=1.8,
+        regions=[
+            {"kind": f"metric_{index + 1}", "min_width": 1.8, "flex": flex}
+            for index, flex in enumerate(metric_flexes)
+        ],
     )
 
     for idx, (metric, (x, card_width)) in enumerate(zip(metrics, metric_columns, strict=True)):

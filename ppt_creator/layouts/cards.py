@@ -18,6 +18,18 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
 
     top = 2.55
     gap = 0.35
+    card_flexes = renderer.normalize_content_flexes(
+        [
+            renderer.estimate_content_weight(
+                title=card.title,
+                body=card.body,
+                footer=card.footer,
+            )
+            for card in slide_spec.cards
+        ],
+        min_flex=0.95,
+        max_flex=1.25,
+    )
 
     card_bounds = renderer.build_panel_row_bounds(
         left=g.content_left,
@@ -25,8 +37,11 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
         width=g.content_width,
         height=2.95,
         gap=gap,
-        count=len(slide_spec.cards),
         min_width=3.0,
+        regions=[
+            {"kind": f"card_{index + 1}", "min_width": 3.0, "flex": flex}
+            for index, flex in enumerate(card_flexes)
+        ],
     )
 
     for idx, (card, (x, panel_top, card_width, panel_height)) in enumerate(zip(slide_spec.cards, card_bounds, strict=True)):

@@ -667,6 +667,7 @@ Também começou a entrar uma base bem inicial de **layout primitives** dentro d
 - distribuir regiões horizontais para rows/columns de forma reutilizável
 - compor grids simples a partir dessas regiões para layouts multi-painel
 - expor helpers mais semânticos para `columns`, `rows`, `panel rows` e `panel grids`
+- usar pesos de conteúdo para começar a balancear larguras e alturas automaticamente
 
 Essa base já começou a ser aplicada em layouts compostos mais exigentes, como:
 
@@ -677,6 +678,8 @@ Essa base já começou a ser aplicada em layouts compostos mais exigentes, como:
 - `metrics`
 - `table`
 - `summary`
+
+Além disso, alguns layouts já começaram a ganhar um primeiro balanceamento automático baseado em densidade de conteúdo, especialmente em colunas/rows como `metrics`, `cards`, `table`, `comparison`, `two_column`, `faq` e `summary`.
 
 Isso ainda não é um layout engine completo, mas já é o primeiro passo para sair de coordenadas excessivamente rígidas e caminhar para composição mais resiliente.
 

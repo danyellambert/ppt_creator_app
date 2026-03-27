@@ -195,6 +195,8 @@ Mesmo com a Fase 1 concluída, ainda há uma camada importante de refinamento vi
   - [x] expansão inicial para layouts com maior risco de overflow (`agenda`, `metrics`, `faq`, `table`, `image_text`)
   - [ ] expandir auto-fit para todos os layouts e blocos compostos
 - [ ] balancear melhor colunas, cards e painéis quando o conteúdo variar
+  - [x] primeira camada de balanceamento adaptativo por peso de conteúdo em `metrics`, `cards`, `table`, `comparison`, `two_column`, `faq` e `summary`
+  - [ ] expandir balanceamento para todos os layouts e heurísticas mais fortes
 - [ ] formalizar baseline vertical e anchors consistentes por tipo de slide
 - [ ] revisar visualmente, slide a slide, os layouts `title`, `metrics`, `comparison`, `table`, `faq`, `summary` e `closing`
 
@@ -484,6 +486,8 @@ Se a meta for perseguir o nível “deck quase pronto sem retoque manual”, a o
   - [x] expansão inicial para layouts executivos com risco maior de densidade/overflow
   - [ ] expansão para caixas compostas, grids e painéis complexos
 - [ ] balanceamento automático de alturas e colunas
+  - [x] primeira camada guiada por peso de conteúdo já aplicada em layouts executivos chave
+  - [ ] expandir para regras mais fortes e consistentes em todo o sistema
 - [ ] prevenção mais forte de overflow visual
 
 ### Prioridade 3 — Polimento visual por layout

@@ -20,14 +20,31 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
     gap = 0.42
     top = 2.3
     height = 3.25
+    column_flexes = renderer.normalize_content_flexes(
+        [
+            renderer.estimate_content_weight(
+                title=column.title,
+                body=column.body,
+                bullets=column.bullets,
+                footer=column.footer,
+                tag=column.tag,
+            )
+            for column in slide_spec.two_column_columns
+        ],
+        min_flex=0.95,
+        max_flex=1.2,
+    )
     panel_bounds = renderer.build_panel_row_bounds(
         left=g.content_left,
         top=top,
         width=g.content_width,
         height=height,
         gap=gap,
-        count=len(slide_spec.two_column_columns),
         min_width=3.6,
+        regions=[
+            {"kind": f"two_column_{index + 1}", "min_width": 3.6, "flex": flex}
+            for index, flex in enumerate(column_flexes)
+        ],
     )
 
     for idx, (column, (left, panel_top, panel_width, panel_height)) in enumerate(zip(slide_spec.two_column_columns, panel_bounds, strict=True)):

@@ -23,7 +23,18 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
     panel_height = 1.35
     top_start = 2.25
     row_count = (len(items) + columns - 1) // columns
-    total_height = row_count * panel_height + max(0, row_count - 1) * 0.24
+    total_height = 3.15 if row_count > 1 else 1.55
+    row_flexes = renderer.normalize_content_flexes(
+        [
+            max(
+                renderer.estimate_content_weight(title=item.title, body=item.body)
+                for item in items[row_index * columns : (row_index + 1) * columns]
+            )
+            for row_index in range(row_count)
+        ],
+        min_flex=0.9,
+        max_flex=1.35,
+    )
     grid_bounds = renderer.build_panel_grid(
         left=g.content_left,
         top=top_start,
@@ -32,9 +43,11 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
         column_gap=panel_gap,
         row_gap=0.24,
         column_count=columns,
-        row_count=row_count,
         column_min_width=3.2,
-        row_min_height=panel_height,
+        row_regions=[
+            {"kind": f"row_{index + 1}", "min_height": 1.15, "flex": flex}
+            for index, flex in enumerate(row_flexes)
+        ],
     )
 
     for idx, item in enumerate(items):

@@ -387,6 +387,48 @@ class PresentationRenderer:
             row_gap=row_gap,
         )
 
+    def estimate_content_weight(
+        self,
+        *,
+        title: str | None = None,
+        body: str | None = None,
+        bullets: list[str] | None = None,
+        footer: str | None = None,
+        tag: str | None = None,
+    ) -> float:
+        bullet_items = bullets or []
+        weight = 1.0
+        if title:
+            weight += min(0.8, len(title.split()) / 7)
+        if body:
+            weight += min(1.4, len(body.split()) / 18)
+        if footer:
+            weight += min(0.35, len(footer.split()) / 10)
+        if tag:
+            weight += min(0.25, len(tag.split()) / 6)
+        for bullet in bullet_items:
+            weight += min(0.3, len(bullet.split()) / 14)
+        return weight
+
+    def normalize_content_flexes(
+        self,
+        weights: list[float],
+        *,
+        min_flex: float = 0.9,
+        max_flex: float = 1.35,
+    ) -> list[float]:
+        if not weights:
+            return []
+        min_weight = min(weights)
+        max_weight = max(weights)
+        if max_weight == min_weight:
+            return [1.0 for _ in weights]
+        span = max_flex - min_flex
+        return [
+            min_flex + ((weight - min_weight) / (max_weight - min_weight)) * span
+            for weight in weights
+        ]
+
     def build_grid_bounds(
         self,
         *,

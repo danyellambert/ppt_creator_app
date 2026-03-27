@@ -21,17 +21,25 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
     )
 
     if has_body and has_bullets:
-        split_regions = renderer.stack_horizontal_regions(
+        split_flexes = renderer.normalize_content_flexes(
+            [
+                renderer.estimate_content_weight(title=slide_spec.title, body=slide_spec.body),
+                renderer.estimate_content_weight(bullets=slide_spec.bullets),
+            ],
+            min_flex=0.9,
+            max_flex=1.4,
+        )
+        split_regions = renderer.build_columns(
             left=g.content_left,
             width=g.content_width,
             regions=[
-                {"kind": "narrative", "min_width": 6.2, "flex": 1.35},
-                {"kind": "panel", "min_width": 3.4, "flex": 0.85},
+                {"kind": "narrative", "min_width": 6.2, "flex": split_flexes[0]},
+                {"kind": "panel", "min_width": 3.4, "flex": split_flexes[1]},
             ],
             gap=0.35,
         )
-        narrative_left, narrative_width = split_regions[0][1]
-        panel_left, panel_width = split_regions[1][1]
+        narrative_left, narrative_width = split_regions[0]
+        panel_left, panel_width = split_regions[1]
 
         body_box = renderer.textbox(slide, narrative_left, 2.35, narrative_width, 1.55)
         renderer.write_paragraph(

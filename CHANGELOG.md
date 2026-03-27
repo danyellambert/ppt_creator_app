@@ -12,6 +12,7 @@ The format is inspired by Keep a Changelog, and the project aims to follow Seman
 - horizontal layout primitives for reusable row/column distribution, now applied to metrics, cards, and table layouts
 - simple grid composition helpers built on top of layout primitives, now applied to comparison, two-column, FAQ, and summary layouts
 - higher-level semantic layout helpers for columns, panel rows, and panel grids, now reused across multiple executive layouts
+- initial content-aware balancing for widths/heights in metrics, cards, table, comparison, two-column, FAQ, and summary layouts
 - optional office-aware preview backend selection with automatic fallback to synthetic previews
 - initial layout primitive helpers for panel inner bounds and stacked vertical regions
 - initial application of layout primitives to comparison, faq, cards, and two-column slides

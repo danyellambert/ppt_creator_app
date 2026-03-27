@@ -205,3 +205,27 @@ def test_build_panel_grid_creates_matrix_from_counts() -> None:
 
     assert len(grid) == 2
     assert len(grid[0]) == 2
+
+
+def test_estimate_content_weight_increases_with_more_content() -> None:
+    renderer = PresentationRenderer(asset_root="examples")
+
+    light = renderer.estimate_content_weight(title="Short")
+    heavy = renderer.estimate_content_weight(
+        title="Longer title for comparison",
+        body="This body contains substantially more words and should therefore produce a higher estimated content weight.",
+        bullets=["A long bullet explaining more context", "Another long bullet with more detail"],
+    )
+
+    assert heavy > light
+
+
+def test_normalize_content_flexes_returns_scaled_values() -> None:
+    renderer = PresentationRenderer(asset_root="examples")
+
+    flexes = renderer.normalize_content_flexes([1.0, 2.0, 3.0], min_flex=0.8, max_flex=1.4)
+
+    assert len(flexes) == 3
+    assert min(flexes) >= 0.8
+    assert max(flexes) <= 1.4
+    assert flexes[0] < flexes[-1]

@@ -30,13 +30,27 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
     gap = 0.06
     header_height = 0.48
     row_height = 0.52
+    column_flexes = renderer.normalize_content_flexes(
+        [
+            renderer.estimate_content_weight(
+                title=column,
+                body=" ".join(row[index] for row in rows if index < len(row)),
+            )
+            for index, column in enumerate(columns)
+        ],
+        min_flex=0.85,
+        max_flex=1.5,
+    )
 
     column_bounds = renderer.build_columns(
         left=g.content_left,
         width=g.content_width,
         gap=gap,
-        count=len(columns),
         min_width=1.0,
+        regions=[
+            {"kind": f"column_{index + 1}", "min_width": 1.0, "flex": flex}
+            for index, flex in enumerate(column_flexes)
+        ],
     )
 
     for column, (left, column_width) in zip(columns, column_bounds, strict=True):
