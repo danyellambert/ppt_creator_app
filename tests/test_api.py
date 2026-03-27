@@ -114,6 +114,35 @@ def test_api_validate_render_and_template_endpoints(tmp_path: Path) -> None:
         assert preview_payload["result"]["backend_requested"] == "auto"
         assert preview_payload["result"]["backend_used"] in {"synthetic", "office"}
         assert Path(preview_payload["result"]["thumbnail_sheet"]).exists()
+
+        baseline_dir = tmp_path / "api_baseline_previews"
+        status, baseline_preview_payload = _request_json(
+            f"{base_url}/preview",
+            {
+                "spec": spec_payload,
+                "output_dir": str(baseline_dir),
+                "basename": "api-baseline",
+            },
+            method="POST",
+        )
+        assert status == 200
+        assert baseline_preview_payload["result"]["preview_count"] == len(spec_payload["slides"])
+
+        regression_dir = tmp_path / "api_regression_previews"
+        status, regression_preview_payload = _request_json(
+            f"{base_url}/preview",
+            {
+                "spec": spec_payload,
+                "output_dir": str(regression_dir),
+                "basename": "api-regression",
+                "baseline_dir": str(baseline_dir),
+                "write_diff_images": True,
+            },
+            method="POST",
+        )
+        assert status == 200
+        assert regression_preview_payload["result"]["visual_regression"] is not None
+        assert regression_preview_payload["result"]["visual_regression"]["diff_count"] == 0
     finally:
         server.shutdown()
         server.server_close()

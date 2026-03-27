@@ -155,6 +155,9 @@ def preview_spec_payload(
     debug_grid: bool = False,
     debug_safe_areas: bool = False,
     backend: str = "auto",
+    baseline_dir: str | Path | None = None,
+    diff_threshold: float = 0.01,
+    write_diff_images: bool = False,
 ) -> dict[str, object]:
     spec = PresentationInput.model_validate(spec_payload)
     effective_theme = theme_name or spec.presentation.theme
@@ -169,6 +172,9 @@ def preview_spec_payload(
         debug_grid=debug_grid,
         debug_safe_areas=debug_safe_areas,
         backend=backend,
+        baseline_dir=baseline_dir,
+        diff_threshold=diff_threshold,
+        write_diff_images=write_diff_images,
     )
 
 
@@ -304,6 +310,9 @@ class PptCreatorAPIHandler(BaseHTTPRequestHandler):
                     debug_grid=bool(payload.get("debug_grid", False)),
                     debug_safe_areas=bool(payload.get("debug_safe_areas", False)),
                     backend=str(payload["preview_backend"]) if payload.get("preview_backend") else "auto",
+                    baseline_dir=payload.get("baseline_dir"),
+                    diff_threshold=float(payload.get("diff_threshold", 0.01)),
+                    write_diff_images=bool(payload.get("write_diff_images", False)),
                 )
                 self._json_response(HTTPStatus.OK, {"result": result})
                 return

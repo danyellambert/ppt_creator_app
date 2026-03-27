@@ -489,6 +489,15 @@ Hoje, se o runtime de Office não estiver instalado, o sistema cai automaticamen
 
 A folha de thumbnails também começou a incorporar sinais do review heurístico, destacando slides mais arriscados com badges de risco e regiões prováveis de overflow.
 
+Também entrou uma primeira camada de **regressão visual baseada em golden previews**:
+
+```bash
+python -m ppt_creator.cli preview examples/ai_sales.json outputs/previews \
+  --baseline-dir outputs/golden-previews --write-diff-images
+```
+
+Isso permite comparar os previews atuais contra um diretório baseline, gerar scores de diferença por slide e opcionalmente salvar imagens de diff para inspeção.
+
 ## Modo API / serviço
 
 Também existe um modo HTTP simples para integrar o `ppt_creator` em outros fluxos:

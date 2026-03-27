@@ -75,6 +75,18 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Overlay safe-area bounds on preview images",
     )
+    preview_parser.add_argument("--baseline-dir", help="Optional directory of golden preview PNGs for regression comparison")
+    preview_parser.add_argument(
+        "--diff-threshold",
+        type=float,
+        default=0.01,
+        help="Threshold used to flag preview regressions against baseline images",
+    )
+    preview_parser.add_argument(
+        "--write-diff-images",
+        action="store_true",
+        help="Write per-slide diff images when running baseline comparison",
+    )
     preview_parser.add_argument("--report-json", help="Optional path to write a JSON preview report")
 
     validate_parser = subparsers.add_parser("validate", help="Validate JSON without rendering")
@@ -388,6 +400,9 @@ def preview_one(
     debug_grid: bool = False,
     debug_safe_areas: bool = False,
     backend: str = "auto",
+    baseline_dir: str | None = None,
+    diff_threshold: float = 0.01,
+    write_diff_images: bool = False,
 ) -> dict[str, object]:
     input_path = Path(input_json)
     print_info(f"Loading input: {input_path}")
@@ -411,6 +426,9 @@ def preview_one(
         debug_grid=debug_grid,
         debug_safe_areas=debug_safe_areas,
         backend=backend,
+        baseline_dir=baseline_dir,
+        diff_threshold=diff_threshold,
+        write_diff_images=write_diff_images,
     )
     print(
         f"[OK] Generated previews: {result['preview_count']} slide image(s) + thumbnail sheet"
@@ -418,6 +436,12 @@ def preview_one(
     if result["quality_review"]["warning_count"]:
         print_info(
             f"Preview quality review flagged {result['quality_review']['warning_count']} issue(s)"
+        )
+    if result["visual_regression"] is not None:
+        print_info(
+            "Preview regression check: "
+            f"{result['visual_regression']['diff_count']} diff(s), "
+            f"{result['visual_regression']['missing_baseline_count']} missing baseline(s)"
         )
     return build_preview_report(
         input_path=input_path,
@@ -498,6 +522,9 @@ def main(argv: list[str] | None = None) -> int:
                 debug_grid=args.debug_grid,
                 debug_safe_areas=args.debug_safe_areas,
                 backend=args.backend,
+                baseline_dir=args.baseline_dir,
+                diff_threshold=args.diff_threshold,
+                write_diff_images=args.write_diff_images,
             )
             if args.report_json:
                 write_report(args.report_json, report)

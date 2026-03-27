@@ -253,3 +253,43 @@ def test_cli_preview_auto_backend_reports_synthetic_fallback(tmp_path: Path, mon
     payload = json.loads(report_path.read_text(encoding="utf-8"))
     assert payload["backend_requested"] == "auto"
     assert payload["backend_used"] == "synthetic"
+
+
+def test_cli_preview_supports_visual_regression_against_baseline(tmp_path: Path) -> None:
+    baseline_dir = tmp_path / "baseline_previews"
+    current_dir = tmp_path / "current_previews"
+    report_path = tmp_path / "regression_report.json"
+
+    baseline_result = main(
+        [
+            "preview",
+            "examples/ai_sales.json",
+            str(baseline_dir),
+            "--basename",
+            "baseline-deck",
+        ]
+    )
+    assert baseline_result == 0
+
+    result = main(
+        [
+            "preview",
+            "examples/ai_sales.json",
+            str(current_dir),
+            "--basename",
+            "current-deck",
+            "--baseline-dir",
+            str(baseline_dir),
+            "--write-diff-images",
+            "--report-json",
+            str(report_path),
+        ]
+    )
+
+    assert result == 0
+    payload = json.loads(report_path.read_text(encoding="utf-8"))
+    assert payload["visual_regression"] is not None
+    assert payload["visual_regression"]["status"] == "ok"
+    assert payload["visual_regression"]["diff_count"] == 0
+    assert payload["visual_regression"]["compared_preview_count"] == 10
+    assert len(payload["visual_regression"]["diff_images"]) == 10

@@ -341,6 +341,8 @@ Como a qualidade percebida do deck depende muito da inspeção visual, existe um
 - [x] preparar seleção de backend com tentativa de preview via runtime Office e fallback limpo para o sintético
 - [ ] gerar preview a partir do `.pptx` real em vez de uma reconstrução paralela em Pillow
 - [ ] adicionar regressão visual baseada em previews reais/golden files
+  - [x] primeira camada de comparação contra golden previews com diffs opcionais
+  - [ ] evoluir para comparação baseada preferencialmente em preview do `.pptx` real
 - [ ] criar detectores mais fortes de colisão, overflow e clipping
   - [x] primeira camada heurística de risco de overflow e desbalanceamento exposta no review/QA
   - [x] sumarização de slides mais arriscados e sinais de clipping/overflow em relatórios de QA

@@ -6,7 +6,7 @@ import subprocess
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageChops, ImageDraw, ImageFont, ImageStat
 
 from ppt_creator.qa import review_presentation
 from ppt_creator.renderer import PresentationRenderer
@@ -65,6 +65,35 @@ def _load_font(size: int, *, bold: bool = False) -> ImageFont.ImageFont:
     return ImageFont.load_default()
 
 
+def _list_preview_images(path: str | Path) -> list[Path]:
+    root = Path(path)
+    return sorted(
+        file_path
+        for file_path in root.glob("*.png")
+        if not file_path.name.endswith("-thumbnails.png") and "-diff-" not in file_path.stem
+    )
+
+
+def _normalized_diff_score(generated: Image.Image, baseline: Image.Image) -> tuple[float, float, Image.Image]:
+    left = generated.convert("RGB")
+    right = baseline.convert("RGB")
+    size_mismatch = left.size != right.size
+    if size_mismatch:
+        right = right.resize(left.size)
+
+    diff = ImageChops.difference(left, right)
+    grayscale = diff.convert("L")
+    mean_diff = float(ImageStat.Stat(grayscale).mean[0]) / 255.0
+    histogram = grayscale.histogram()
+    changed_pixels = sum(count for index, count in enumerate(histogram) if index > 0)
+    total_pixels = max(1, grayscale.size[0] * grayscale.size[1])
+    changed_ratio = changed_pixels / total_pixels
+    if size_mismatch:
+        mean_diff = max(mean_diff, 1.0)
+        changed_ratio = max(changed_ratio, 1.0)
+    return mean_diff, changed_ratio, diff
+
+
 def _wrap_text(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.ImageFont, max_width: int) -> list[str]:
     lines: list[str] = []
     for paragraph in text.splitlines() or [text]:
@@ -95,6 +124,9 @@ class PreviewRenderer:
         debug_grid: bool = False,
         debug_safe_areas: bool = False,
         backend: str = "auto",
+        baseline_dir: str | Path | None = None,
+        diff_threshold: float = 0.01,
+        write_diff_images: bool = False,
     ):
         self.requested_theme_name = theme_name
         self.requested_primary_color = primary_color
@@ -103,6 +135,9 @@ class PreviewRenderer:
         self.debug_grid = debug_grid
         self.debug_safe_areas = debug_safe_areas
         self.backend = backend
+        self.baseline_dir = Path(baseline_dir).resolve() if baseline_dir else None
+        self.diff_threshold = diff_threshold
+        self.write_diff_images = write_diff_images
         self.theme = get_theme(theme_name, primary_color=primary_color, secondary_color=secondary_color)
 
     def render(self, spec: PresentationInput, output_dir: str | Path, *, basename: str | None = None) -> dict[str, object]:
@@ -146,6 +181,12 @@ class PreviewRenderer:
             quality_review=quality_review,
         )
 
+        visual_regression = self.build_visual_regression_report(
+            preview_paths,
+            destination,
+            base,
+        )
+
         return {
             "mode": "preview",
             "output_dir": str(destination),
@@ -153,6 +194,7 @@ class PreviewRenderer:
             "previews": preview_paths,
             "thumbnail_sheet": str(contact_sheet_path),
             "quality_review": quality_review,
+            "visual_regression": visual_regression,
             "debug_grid": self.debug_grid,
             "debug_safe_areas": self.debug_safe_areas,
             "backend_requested": self.backend,
@@ -364,6 +406,67 @@ class PreviewRenderer:
         destination.parent.mkdir(parents=True, exist_ok=True)
         sheet.save(destination)
         return destination
+
+    def build_visual_regression_report(
+        self,
+        preview_paths: list[str],
+        output_dir: Path,
+        base: str,
+    ) -> dict[str, object] | None:
+        if self.baseline_dir is None:
+            return None
+
+        baseline_images = _list_preview_images(self.baseline_dir)
+        compared = min(len(preview_paths), len(baseline_images))
+        diff_images: list[str] = []
+        slide_reports: list[dict[str, object]] = []
+        diff_count = 0
+        missing_baseline_count = max(0, len(preview_paths) - len(baseline_images))
+
+        for index in range(compared):
+            generated_path = Path(preview_paths[index])
+            baseline_path = baseline_images[index]
+            generated_image = Image.open(generated_path)
+            baseline_image = Image.open(baseline_path)
+            mean_diff, changed_ratio, diff_image = _normalized_diff_score(generated_image, baseline_image)
+            regression = mean_diff > self.diff_threshold or changed_ratio > self.diff_threshold
+            if regression:
+                diff_count += 1
+
+            diff_image_path: str | None = None
+            if self.write_diff_images:
+                target_path = output_dir / f"{base}-diff-{index + 1:02d}.png"
+                diff_image.save(target_path)
+                diff_image_path = str(target_path)
+                diff_images.append(diff_image_path)
+
+            slide_reports.append(
+                {
+                    "slide_number": index + 1,
+                    "generated_path": str(generated_path),
+                    "baseline_path": str(baseline_path),
+                    "mean_diff": round(mean_diff, 6),
+                    "changed_ratio": round(changed_ratio, 6),
+                    "regression": regression,
+                    "diff_image": diff_image_path,
+                }
+            )
+
+        status = "ok"
+        if diff_count or missing_baseline_count:
+            status = "review"
+
+        return {
+            "status": status,
+            "baseline_dir": str(self.baseline_dir),
+            "threshold": self.diff_threshold,
+            "compared_preview_count": compared,
+            "baseline_preview_count": len(baseline_images),
+            "diff_count": diff_count,
+            "missing_baseline_count": missing_baseline_count,
+            "slides": slide_reports,
+            "diff_images": diff_images,
+        }
 
     def _x(self, value_in_inches: float) -> int:
         return int((value_in_inches / self.theme.canvas.width) * PREVIEW_WIDTH)
@@ -771,6 +874,9 @@ def render_previews(
     debug_grid: bool = False,
     debug_safe_areas: bool = False,
     backend: str = "auto",
+    baseline_dir: str | Path | None = None,
+    diff_threshold: float = 0.01,
+    write_diff_images: bool = False,
 ) -> dict[str, object]:
     renderer = PreviewRenderer(
         theme_name=theme_name,
@@ -780,5 +886,8 @@ def render_previews(
         debug_grid=debug_grid,
         debug_safe_areas=debug_safe_areas,
         backend=backend,
+        baseline_dir=baseline_dir,
+        diff_threshold=diff_threshold,
+        write_diff_images=write_diff_images,
     )
     return renderer.render(spec, output_dir, basename=basename)
