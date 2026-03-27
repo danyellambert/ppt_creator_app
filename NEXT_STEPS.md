@@ -365,6 +365,7 @@ Qualquer camada de IA deve ser opcional.
 - [x] revisar densidade de conteúdo por slide
 - [ ] integrar provedores reais de LLM de forma opcional (`OpenAI`, `Anthropic`, `Ollama`, etc.)
   - [x] provider local via GGUF/`llama.cpp` para modelos como `PPTAgent`
+  - [x] endurecer execução local em modo não interativo com timeout e captura opcional de saída bruta
   - [ ] providers remotos (`OpenAI`, `Anthropic`) e/ou locais adicionais (`Ollama`)
 - [ ] usar LLM para revisão iterativa de narrativa após o primeiro deck ser gerado
 - [ ] usar LLM para reescrever títulos, subtitles e summaries em tom mais executivo

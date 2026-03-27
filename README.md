@@ -408,12 +408,19 @@ export PPT_CREATOR_AI_CTX_SIZE=8192
 export PPT_CREATOR_AI_MAX_TOKENS=1800
 export PPT_CREATOR_AI_GPU_LAYERS=-1
 export PPT_CREATOR_AI_TEMPERATURE=0.2
+export PPT_CREATOR_AI_TIMEOUT_SECONDS=180
 ```
 
 Pré-requisito:
 
 ```bash
 brew install llama.cpp
+```
+
+O provider local agora força modo **não conversacional** (`--no-conversation`) e `--simple-io` para evitar que o `llama-cli` fique preso esperando input interativo no final da geração. Se quiser guardar a saída bruta do modelo para debug:
+
+```bash
+export PPT_CREATOR_AI_RAW_OUTPUT_PATH=outputs/pptagent_raw_output.txt
 ```
 
 Os comandos da CLI agora também emitem logs mais claros com prefixos como:

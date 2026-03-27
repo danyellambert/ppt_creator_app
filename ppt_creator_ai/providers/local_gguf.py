@@ -75,6 +75,8 @@ class PPTAgentLocalProvider:
         max_tokens = os.environ.get("PPT_CREATOR_AI_MAX_TOKENS", "1800")
         gpu_layers = os.environ.get("PPT_CREATOR_AI_GPU_LAYERS", "-1")
         temperature = os.environ.get("PPT_CREATOR_AI_TEMPERATURE", "0.2")
+        timeout_seconds = int(os.environ.get("PPT_CREATOR_AI_TIMEOUT_SECONDS", "180"))
+        raw_output_path = os.environ.get("PPT_CREATOR_AI_RAW_OUTPUT_PATH")
 
         command = [
             "llama-cli",
@@ -88,11 +90,31 @@ class PPTAgentLocalProvider:
             max_tokens,
             "--temp",
             temperature,
+            "--no-conversation",
+            "--simple-io",
             "-p",
             prompt,
         ]
-        completed = subprocess.run(command, capture_output=True, text=True, check=False)
+        try:
+            completed = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                check=False,
+                stdin=subprocess.DEVNULL,
+                timeout=timeout_seconds,
+            )
+        except subprocess.TimeoutExpired as exc:
+            partial_output = ((exc.stdout or "") + (f"\n{exc.stderr}" if exc.stderr else "")).strip()
+            if raw_output_path:
+                Path(raw_output_path).write_text(partial_output + "\n", encoding="utf-8")
+            raise RuntimeError(
+                "llama-cli timed out before finishing. This often means the model is too slow or entered an unexpected mode. "
+                f"Increase PPT_CREATOR_AI_TIMEOUT_SECONDS if needed. Partial output: {partial_output[:400]}"
+            ) from exc
         output = (completed.stdout or "") + (f"\n{completed.stderr}" if completed.stderr else "")
+        if raw_output_path:
+            Path(raw_output_path).write_text(output + "\n", encoding="utf-8")
         if completed.returncode != 0:
             raise RuntimeError(f"llama-cli failed with exit code {completed.returncode}: {output.strip()}")
         return output

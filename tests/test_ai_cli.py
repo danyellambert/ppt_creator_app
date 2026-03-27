@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 
 from ppt_creator.schema import PresentationInput
@@ -100,3 +101,20 @@ def test_ai_cli_can_use_local_provider_when_mocked(tmp_path: Path, monkeypatch) 
     assert result == 0
     spec = PresentationInput.from_path(output)
     assert spec.presentation.title == "AI copilots for sales teams"
+
+
+def test_local_provider_timeout_surfaces_clear_error(monkeypatch) -> None:
+    provider = get_provider("pptagent_local")
+
+    def _timeout(*args, **kwargs):
+        raise subprocess.TimeoutExpired(cmd=["llama-cli"], timeout=1, output="partial json", stderr="")
+
+    monkeypatch.setattr(subprocess, "run", _timeout)
+    monkeypatch.setattr("shutil.which", lambda name: "/usr/local/bin/llama-cli")
+
+    try:
+        provider.run_model(Path("/tmp/fake.gguf"), "prompt")
+    except RuntimeError as exc:
+        assert "timed out" in str(exc)
+    else:
+        raise AssertionError("Expected RuntimeError when llama-cli times out")
