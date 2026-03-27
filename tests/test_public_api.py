@@ -51,6 +51,8 @@ def test_api_helpers_are_exposed() -> None:
     assert ppt_creator.PreviewRenderer is not None
     assert ppt_creator.preview_spec_payload is not None
     assert ppt_creator.render_previews is not None
+    assert ppt_creator.review_presentation is not None
+    assert ppt_creator.review_spec_payload is not None
     assert ppt_creator.serve_api is not None
     assert ppt_creator.validate_spec_payload is not None
     assert ppt_creator.render_spec_payload is not None

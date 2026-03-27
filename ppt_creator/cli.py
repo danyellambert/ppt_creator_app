@@ -8,6 +8,7 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from ppt_creator.preview import render_previews
+from ppt_creator.qa import review_presentation
 from ppt_creator.renderer import PresentationRenderer
 from ppt_creator.schema import PresentationInput
 from ppt_creator.templates import build_domain_template, list_template_domains
@@ -74,6 +75,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="Warn when referenced image assets cannot be resolved",
     )
     validate_parser.add_argument("--report-json", help="Optional path to write a JSON validation report")
+
+    review_parser = subparsers.add_parser(
+        "review",
+        help="Run heuristic QA review for a presentation JSON",
+    )
+    review_parser.add_argument("input_json", help="Path to the structured JSON input")
+    review_parser.add_argument("--theme", help="Override the theme declared in the JSON")
+    review_parser.add_argument("--asset-root", help="Base directory for resolving relative image paths")
+    review_parser.add_argument("--report-json", help="Optional path to write a JSON review report")
 
     template_parser = subparsers.add_parser(
         "template",
@@ -242,6 +252,26 @@ def validate_one(
     )
 
 
+def review_one(
+    input_json: str | Path,
+    *,
+    theme_name: str | None = None,
+    asset_root: str | None = None,
+) -> dict[str, object]:
+    input_path = Path(input_json)
+    print_info(f"Loading input: {input_path}")
+    spec = PresentationInput.from_path(input_path)
+    resolved_asset_root = resolve_asset_root(input_path, asset_root)
+    result = review_presentation(spec, asset_root=resolved_asset_root, theme_name=theme_name)
+    print(
+        f"[OK] Review completed: {result['issue_count']} issue(s), average score {result['average_score']}"
+    )
+    return {
+        "input_path": str(input_path),
+        **result,
+    }
+
+
 def render_one(
     input_json: str | Path,
     output_pptx: str | Path,
@@ -395,6 +425,16 @@ def main(argv: list[str] | None = None) -> int:
                 args.input_json,
                 asset_root=args.asset_root,
                 check_assets=args.check_assets,
+            )
+            if args.report_json:
+                write_report(args.report_json, report)
+            return 0
+
+        if args.command == "review":
+            report = review_one(
+                args.input_json,
+                theme_name=args.theme,
+                asset_root=args.asset_root,
             )
             if args.report_json:
                 write_report(args.report_json, report)

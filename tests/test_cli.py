@@ -35,6 +35,16 @@ def test_cli_validate_second_example() -> None:
     assert result == 0
 
 
+def test_cli_review_generates_report(tmp_path: Path, capsys) -> None:
+    report_path = tmp_path / "review_report.json"
+    result = main(["review", "examples/ai_sales.json", "--report-json", str(report_path)])
+    captured = capsys.readouterr()
+
+    assert result == 0
+    assert report_path.exists()
+    assert "Review completed" in captured.out
+
+
 def test_cli_validate_emits_informational_logs(capsys) -> None:
     result = main(["validate", "examples/product_strategy.json"])
     captured = capsys.readouterr()

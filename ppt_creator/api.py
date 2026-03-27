@@ -9,6 +9,7 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from ppt_creator.preview import render_previews
+from ppt_creator.qa import review_presentation
 from ppt_creator.renderer import PresentationRenderer
 from ppt_creator.schema import PresentationInput
 from ppt_creator.templates import build_domain_template, list_template_domains
@@ -114,6 +115,20 @@ def render_spec_payload(
         "missing_asset_count": len(missing_assets) if check_assets else 0,
         "missing_assets": missing_assets if check_assets else [],
     }
+
+
+def review_spec_payload(
+    spec_payload: dict[str, object],
+    *,
+    theme_name: str | None = None,
+    asset_root: str | Path | None = None,
+) -> dict[str, object]:
+    spec = PresentationInput.model_validate(spec_payload)
+    return review_presentation(
+        spec,
+        theme_name=theme_name or spec.presentation.theme,
+        asset_root=_resolve_service_asset_root(asset_root),
+    )
 
 
 def preview_spec_payload(
@@ -245,6 +260,16 @@ class PptCreatorAPIHandler(BaseHTTPRequestHandler):
                     secondary_color=str(payload["secondary_color"]) if payload.get("secondary_color") else None,
                     dry_run=bool(payload.get("dry_run", False)),
                     check_assets=bool(payload.get("check_assets", False)),
+                )
+                self._json_response(HTTPStatus.OK, {"result": result})
+                return
+
+            if self.path == "/review":
+                spec_payload = _extract_spec_payload(payload)
+                result = review_spec_payload(
+                    spec_payload,
+                    theme_name=str(payload["theme_name"]) if payload.get("theme_name") else None,
+                    asset_root=payload.get("asset_root") or default_asset_root,
                 )
                 self._json_response(HTTPStatus.OK, {"result": result})
                 return

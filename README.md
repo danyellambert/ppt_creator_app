@@ -327,6 +327,18 @@ python -m ppt_creator.cli render examples/ai_sales.json outputs/ai_sales.pptx \
   --dry-run --report-json outputs/ai_sales_report.json --check-assets
 ```
 
+Rodar uma revisão heurística de qualidade:
+
+```bash
+python -m ppt_creator.cli review examples/ai_sales.json --report-json outputs/ai_sales_review.json
+```
+
+Esse comando gera um relatório com:
+
+- score médio do deck
+- issues por slide
+- alertas de densidade, bullet overload, tabelas carregadas e assets ausentes
+
 Renderização em lote:
 
 ```bash
@@ -449,6 +461,7 @@ Endpoints disponíveis:
 
 - `GET /health`
 - `GET /templates`
+- `POST /review`
 - `POST /preview`
 - `POST /validate`
 - `POST /render`
@@ -611,5 +624,6 @@ O projeto agora também começou a ganhar uma primeira camada de QA visual heur�
 - identificação visual de slide número/título/tipo
 - overlays de debug opcionais
 - revisão heurística de densidade e risco visual no relatório de preview
+- comando/endpoint dedicado de review heurístico para QA do deck
 
 O próximo passo mais importante continua sendo evoluir de preview sintético para preview fiel ao `.pptx` real.

@@ -4,10 +4,12 @@ from ppt_creator.api import (
     build_api_server,
     preview_spec_payload,
     render_spec_payload,
+    review_spec_payload,
     serve_api,
     validate_spec_payload,
 )
 from ppt_creator.preview import PreviewRenderer, render_previews
+from ppt_creator.qa import review_presentation
 from ppt_creator.renderer import PresentationRenderer, render_presentation
 from ppt_creator.schema import (
     CardItem,
@@ -67,6 +69,8 @@ __all__ = [
     "PreviewRenderer",
     "preview_spec_payload",
     "render_previews",
+    "review_presentation",
+    "review_spec_payload",
     "render_spec_payload",
     "render_presentation",
     "serve_api",

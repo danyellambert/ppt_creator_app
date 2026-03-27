@@ -319,6 +319,7 @@ Como a qualidade percebida do deck depende muito da inspeção visual, existe um
 - [x] melhorar a folha de thumbnails com composição mais legível e metadados por slide
 - [x] adicionar overlays opcionais de debug para grid e safe areas no preview sintético
 - [x] adicionar uma primeira revisão heurística de qualidade visual no relatório de preview
+- [x] expor revisão heurística dedicada via CLI/API para QA do deck
 - [ ] gerar preview a partir do `.pptx` real em vez de uma reconstrução paralela em Pillow
 - [ ] adicionar regressão visual baseada em previews reais/golden files
 - [ ] criar detectores mais fortes de colisão, overflow e clipping

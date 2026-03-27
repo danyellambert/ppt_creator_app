@@ -69,6 +69,15 @@ def test_api_validate_render_and_template_endpoints(tmp_path: Path) -> None:
         assert render_payload["result"]["rendered"] is False
         assert render_payload["result"]["output_path"].endswith("api_render_output.pptx")
 
+        status, review_payload = _request_json(
+            f"{base_url}/review",
+            {"spec": spec_payload},
+            method="POST",
+        )
+        assert status == 200
+        assert review_payload["result"]["slide_count"] == len(spec_payload["slides"])
+        assert review_payload["result"]["status"] in {"ok", "review", "attention"}
+
         status, template_payload = _request_json(
             f"{base_url}/template",
             {"domain": "sales", "theme_name": "consulting_clean"},
