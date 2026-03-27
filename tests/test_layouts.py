@@ -298,3 +298,88 @@ def test_new_layout_types_render_without_crashing(tmp_path: Path) -> None:
     assert rendered.exists()
     presentation = Presentation(str(rendered))
     assert len(presentation.slides) == 8
+
+
+def test_long_content_layouts_render_with_initial_autofit(tmp_path: Path) -> None:
+    long_bullet = "This bullet is intentionally long so the renderer needs to shrink the text and preserve a cleaner layout without immediately overflowing the expected content area."
+    spec = PresentationInput.model_validate(
+        {
+            "presentation": {
+                "title": "Autofit Stress Deck",
+                "theme": "executive_premium_minimal",
+            },
+            "slides": [
+                {
+                    "type": "agenda",
+                    "title": "A very long agenda title that should still remain usable after autofit is applied to the heading and content rows",
+                    "body": "This introduction paragraph is intentionally verbose so we can validate that the first layer of autofit handles agenda narrative copy without crashing the render pipeline.",
+                    "bullets": [long_bullet, long_bullet, long_bullet],
+                },
+                {
+                    "type": "metrics",
+                    "title": "Metrics under pressure",
+                    "subtitle": "Labels and details here are long on purpose to exercise the new layout hardening rules.",
+                    "metrics": [
+                        {
+                            "value": "128%",
+                            "label": "Expansion revenue influenced by automation-assisted planning workflows",
+                            "detail": "Very long detail text that should be compressed to fit inside the KPI card without destroying the rest of the composition.",
+                            "trend": "Up meaningfully vs prior baseline",
+                        },
+                        {
+                            "value": "4.3x",
+                            "label": "Time saved in preparation-heavy executive communication loops",
+                            "detail": "Another intentionally verbose detail line for layout resilience.",
+                        },
+                    ],
+                },
+                {
+                    "type": "table",
+                    "title": "Dense executive table",
+                    "table_columns": ["Area with a longer label", "Status summary", "Next action and implication"],
+                    "table_rows": [
+                        [
+                            "Pipeline governance and operating cadence",
+                            "Stable but still verbose",
+                            "Clarify owners and tighten the weekly review motion",
+                        ],
+                        [
+                            "Enablement and training rhythm",
+                            "Lagging in parts",
+                            "Refresh collateral and sequence leadership communication better",
+                        ],
+                    ],
+                },
+                {
+                    "type": "faq",
+                    "title": "FAQ under stress",
+                    "faq_items": [
+                        {
+                            "title": "Why should this initiative start now if the organization is already overloaded?",
+                            "body": "Because the current operating friction is already imposing a tax on execution quality, and delaying a narrower rollout only preserves that cost structure.",
+                        },
+                        {
+                            "title": "How do we ensure the first release remains constrained enough to be credible?",
+                            "body": "Pick one workflow, one audience, one measurable outcome, and one governance owner before expanding scope.",
+                        },
+                    ],
+                },
+                {
+                    "type": "image_text",
+                    "title": "Image text stress case",
+                    "body": "This narrative paragraph is intentionally long so the renderer needs to reduce text size and keep the surrounding composition more stable than before.",
+                    "bullets": [long_bullet, long_bullet],
+                    "image_path": "missing-image.png",
+                    "image_caption": "A deliberately long placeholder caption describing the intended image and how it supports the business narrative.",
+                },
+            ],
+        }
+    )
+    output = tmp_path / "autofit-layouts.pptx"
+
+    renderer = PresentationRenderer(asset_root="examples")
+    rendered = renderer.render(spec, output)
+
+    assert rendered.exists()
+    presentation = Presentation(str(rendered))
+    assert len(presentation.slides) == 5

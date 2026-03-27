@@ -26,6 +26,7 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
             size=t.body_size - 1,
             color=colors.text,
         )
+        renderer.fit_text_frame(intro_box.text_frame, max_size=t.body_size - 1)
         current_top += 0.72
 
     row_height = 0.58
@@ -57,6 +58,11 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
             color=colors.accent if idx == 1 else colors.navy,
             bold=True,
         )
+        renderer.fit_text_frame(
+            number_box.text_frame,
+            max_size=t.small_size + 1,
+            bold=True,
+        )
 
         text_box = renderer.textbox(slide, g.content_left + 0.72, current_top + 0.10, g.content_width - 0.95, 0.26)
         renderer.write_paragraph(
@@ -64,6 +70,11 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
             bullet,
             size=t.body_size - 1,
             color=colors.text,
+            bold=True if idx == 1 else False,
+        )
+        renderer.fit_text_frame(
+            text_box.text_frame,
+            max_size=t.body_size - 1,
             bold=True if idx == 1 else False,
         )
         current_top += row_height + row_gap

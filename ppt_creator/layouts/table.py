@@ -52,6 +52,7 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
             bold=True,
             align=PP_ALIGN.CENTER,
         )
+        renderer.fit_text_frame(header_box.text_frame, max_size=t.small_size + 1, bold=True)
 
     current_top = top + header_height + 0.08
     for row in rows:
@@ -74,4 +75,5 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
                 color=colors.text,
                 align=PP_ALIGN.CENTER,
             )
+            renderer.fit_text_frame(cell_box.text_frame, max_size=t.small_size + 1)
         current_top += row_height + 0.08

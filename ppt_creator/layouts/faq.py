@@ -48,14 +48,21 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
             color=colors.accent if idx % 2 else colors.navy,
         )
 
-        box = renderer.panel_content_box(
-            slide,
-            left=left,
-            top=top,
-            width=panel_width,
-            height=panel_height,
-            padding=0.22,
+        title_box = renderer.textbox(slide, left + 0.22, top + 0.22, panel_width - 0.44, 0.28)
+        renderer.write_paragraph(
+            title_box.text_frame,
+            item.title,
+            size=t.small_size + 2,
+            color=colors.navy,
+            bold=True,
         )
-        tf = box.text_frame
-        renderer.write_paragraph(tf, item.title, size=t.small_size + 2, color=colors.navy, bold=True, space_after=8)
-        renderer.write_paragraph(tf, item.body, size=t.small_size + 1, color=colors.text)
+        renderer.fit_text_frame(title_box.text_frame, max_size=t.small_size + 2, bold=True)
+
+        body_box = renderer.textbox(slide, left + 0.22, top + 0.56, panel_width - 0.44, 0.68)
+        renderer.write_paragraph(
+            body_box.text_frame,
+            item.body,
+            size=t.small_size + 1,
+            color=colors.text,
+        )
+        renderer.fit_text_frame(body_box.text_frame, max_size=t.small_size + 1)
