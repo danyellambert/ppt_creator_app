@@ -409,6 +409,20 @@ Isso ajuda a aproximar o fluxo de:
 - QA heurístico do deck gerado
 - renderização final em `.pptx`
 
+Também já existe uma primeira camada de **refinamento automático heurístico**:
+
+```bash
+python -m ppt_creator_ai.cli generate examples/briefing_sales.json outputs/briefing_sales_deck.json \
+  --auto-refine --refine-passes 2 --report-json outputs/briefing_sales_generation_report.json
+```
+
+Esse fluxo tenta:
+
+- gerar o deck inicial
+- rodar review heurístico
+- aplicar um pass de refinamento em slides mais densos
+- reavaliar o deck refinado
+
 Você também pode listar os providers disponíveis da camada opcional:
 
 ```bash

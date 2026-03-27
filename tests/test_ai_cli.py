@@ -86,6 +86,72 @@ def test_ai_cli_can_write_review_and_render_generated_pptx(tmp_path: Path) -> No
     assert review_payload["status"] in {"ok", "review", "attention"}
 
 
+def test_ai_cli_can_auto_refine_generated_deck(tmp_path: Path, monkeypatch) -> None:
+    output = tmp_path / "generated_refined_deck.json"
+    report = tmp_path / "generated_refined_report.json"
+    provider = get_provider("heuristic")
+
+    long_bullet = (
+        "This bullet is intentionally too long and too detailed for a clean executive slide so the refine pass should shorten it significantly."
+    )
+    fake_payload = {
+        "presentation": {
+            "title": "AI copilots for sales teams",
+            "theme": "executive_premium_minimal",
+        },
+        "slides": [
+            {"type": "title", "title": "AI copilots for sales teams"},
+            {
+                "type": "agenda",
+                "title": "Agenda",
+                "body": "This introduction paragraph is intentionally verbose and dense so the QA review can flag the generated slide before the refine pass runs.",
+                "bullets": [long_bullet, long_bullet, long_bullet, long_bullet, long_bullet, long_bullet],
+            },
+            {
+                "type": "summary",
+                "title": "Summary",
+                "body": "Another intentionally long narrative paragraph that should be reduced after the automatic refinement step is applied.",
+                "bullets": [long_bullet, long_bullet, long_bullet, long_bullet, long_bullet],
+            },
+            {"type": "closing", "title": "Closing", "quote": "Done."},
+        ],
+    }
+    fake_analysis = {
+        "image_suggestions": ["sales leadership dashboard"],
+        "density_review": {"status": "review", "warning_count": 2, "warnings": ["dense"], "slides": []},
+    }
+
+    monkeypatch.setattr(
+        provider,
+        "generate",
+        lambda briefing, theme_name=None: BriefingGenerationResult(
+            provider_name="heuristic",
+            payload=fake_payload,
+            analysis=fake_analysis,
+        ),
+    )
+
+    result = main(
+        [
+            "generate",
+            "examples/briefing_sales.json",
+            str(output),
+            "--auto-refine",
+            "--refine-passes",
+            "2",
+            "--report-json",
+            str(report),
+        ]
+    )
+
+    assert result == 0
+    output_payload = json.loads(output.read_text(encoding="utf-8"))
+    report_payload = json.loads(report.read_text(encoding="utf-8"))
+    assert report_payload["auto_refine_enabled"] is True
+    assert report_payload["generated_deck_issue_count"] <= report_payload["initial_generated_deck_issue_count"]
+    assert len(output_payload["slides"][1]["bullets"]) <= 4
+
+
 def test_ai_cli_can_use_local_provider_when_mocked(tmp_path: Path, monkeypatch) -> None:
     output = tmp_path / "generated_local_deck.json"
     provider = get_provider("pptagent_local")

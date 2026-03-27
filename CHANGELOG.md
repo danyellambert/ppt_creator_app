@@ -23,6 +23,7 @@ The format is inspired by Keep a Changelog, and the project aims to follow Seman
 - initial preview-based visual regression support against baseline/golden PNGs with optional diff images
 - optional local Ollama provider for the AI briefing layer, alongside heuristic and GGUF/llama.cpp flows
 - AI briefing CLI can now emit generated-deck QA reviews and optionally render the generated `.pptx` in the same flow
+- AI briefing CLI now supports an initial automatic refine loop driven by heuristic QA feedback
 - optional office-aware preview backend selection with automatic fallback to synthetic previews
 - initial layout primitive helpers for panel inner bounds and stacked vertical regions
 - initial application of layout primitives to comparison, faq, cards, and two-column slides

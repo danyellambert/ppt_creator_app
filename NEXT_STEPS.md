@@ -398,6 +398,7 @@ Qualquer camada de IA deve ser opcional.
 - [x] criar interface de provider para alternar entre LLMs locais e remotos
 - [ ] manter um loop: briefing -> estrutura -> render -> QA -> revisão opcional -> nova iteração
   - [x] primeira integração prática de generate + review + render dentro da CLI opcional de briefing
+  - [x] primeira iteração automática heurística de refine/re-review na CLI opcional
   - [ ] evoluir para revisão opcional/regeração iterativa automática
 
 ### Resultado esperado

@@ -14,6 +14,7 @@ from ppt_creator_ai.briefing import (
     BriefingInput,
 )
 from ppt_creator_ai.providers import get_provider, list_provider_names
+from ppt_creator_ai.refine import refine_presentation_input
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -45,6 +46,17 @@ def build_parser() -> argparse.ArgumentParser:
     generate_parser.add_argument(
         "--asset-root",
         help="Optional asset root to use when rendering the generated deck or reviewing asset references",
+    )
+    generate_parser.add_argument(
+        "--auto-refine",
+        action="store_true",
+        help="Run a heuristic refine pass on the generated deck when QA signals issues",
+    )
+    generate_parser.add_argument(
+        "--refine-passes",
+        type=int,
+        default=1,
+        help="Maximum number of heuristic refine passes to attempt when --auto-refine is enabled",
     )
     generate_parser.add_argument("--report-json", help="Optional path to write a JSON generation report")
 
@@ -80,6 +92,8 @@ def generate_from_briefing(
     review_json: str | Path | None = None,
     render_pptx: str | Path | None = None,
     asset_root: str | Path | None = None,
+    auto_refine: bool = False,
+    refine_passes: int = 1,
 ) -> dict[str, object]:
     input_path = Path(input_briefing)
     print_info(f"Loading briefing: {input_path}")
@@ -90,10 +104,54 @@ def generate_from_briefing(
     payload = result.payload
     spec = PresentationInput.model_validate(payload)
     resolved_asset_root = Path(asset_root).resolve() if asset_root else input_path.parent.resolve()
-    output_path = write_json(output_json, payload)
     analysis_path: str | None = None
     analysis = result.analysis
-    deck_review = review_presentation(spec, asset_root=resolved_asset_root, theme_name=spec.presentation.theme)
+    initial_deck_review = review_presentation(spec, asset_root=resolved_asset_root, theme_name=spec.presentation.theme)
+    deck_review = initial_deck_review
+    refinement_history: list[dict[str, object]] = []
+    refine_applied = False
+
+    if auto_refine:
+        current_spec = spec
+        current_review = initial_deck_review
+        for pass_index in range(max(1, refine_passes)):
+            if current_review["issue_count"] == 0:
+                break
+            candidate_spec = refine_presentation_input(current_spec, review=current_review)
+            candidate_review = review_presentation(
+                candidate_spec,
+                asset_root=resolved_asset_root,
+                theme_name=candidate_spec.presentation.theme,
+            )
+            refinement_history.append(
+                {
+                    "pass": pass_index + 1,
+                    "before_issue_count": current_review["issue_count"],
+                    "after_issue_count": candidate_review["issue_count"],
+                    "before_average_score": current_review["average_score"],
+                    "after_average_score": candidate_review["average_score"],
+                }
+            )
+            payload_changed = candidate_spec.model_dump(mode="json") != current_spec.model_dump(mode="json")
+            improved = (
+                candidate_review["issue_count"] < current_review["issue_count"]
+                or candidate_review["average_score"] > current_review["average_score"]
+                or (
+                    payload_changed
+                    and candidate_review["issue_count"] <= current_review["issue_count"]
+                    and candidate_review["average_score"] >= current_review["average_score"]
+                )
+            )
+            if not improved:
+                break
+            current_spec = candidate_spec
+            current_review = candidate_review
+            refine_applied = True
+        spec = current_spec
+        deck_review = current_review
+
+    payload = spec.model_dump(mode="json")
+    output_path = write_json(output_json, payload)
     review_path: str | None = None
     rendered_pptx_path: str | None = None
     if analysis_json:
@@ -101,7 +159,9 @@ def generate_from_briefing(
             analysis_json,
             {
                 **analysis,
+                "initial_generated_deck_review": initial_deck_review,
                 "generated_deck_review": deck_review,
+                "refinement_history": refinement_history,
             },
         )
         analysis_path = str(analysis_output)
@@ -125,8 +185,14 @@ def generate_from_briefing(
         "analysis_output_json": analysis_path,
         "review_output_json": review_path,
         "render_output_pptx": rendered_pptx_path,
+        "auto_refine_enabled": auto_refine,
+        "auto_refine_applied": refine_applied,
+        "refine_passes_requested": refine_passes if auto_refine else 0,
+        "refine_passes_completed": len(refinement_history),
         "image_suggestion_count": len(analysis["image_suggestions"]),
         "density_review_status": analysis["density_review"]["status"],
+        "initial_generated_deck_review_status": initial_deck_review["status"],
+        "initial_generated_deck_issue_count": initial_deck_review["issue_count"],
         "generated_deck_review_status": deck_review["status"],
         "generated_deck_issue_count": deck_review["issue_count"],
     }
@@ -160,6 +226,8 @@ def main(argv: list[str] | None = None) -> int:
             review_json=args.review_json,
             render_pptx=args.render_pptx,
             asset_root=args.asset_root,
+            auto_refine=args.auto_refine,
+            refine_passes=args.refine_passes,
         )
         if args.report_json:
             write_json(args.report_json, result)
