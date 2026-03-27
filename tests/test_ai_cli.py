@@ -19,6 +19,19 @@ def test_ai_cli_generates_deck_json_from_briefing(tmp_path: Path) -> None:
     assert len(spec.slides) >= 6
 
 
+def test_ai_cli_lists_available_providers(tmp_path: Path, capsys) -> None:
+    report = tmp_path / "providers.json"
+    result = main(["providers", "--report-json", str(report)])
+    captured = capsys.readouterr()
+
+    assert result == 0
+    assert report.exists()
+    assert "Available providers" in captured.out
+
+    payload = json.loads(report.read_text(encoding="utf-8"))
+    assert payload["providers"][0]["name"] == "heuristic"
+
+
 def test_ai_cli_can_write_analysis_report(tmp_path: Path) -> None:
     output = tmp_path / "generated_deck.json"
     analysis = tmp_path / "briefing_analysis.json"

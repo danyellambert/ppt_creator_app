@@ -7,6 +7,7 @@ The format is inspired by Keep a Changelog, and the project aims to follow Seman
 ## [Unreleased]
 
 ### Added
+- provider interface for the optional briefing layer, with initial `heuristic` provider
 - improved thumbnail contact sheets, preview debug overlays, and initial heuristic preview QA
 - optional `ppt_creator_ai` layer to generate deck JSON from structured briefing input
 - heuristic briefing analysis with executive summaries, image suggestions, and density review

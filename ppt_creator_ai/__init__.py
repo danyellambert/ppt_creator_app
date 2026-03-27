@@ -13,6 +13,11 @@ from ppt_creator_ai.briefing import (
     suggest_image_queries_from_briefing,
     summarize_text_to_executive_bullets,
 )
+from ppt_creator_ai.providers import (
+    HeuristicBriefingProvider,
+    get_provider,
+    list_provider_names,
+)
 
 __all__ = [
     "BriefingFAQ",
@@ -26,4 +31,7 @@ __all__ = [
     "review_presentation_density",
     "suggest_image_queries_from_briefing",
     "summarize_text_to_executive_bullets",
+    "HeuristicBriefingProvider",
+    "get_provider",
+    "list_provider_names",
 ]

@@ -368,6 +368,19 @@ python -m ppt_creator_ai.cli generate examples/briefing_sales.json outputs/brief
   --analysis-json outputs/briefing_sales_analysis.json
 ```
 
+Você também pode listar os providers disponíveis da camada opcional:
+
+```bash
+python -m ppt_creator_ai.cli providers
+```
+
+E escolher explicitamente o provider usado no pipeline:
+
+```bash
+python -m ppt_creator_ai.cli generate examples/briefing_sales.json outputs/briefing_sales_deck.json \
+  --provider heuristic
+```
+
 Os comandos da CLI agora também emitem logs mais claros com prefixos como:
 
 - `[INFO]`
@@ -562,6 +575,8 @@ Essa camada tenta:
 - revisar densidade do deck gerado para sinalizar slides potencialmente carregados
 
 Ela **não depende de LLM** nesta fase: é um gerador heurístico, útil como ponto de partida para pipelines futuros.
+
+Para preparar a futura entrada de LLM real, a camada opcional agora já possui uma interface de provider. Hoje existe apenas o provider `heuristic`, mas a arquitetura foi organizada para receber providers futuros sem acoplar o núcleo do `ppt_creator`.
 
 ## Evolução visual e QA
 

@@ -365,7 +365,7 @@ Qualquer camada de IA deve ser opcional.
 - [x] manter um módulo separado, algo como `ppt_creator_ai/` ou `pipelines/`
 - nunca misturar lógica de prompt com o renderizador base
 - tratar LLM como produtor de estrutura, não como renderizador
-- [ ] criar interface de provider para alternar entre LLMs locais e remotos
+- [x] criar interface de provider para alternar entre LLMs locais e remotos
 - [ ] manter um loop: briefing -> estrutura -> render -> QA -> revisão opcional -> nova iteração
 
 ### Resultado esperado
@@ -480,7 +480,7 @@ Se a meta for perseguir o nível “deck quase pronto sem retoque manual”, a o
 
 ### Prioridade 5 — LLM opcional de conteúdo e revisão
 
-- [ ] provider layer para múltiplas LLMs
+- [x] provider layer para múltiplas LLMs
 - [ ] geração de outline e narrativa a partir de briefing livre
 - [ ] reescrita executiva de conteúdo fraco
 - [ ] revisão iterativa do deck após renderização e QA

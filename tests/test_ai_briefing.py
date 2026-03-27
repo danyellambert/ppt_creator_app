@@ -8,6 +8,7 @@ from ppt_creator_ai.briefing import (
     generate_presentation_payload_from_briefing,
     summarize_text_to_executive_bullets,
 )
+from ppt_creator_ai.providers import get_provider, list_provider_names
 
 
 def test_briefing_example_generates_valid_presentation_payload() -> None:
@@ -49,3 +50,9 @@ def test_briefing_analysis_provides_image_suggestions_and_density_review() -> No
     assert analysis["executive_summary_bullets"]
     assert analysis["image_suggestions"]
     assert analysis["density_review"]["status"] in {"ok", "review"}
+
+
+def test_provider_registry_exposes_heuristic_provider() -> None:
+    assert list_provider_names() == ["heuristic"]
+    provider = get_provider("heuristic")
+    assert provider.name == "heuristic"
