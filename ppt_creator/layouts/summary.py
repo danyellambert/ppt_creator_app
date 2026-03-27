@@ -21,10 +21,17 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
     )
 
     if has_body and has_bullets:
-        narrative_left = g.content_left
-        narrative_width = 6.9
-        panel_left = 8.15
-        panel_width = 4.1
+        split_regions = renderer.stack_horizontal_regions(
+            left=g.content_left,
+            width=g.content_width,
+            regions=[
+                {"kind": "narrative", "min_width": 6.2, "flex": 1.35},
+                {"kind": "panel", "min_width": 3.4, "flex": 0.85},
+            ],
+            gap=0.35,
+        )
+        narrative_left, narrative_width = split_regions[0][1]
+        panel_left, panel_width = split_regions[1][1]
 
         body_box = renderer.textbox(slide, narrative_left, 2.35, narrative_width, 1.55)
         renderer.write_paragraph(
@@ -35,32 +42,36 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
         )
         renderer.fit_text_frame(body_box.text_frame, max_size=t.body_size)
 
-        renderer.add_panel(
-            slide,
-            panel_left,
-            2.1,
-            panel_width,
-            3.2,
-            fill_color=colors.surface,
-            line_color=colors.line,
-        )
+        panel_top = 2.1
+        panel_height = 3.2
+        renderer.add_panel(slide, panel_left, panel_top, panel_width, panel_height, fill_color=colors.surface, line_color=colors.line)
         renderer.add_accent_bar(
             slide,
             panel_left,
-            2.1,
+            panel_top,
             panel_width,
             renderer.theme.components.accent_bar_height,
             color=colors.accent,
         )
-        heading_box = renderer.textbox(slide, panel_left + 0.26, 2.42, panel_width - 0.52, 0.28)
-        renderer.write_paragraph(
-            heading_box.text_frame,
-            "Key takeaways",
-            size=t.eyebrow_size,
-            color=colors.muted,
-            bold=True,
+        content_left, content_top, content_width, content_height = renderer.panel_inner_bounds(
+            left=panel_left,
+            top=panel_top,
+            width=panel_width,
+            height=panel_height,
+            padding=0.26,
         )
-        bullets_box = renderer.textbox(slide, panel_left + 0.26, 2.78, panel_width - 0.52, 2.18)
+        panel_regions = renderer.stack_vertical_regions(
+            top=content_top,
+            height=content_height,
+            regions=[
+                {"kind": "heading", "height": 0.28},
+                {"kind": "bullets", "min_height": 2.18, "flex": 1.0},
+            ],
+            gap=0.08,
+        )
+        heading_box = renderer.textbox(slide, content_left, panel_regions[0][1][0], content_width, panel_regions[0][1][1])
+        renderer.write_paragraph(heading_box.text_frame, "Key takeaways", size=t.eyebrow_size, color=colors.muted, bold=True)
+        bullets_box = renderer.textbox(slide, content_left, panel_regions[1][1][0], content_width, panel_regions[1][1][1])
         tf = bullets_box.text_frame
         for bullet in slide_spec.bullets:
             renderer.write_paragraph(tf, f"• {bullet}", size=t.small_size + 1, color=colors.text, space_after=6)

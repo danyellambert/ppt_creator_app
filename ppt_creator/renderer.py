@@ -282,6 +282,39 @@ class PresentationRenderer:
             cursor_left += region_width + gap
         return bounds
 
+    def build_grid_bounds(
+        self,
+        *,
+        left: float,
+        top: float,
+        width: float,
+        height: float,
+        column_regions: list[dict[str, float | str]],
+        row_regions: list[dict[str, float | str]],
+        column_gap: float,
+        row_gap: float,
+    ) -> list[list[tuple[float, float, float, float]]]:
+        columns = self.stack_horizontal_regions(
+            left=left,
+            width=width,
+            regions=column_regions,
+            gap=column_gap,
+        )
+        rows = self.stack_vertical_regions(
+            top=top,
+            height=height,
+            regions=row_regions,
+            gap=row_gap,
+        )
+
+        return [
+            [
+                (column_left, row_top, column_width, row_height)
+                for _, (column_left, column_width) in columns
+            ]
+            for _, (row_top, row_height) in rows
+        ]
+
     def add_quote_block(
         self,
         slide: "PptxSlide",

@@ -18,27 +18,35 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
     )
 
     gap = 0.42
-    panel_width = (g.content_width - gap) / 2
     top = 2.45
     height = 3.25
+    panel_bounds = renderer.build_grid_bounds(
+        left=g.content_left,
+        top=top,
+        width=g.content_width,
+        height=height,
+        column_regions=[{"kind": "column", "min_width": 3.6, "flex": 1.0} for _ in slide_spec.comparison_columns],
+        row_regions=[{"kind": "row", "height": height}],
+        column_gap=gap,
+        row_gap=0.0,
+    )[0]
 
-    for idx, column in enumerate(slide_spec.comparison_columns):
-        left = g.content_left + idx * (panel_width + gap)
+    for idx, (column, (left, panel_top, panel_width, panel_height)) in enumerate(zip(slide_spec.comparison_columns, panel_bounds, strict=True)):
         accent = colors.navy if idx == 0 else colors.accent
 
         renderer.add_panel(
             slide,
             left,
-            top,
+            panel_top,
             panel_width,
-            height,
+            panel_height,
             fill_color=colors.surface,
             line_color=colors.line,
         )
         renderer.add_accent_bar(
             slide,
             left,
-            top,
+            panel_top,
             panel_width,
             renderer.theme.components.accent_bar_height,
             color=accent,
@@ -46,9 +54,9 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
 
         content_left, content_top, content_width, content_height = renderer.panel_inner_bounds(
             left=left,
-            top=top,
+            top=panel_top,
             width=panel_width,
-            height=height,
+            height=panel_height,
             padding=0.28,
         )
 

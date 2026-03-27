@@ -20,15 +20,25 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
     items = slide_spec.faq_items
     columns = 2 if len(items) > 1 else 1
     panel_gap = 0.35
-    panel_width = (g.content_width - (panel_gap * (columns - 1))) / columns
     panel_height = 1.35
     top_start = 2.25
+    row_count = (len(items) + columns - 1) // columns
+    total_height = row_count * panel_height + max(0, row_count - 1) * 0.24
+    grid_bounds = renderer.build_grid_bounds(
+        left=g.content_left,
+        top=top_start,
+        width=g.content_width,
+        height=total_height,
+        column_regions=[{"kind": "column", "min_width": 3.2, "flex": 1.0} for _ in range(columns)],
+        row_regions=[{"kind": "row", "min_height": panel_height, "flex": 1.0} for _ in range(row_count)],
+        column_gap=panel_gap,
+        row_gap=0.24,
+    )
 
     for idx, item in enumerate(items):
         row = idx // 2
         col = idx % 2
-        left = g.content_left + col * (panel_width + panel_gap)
-        top = top_start + row * (panel_height + 0.24)
+        left, top, panel_width, panel_height = grid_bounds[row][col]
 
         renderer.add_panel(
             slide,

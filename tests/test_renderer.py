@@ -137,3 +137,32 @@ def test_stack_horizontal_regions_distributes_flexible_space() -> None:
     assert len(regions) == 3
     center_bounds = regions[1][1]
     assert center_bounds[1] > 0.8
+
+
+def test_build_grid_bounds_returns_expected_matrix() -> None:
+    renderer = PresentationRenderer(asset_root="examples")
+
+    grid = renderer.build_grid_bounds(
+        left=1.0,
+        top=2.0,
+        width=4.0,
+        height=2.0,
+        column_regions=[
+            {"kind": "left", "min_width": 1.0, "flex": 1.0},
+            {"kind": "right", "min_width": 1.0, "flex": 1.0},
+        ],
+        row_regions=[
+            {"kind": "top", "min_height": 0.6, "flex": 1.0},
+            {"kind": "bottom", "min_height": 0.6, "flex": 1.0},
+        ],
+        column_gap=0.1,
+        row_gap=0.2,
+    )
+
+    assert len(grid) == 2
+    assert len(grid[0]) == 2
+    left, top, width, height = grid[0][0]
+    assert left >= 1.0
+    assert top >= 2.0
+    assert width > 1.0
+    assert height > 0.6
