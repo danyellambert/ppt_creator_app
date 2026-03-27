@@ -111,6 +111,7 @@ def test_api_validate_render_and_template_endpoints(tmp_path: Path) -> None:
         assert preview_payload["result"]["quality_review"]["status"] in {"ok", "review"}
         assert "severity_counts" in preview_payload["result"]["quality_review"]
         assert "clipping_risk_count" in preview_payload["result"]["quality_review"]
+        assert preview_payload["result"]["preview_artifact_review"]["status"] in {"ok", "review"}
         assert preview_payload["result"]["backend_requested"] == "auto"
         assert preview_payload["result"]["backend_used"] in {"synthetic", "office"}
         assert Path(preview_payload["result"]["thumbnail_sheet"]).exists()

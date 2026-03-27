@@ -94,6 +94,21 @@ def _normalized_diff_score(generated: Image.Image, baseline: Image.Image) -> tup
     return mean_diff, changed_ratio, diff
 
 
+def _changed_ratio_against_background(
+    image: Image.Image,
+    background_rgb: tuple[int, int, int],
+    *,
+    box: tuple[int, int, int, int] | None = None,
+) -> float:
+    region = image.crop(box) if box else image
+    background = Image.new("RGB", region.size, background_rgb)
+    diff = ImageChops.difference(region.convert("RGB"), background)
+    histogram = diff.convert("L").histogram()
+    changed_pixels = sum(count for index, count in enumerate(histogram) if index > 0)
+    total_pixels = max(1, region.size[0] * region.size[1])
+    return changed_pixels / total_pixels
+
+
 def _wrap_text(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.ImageFont, max_width: int) -> list[str]:
     lines: list[str] = []
     for paragraph in text.splitlines() or [text]:
@@ -186,6 +201,7 @@ class PreviewRenderer:
             destination,
             base,
         )
+        preview_artifact_review = self.build_preview_artifact_review(preview_paths)
 
         return {
             "mode": "preview",
@@ -194,6 +210,7 @@ class PreviewRenderer:
             "previews": preview_paths,
             "thumbnail_sheet": str(contact_sheet_path),
             "quality_review": quality_review,
+            "preview_artifact_review": preview_artifact_review,
             "visual_regression": visual_regression,
             "debug_grid": self.debug_grid,
             "debug_safe_areas": self.debug_safe_areas,
@@ -466,6 +483,74 @@ class PreviewRenderer:
             "missing_baseline_count": missing_baseline_count,
             "slides": slide_reports,
             "diff_images": diff_images,
+        }
+
+    def build_preview_artifact_review(self, preview_paths: list[str]) -> dict[str, object]:
+        background_rgb = _rgb_tuple(self.theme.colors.background)
+        strip = 16
+        edge_contact_count = 0
+        safe_margin_warning_count = 0
+        edge_density_warning_count = 0
+        slides: list[dict[str, object]] = []
+
+        for index, preview_path in enumerate(preview_paths, start=1):
+            image = Image.open(preview_path).convert("RGB")
+            width, height = image.size
+            background = Image.new("RGB", image.size, background_rgb)
+            bbox = ImageChops.difference(image, background).getbbox()
+            if bbox is None:
+                bbox = (0, 0, 0, 0)
+
+            left_ratio = _changed_ratio_against_background(image, background_rgb, box=(0, 0, strip, height))
+            right_ratio = _changed_ratio_against_background(image, background_rgb, box=(width - strip, 0, width, height))
+            top_ratio = _changed_ratio_against_background(image, background_rgb, box=(0, 0, width, strip))
+            bottom_ratio = _changed_ratio_against_background(image, background_rgb, box=(0, height - strip, width, height))
+            max_edge_ratio = max(left_ratio, right_ratio, top_ratio, bottom_ratio)
+
+            edge_contact = bool(bbox != (0, 0, 0, 0) and (bbox[0] <= 8 or bbox[1] <= 8 or bbox[2] >= width - 8 or bbox[3] >= height - 8))
+            safe_margin_warning = bool(
+                bbox != (0, 0, 0, 0)
+                and (bbox[0] <= 24 or bbox[1] <= 24 or bbox[2] >= width - 24 or bbox[3] >= height - 24)
+            )
+            edge_density_warning = max_edge_ratio >= 0.015
+
+            issues: list[str] = []
+            if edge_contact:
+                edge_contact_count += 1
+                issues.append("foreground touches the slide edge")
+            elif safe_margin_warning:
+                safe_margin_warning_count += 1
+                issues.append("foreground approaches the slide edge")
+            if edge_density_warning:
+                edge_density_warning_count += 1
+                issues.append("edge density suggests possible clipping or aggressive packing")
+
+            slides.append(
+                {
+                    "slide_number": index,
+                    "preview_path": preview_path,
+                    "foreground_bbox": {
+                        "left": int(bbox[0]),
+                        "top": int(bbox[1]),
+                        "right": int(bbox[2]),
+                        "bottom": int(bbox[3]),
+                    },
+                    "edge_contact": edge_contact,
+                    "safe_margin_warning": safe_margin_warning,
+                    "edge_density_warning": edge_density_warning,
+                    "max_edge_ratio": round(max_edge_ratio, 6),
+                    "issues": issues,
+                }
+            )
+
+        status = "review" if (edge_contact_count or safe_margin_warning_count or edge_density_warning_count) else "ok"
+        return {
+            "status": status,
+            "preview_count": len(preview_paths),
+            "edge_contact_count": edge_contact_count,
+            "safe_margin_warning_count": safe_margin_warning_count,
+            "edge_density_warning_count": edge_density_warning_count,
+            "slides": slides,
         }
 
     def _x(self, value_in_inches: float) -> int:

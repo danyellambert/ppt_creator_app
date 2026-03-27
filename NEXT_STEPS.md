@@ -346,6 +346,7 @@ Como a qualidade percebida do deck depende muito da inspeção visual, existe um
 - [ ] criar detectores mais fortes de colisão, overflow e clipping
   - [x] primeira camada heurística de risco de overflow e desbalanceamento exposta no review/QA
   - [x] sumarização de slides mais arriscados e sinais de clipping/overflow em relatórios de QA
+  - [x] primeira análise de artefatos no próprio preview (edge contact / edge density)
   - [ ] evoluir para detectores mais próximos de colisão/clipping real com base em preview/layout final
 
 Racional:
@@ -399,6 +400,7 @@ Qualquer camada de IA deve ser opcional.
 - [ ] manter um loop: briefing -> estrutura -> render -> QA -> revisão opcional -> nova iteração
   - [x] primeira integração prática de generate + review + render dentro da CLI opcional de briefing
   - [x] primeira iteração automática heurística de refine/re-review na CLI opcional
+  - [x] integração inicial de preview visual no pipeline opcional de briefing
   - [ ] evoluir para revisão opcional/regeração iterativa automática
 
 ### Resultado esperado

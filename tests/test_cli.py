@@ -211,6 +211,7 @@ def test_cli_preview_generates_pngs_and_thumbnail_sheet(tmp_path: Path, capsys) 
     assert "quality_review" in report
     assert "severity_counts" in report
     assert "top_risk_slides" in report
+    assert "preview_artifact_review" in report
     generated_pngs = sorted(output_dir.glob("*.png"))
     assert len(generated_pngs) == 11
     assert any(path.name.endswith("-thumbnails.png") for path in generated_pngs)

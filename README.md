@@ -423,6 +423,22 @@ Esse fluxo tenta:
 - aplicar um pass de refinamento em slides mais densos
 - reavaliar o deck refinado
 
+E agora você também pode acoplar **preview visual** diretamente nesse pipeline opcional:
+
+```bash
+python -m ppt_creator_ai.cli generate examples/briefing_sales.json outputs/briefing_sales_deck.json \
+  --preview-dir outputs/briefing_sales_previews \
+  --preview-report-json outputs/briefing_sales_preview_report.json
+```
+
+Isso aproxima ainda mais o ciclo de:
+
+- briefing
+- deck estruturado
+- review heurístico
+- preview visual
+- render final
+
 Você também pode listar os providers disponíveis da camada opcional:
 
 ```bash
@@ -791,3 +807,5 @@ Os relatórios também passam a destacar melhor onde olhar primeiro, com campos 
 - `likely_overflow_regions` por slide
 
 O próximo passo mais importante continua sendo evoluir de preview sintético para preview fiel ao `.pptx` real.
+
+Também entrou uma primeira camada de análise de artefatos no próprio preview, com sinais como contato com bordas e densidade suspeita nas margens do slide.

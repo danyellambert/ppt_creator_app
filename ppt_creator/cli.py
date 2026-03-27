@@ -437,6 +437,12 @@ def preview_one(
         print_info(
             f"Preview quality review flagged {result['quality_review']['warning_count']} issue(s)"
         )
+    if result["preview_artifact_review"]["status"] != "ok":
+        print_info(
+            "Preview artifact review: "
+            f"{result['preview_artifact_review']['edge_contact_count']} edge-contact signal(s), "
+            f"{result['preview_artifact_review']['edge_density_warning_count']} edge-density signal(s)"
+        )
     if result["visual_regression"] is not None:
         print_info(
             "Preview regression check: "

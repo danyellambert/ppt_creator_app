@@ -152,6 +152,37 @@ def test_ai_cli_can_auto_refine_generated_deck(tmp_path: Path, monkeypatch) -> N
     assert len(output_payload["slides"][1]["bullets"]) <= 4
 
 
+def test_ai_cli_can_generate_previews_for_generated_deck(tmp_path: Path) -> None:
+    output_json = tmp_path / "generated_deck.json"
+    preview_dir = tmp_path / "generated_previews"
+    preview_report = tmp_path / "generated_preview_report.json"
+    generation_report = tmp_path / "generated_report.json"
+
+    result = main(
+        [
+            "generate",
+            "examples/briefing_sales.json",
+            str(output_json),
+            "--preview-dir",
+            str(preview_dir),
+            "--preview-report-json",
+            str(preview_report),
+            "--report-json",
+            str(generation_report),
+        ]
+    )
+
+    assert result == 0
+    assert output_json.exists()
+    assert preview_report.exists()
+    preview_payload = json.loads(preview_report.read_text(encoding="utf-8"))
+    generation_payload = json.loads(generation_report.read_text(encoding="utf-8"))
+    assert preview_payload["preview_count"] >= 1
+    assert preview_payload["quality_review"]["status"] in {"ok", "review"}
+    assert preview_payload["preview_artifact_review"]["status"] in {"ok", "review"}
+    assert generation_payload["preview_output_dir"] == str(preview_dir)
+
+
 def test_ai_cli_can_use_local_provider_when_mocked(tmp_path: Path, monkeypatch) -> None:
     output = tmp_path / "generated_local_deck.json"
     provider = get_provider("pptagent_local")
