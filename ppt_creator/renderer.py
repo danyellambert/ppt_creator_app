@@ -301,6 +301,30 @@ class PresentationRenderer:
             ]
         return [bounds for _, bounds in self.stack_horizontal_regions(left=left, width=width, regions=regions, gap=gap)]
 
+    def build_weighted_columns(
+        self,
+        *,
+        left: float,
+        width: float,
+        gap: float,
+        weights: list[float],
+        min_width: float = 0.0,
+        min_flex: float = 0.9,
+        max_flex: float = 1.35,
+        kind_prefix: str = "column",
+    ) -> list[tuple[float, float]]:
+        flexes = self.normalize_content_flexes(weights, min_flex=min_flex, max_flex=max_flex)
+        return self.build_columns(
+            left=left,
+            width=width,
+            gap=gap,
+            min_width=min_width,
+            regions=[
+                {"kind": f"{kind_prefix}_{index + 1}", "min_width": min_width, "flex": flex}
+                for index, flex in enumerate(flexes)
+            ],
+        )
+
     def build_rows(
         self,
         *,
@@ -319,6 +343,30 @@ class PresentationRenderer:
                 for index in range(count)
             ]
         return [bounds for _, bounds in self.stack_vertical_regions(top=top, height=height, regions=regions, gap=gap)]
+
+    def build_weighted_rows(
+        self,
+        *,
+        top: float,
+        height: float,
+        gap: float,
+        weights: list[float],
+        min_height: float = 0.0,
+        min_flex: float = 0.9,
+        max_flex: float = 1.35,
+        kind_prefix: str = "row",
+    ) -> list[tuple[float, float]]:
+        flexes = self.normalize_content_flexes(weights, min_flex=min_flex, max_flex=max_flex)
+        return self.build_rows(
+            top=top,
+            height=height,
+            gap=gap,
+            min_height=min_height,
+            regions=[
+                {"kind": f"{kind_prefix}_{index + 1}", "min_height": min_height, "flex": flex}
+                for index, flex in enumerate(flexes)
+            ],
+        )
 
     def build_panel_row_bounds(
         self,
@@ -339,6 +387,32 @@ class PresentationRenderer:
             count=count,
             min_width=min_width,
             regions=regions,
+        )
+        return [(column_left, top, column_width, height) for column_left, column_width in columns]
+
+    def build_weighted_panel_row_bounds(
+        self,
+        *,
+        left: float,
+        top: float,
+        width: float,
+        height: float,
+        gap: float,
+        weights: list[float],
+        min_width: float = 0.0,
+        min_flex: float = 0.9,
+        max_flex: float = 1.35,
+        kind_prefix: str = "panel",
+    ) -> list[tuple[float, float, float, float]]:
+        columns = self.build_weighted_columns(
+            left=left,
+            width=width,
+            gap=gap,
+            weights=weights,
+            min_width=min_width,
+            min_flex=min_flex,
+            max_flex=max_flex,
+            kind_prefix=kind_prefix,
         )
         return [(column_left, top, column_width, height) for column_left, column_width in columns]
 

@@ -669,6 +669,7 @@ Também começou a entrar uma base bem inicial de **layout primitives** dentro d
 - expor helpers mais semânticos para `columns`, `rows`, `panel rows` e `panel grids`
 - usar pesos de conteúdo para começar a balancear larguras e alturas automaticamente
 - começar a aplicar stacks verticais guiadas por conteúdo em regiões textuais mais densas
+- expandir esse balanceamento para layouts de agenda, bullets e closing com mais regiões semânticas
 
 Essa base já começou a ser aplicada em layouts compostos mais exigentes, como:
 
@@ -683,6 +684,8 @@ Essa base já começou a ser aplicada em layouts compostos mais exigentes, como:
 Além disso, alguns layouts já começaram a ganhar um primeiro balanceamento automático baseado em densidade de conteúdo, especialmente em colunas/rows como `metrics`, `cards`, `table`, `comparison`, `two_column`, `faq` e `summary`.
 
 Layouts narrativos com mistura de corpo + bullets, como `comparison`, `two_column` e `image_text`, também começaram a usar stacks verticais reequilibradas por peso de conteúdo para reduzir divisão rígida de espaço.
+
+Essa mesma abordagem começou a se espalhar também para outros layouts executivos, como `agenda`, `bullets` e `closing`, que agora usam divisões mais semânticas e menos rígidas para texto, painéis e blocos auxiliares.
 
 Isso ainda não é um layout engine completo, mas já é o primeiro passo para sair de coordenadas excessivamente rígidas e caminhar para composição mais resiliente.
 

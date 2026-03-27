@@ -17,64 +17,90 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
         subtitle_width=7.0,
     )
 
-    current_top = 2.2
+    bullet_weights = [renderer.estimate_content_weight(body=bullet) for bullet in slide_spec.bullets]
+    stack_regions: list[dict[str, float | str]] = []
     if slide_spec.body:
-        intro_box = renderer.textbox(slide, g.content_left, current_top, g.content_width, 0.65)
-        renderer.write_paragraph(
-            intro_box.text_frame,
-            slide_spec.body,
-            size=t.body_size - 1,
-            color=colors.text,
+        stack_regions.append(
+            {
+                "kind": "intro",
+                "min_height": 0.56,
+                "flex": 1.0,
+                "content_weight": renderer.estimate_content_weight(body=slide_spec.body),
+            }
         )
-        renderer.fit_text_frame(intro_box.text_frame, max_size=t.body_size - 1)
-        current_top += 0.72
+    stack_regions.append(
+        {
+            "kind": "agenda_rows",
+            "min_height": 2.6,
+            "flex": 1.0,
+            "content_weight": sum(bullet_weights) or 1.0,
+        }
+    )
 
-    row_height = 0.58
-    row_gap = 0.16
-    for idx, bullet in enumerate(slide_spec.bullets, start=1):
-        renderer.add_panel(
-            slide,
-            g.content_left,
-            current_top,
-            g.content_width,
-            row_height,
-            fill_color=colors.surface,
-            line_color=colors.line,
-        )
-        renderer.add_accent_bar(
-            slide,
-            g.content_left,
-            current_top,
-            0.09,
-            row_height,
-            color=colors.accent if idx == 1 else colors.navy,
-        )
+    for region, (region_top, region_height) in renderer.build_content_stack(
+        top=2.2,
+        height=3.9,
+        regions=stack_regions,
+        gap=0.18,
+        min_flex=0.9,
+        max_flex=1.25,
+    ):
+        if region["kind"] == "intro":
+            intro_box = renderer.textbox(slide, g.content_left, region_top, g.content_width, region_height)
+            renderer.write_paragraph(
+                intro_box.text_frame,
+                slide_spec.body or "",
+                size=t.body_size - 1,
+                color=colors.text,
+            )
+            renderer.fit_text_frame(intro_box.text_frame, max_size=t.body_size - 1)
+            continue
 
-        number_box = renderer.textbox(slide, g.content_left + 0.18, current_top + 0.12, 0.45, 0.22)
-        renderer.write_paragraph(
-            number_box.text_frame,
-            f"{idx:02d}",
-            size=t.small_size + 1,
-            color=colors.accent if idx == 1 else colors.navy,
-            bold=True,
+        row_bounds = renderer.build_weighted_rows(
+            top=region_top,
+            height=region_height,
+            gap=0.16,
+            weights=bullet_weights,
+            min_height=0.46,
+            min_flex=0.9,
+            max_flex=1.2,
+            kind_prefix="agenda_row",
         )
-        renderer.fit_text_frame(
-            number_box.text_frame,
-            max_size=t.small_size + 1,
-            bold=True,
-        )
+        for idx, (bullet, (row_top, row_height)) in enumerate(zip(slide_spec.bullets, row_bounds, strict=True), start=1):
+            renderer.add_panel(
+                slide,
+                g.content_left,
+                row_top,
+                g.content_width,
+                row_height,
+                fill_color=colors.surface,
+                line_color=colors.line,
+            )
+            renderer.add_accent_bar(
+                slide,
+                g.content_left,
+                row_top,
+                0.09,
+                row_height,
+                color=colors.accent if idx == 1 else colors.navy,
+            )
 
-        text_box = renderer.textbox(slide, g.content_left + 0.72, current_top + 0.10, g.content_width - 0.95, 0.26)
-        renderer.write_paragraph(
-            text_box.text_frame,
-            bullet,
-            size=t.body_size - 1,
-            color=colors.text,
-            bold=True if idx == 1 else False,
-        )
-        renderer.fit_text_frame(
-            text_box.text_frame,
-            max_size=t.body_size - 1,
-            bold=True if idx == 1 else False,
-        )
-        current_top += row_height + row_gap
+            number_box = renderer.textbox(slide, g.content_left + 0.18, row_top + 0.10, 0.45, max(0.24, row_height - 0.20))
+            renderer.write_paragraph(
+                number_box.text_frame,
+                f"{idx:02d}",
+                size=t.small_size + 1,
+                color=colors.accent if idx == 1 else colors.navy,
+                bold=True,
+            )
+            renderer.fit_text_frame(number_box.text_frame, max_size=t.small_size + 1, bold=True)
+
+            text_box = renderer.textbox(slide, g.content_left + 0.72, row_top + 0.09, g.content_width - 0.95, max(0.28, row_height - 0.18))
+            renderer.write_paragraph(
+                text_box.text_frame,
+                bullet,
+                size=t.body_size - 1,
+                color=colors.text,
+                bold=idx == 1,
+            )
+            renderer.fit_text_frame(text_box.text_frame, max_size=t.body_size - 1, bold=idx == 1)

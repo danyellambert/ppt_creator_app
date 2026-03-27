@@ -177,6 +177,20 @@ def test_build_columns_returns_expected_bounds() -> None:
     assert columns[1][1] >= 0.8
 
 
+def test_build_weighted_columns_allocates_more_width_to_heavier_content() -> None:
+    renderer = PresentationRenderer(asset_root="examples")
+
+    columns = renderer.build_weighted_columns(
+        left=1.0,
+        width=4.0,
+        gap=0.1,
+        weights=[1.0, 3.0],
+        min_width=1.0,
+    )
+
+    assert columns[1][1] > columns[0][1]
+
+
 def test_build_panel_row_bounds_returns_rectangles() -> None:
     renderer = PresentationRenderer(asset_root="examples")
 
@@ -205,6 +219,20 @@ def test_build_panel_grid_creates_matrix_from_counts() -> None:
 
     assert len(grid) == 2
     assert len(grid[0]) == 2
+
+
+def test_build_weighted_rows_allocates_more_height_to_heavier_content() -> None:
+    renderer = PresentationRenderer(asset_root="examples")
+
+    rows = renderer.build_weighted_rows(
+        top=1.0,
+        height=3.0,
+        gap=0.1,
+        weights=[1.0, 3.0],
+        min_height=0.6,
+    )
+
+    assert rows[1][1] > rows[0][1]
 
 
 def test_estimate_content_weight_increases_with_more_content() -> None:
