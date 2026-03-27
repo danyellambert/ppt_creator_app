@@ -62,12 +62,14 @@ def test_api_validate_render_and_template_endpoints(tmp_path: Path) -> None:
                 "spec": spec_payload,
                 "output_path": str(output_path),
                 "dry_run": True,
+                "include_review": True,
             },
             method="POST",
         )
         assert status == 200
         assert render_payload["result"]["rendered"] is False
         assert render_payload["result"]["output_path"].endswith("api_render_output.pptx")
+        assert render_payload["result"]["quality_review"] is not None
 
         status, review_payload = _request_json(
             f"{base_url}/review",
@@ -104,6 +106,7 @@ def test_api_validate_render_and_template_endpoints(tmp_path: Path) -> None:
         assert status == 200
         assert preview_payload["result"]["preview_count"] == len(spec_payload["slides"])
         assert preview_payload["result"]["quality_review"]["status"] in {"ok", "review"}
+        assert "severity_counts" in preview_payload["result"]["quality_review"]
         assert preview_payload["result"]["backend_requested"] == "auto"
         assert preview_payload["result"]["backend_used"] in {"synthetic", "office"}
         assert Path(preview_payload["result"]["thumbnail_sheet"]).exists()

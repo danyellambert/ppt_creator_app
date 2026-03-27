@@ -288,10 +288,12 @@ def review_presentation(
         "average_score": average_score,
         "status": overall_status,
         "issue_count": len(all_issues),
+        "warning_count": len(all_issues),
         "severity_counts": severity_counts,
         "overflow_risk_count": overflow_risk_count,
         "balance_warning_count": balance_warning_count,
         "issues": all_issues,
+        "warnings": all_issues,
         "slides": slides,
         "missing_assets": missing_assets,
     }

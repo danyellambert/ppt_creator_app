@@ -69,6 +69,29 @@ def test_cli_render_dry_run_does_not_create_file(tmp_path: Path, capsys) -> None
     assert "Dry run" in captured.out
 
 
+def test_cli_render_dry_run_can_include_quality_review(tmp_path: Path) -> None:
+    output = tmp_path / "dry_run_review_output.pptx"
+    report_path = tmp_path / "dry_run_review_report.json"
+
+    result = main(
+        [
+            "render",
+            "examples/ai_sales.json",
+            str(output),
+            "--dry-run",
+            "--review",
+            "--report-json",
+            str(report_path),
+        ]
+    )
+
+    assert result == 0
+    payload = json.loads(report_path.read_text(encoding="utf-8"))
+    assert payload["quality_review"] is not None
+    assert "severity_counts" in payload["quality_review"]
+    assert "overflow_risk_count" in payload["quality_review"]
+
+
 def test_cli_render_batch_generates_output_and_report(tmp_path: Path) -> None:
     output_dir = tmp_path / "batch_output"
     report_path = tmp_path / "batch_report.json"
@@ -158,6 +181,7 @@ def test_cli_preview_generates_pngs_and_thumbnail_sheet(tmp_path: Path, capsys) 
     assert "Generated previews" in captured.out
     report = report_path.read_text(encoding="utf-8")
     assert "quality_review" in report
+    assert "severity_counts" in report
     generated_pngs = sorted(output_dir.glob("*.png"))
     assert len(generated_pngs) == 11
     assert any(path.name.endswith("-thumbnails.png") for path in generated_pngs)

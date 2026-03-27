@@ -8,6 +8,7 @@ from tempfile import TemporaryDirectory
 
 from PIL import Image, ImageDraw, ImageFont
 
+from ppt_creator.qa import review_presentation
 from ppt_creator.renderer import PresentationRenderer
 from ppt_creator.schema import PresentationInput, PresentationMeta, Slide, SlideType
 from ppt_creator.theme import get_theme
@@ -368,69 +369,7 @@ class PreviewRenderer:
                 draw.text((x + 6, 34), label, fill=(91, 167, 120), font=_load_font(12))
 
     def build_preview_quality_review(self, spec: PresentationInput) -> dict[str, object]:
-        warnings: list[str] = []
-        slide_reviews: list[dict[str, object]] = []
-
-        for index, slide in enumerate(spec.slides, start=1):
-            issues: list[str] = []
-            title = slide.title or slide.type.value
-
-            if len(title) > 68:
-                issues.append("title may be too long for a clean visual hierarchy")
-            if slide.subtitle and len(slide.subtitle) > 120:
-                issues.append("subtitle may be too long for the current layout")
-            if slide.body and len(slide.body) > 260:
-                issues.append("body text may be too dense")
-
-            if slide.type.value in {"agenda", "bullets", "summary", "image_text"} and len(slide.bullets) > 5:
-                issues.append("too many bullets for executive readability")
-
-            if slide.type.value == "cards":
-                for card in slide.cards:
-                    if len(card.body) > 150:
-                        issues.append(f"card '{card.title}' may be too verbose")
-
-            if slide.type.value in {"comparison", "two_column"}:
-                columns = slide.comparison_columns or slide.two_column_columns
-                for column in columns:
-                    if len(column.bullets) > 3:
-                        issues.append(f"column '{column.title}' has many bullets")
-                    if column.body and len(column.body) > 150:
-                        issues.append(f"column '{column.title}' body may be too dense")
-
-            if slide.type.value == "table":
-                if len(slide.table_rows) > 6:
-                    issues.append("table may have too many rows")
-                if len(slide.table_columns) > 4:
-                    issues.append("table may have too many columns")
-
-            if slide.type.value == "faq" and len(slide.faq_items) > 3:
-                issues.append("faq may be visually crowded")
-
-            if slide.type.value == "chart" and len(slide.chart_categories) > 6:
-                issues.append("chart has many categories for a clean executive view")
-
-            if slide.image_path and self.resolve_asset(slide.image_path) is None:
-                issues.append("image asset is missing and will use placeholder")
-
-            slide_reviews.append(
-                {
-                    "slide_number": index,
-                    "title": title,
-                    "slide_type": slide.type.value,
-                    "issues": issues,
-                    "status": "review" if issues else "ok",
-                }
-            )
-            for issue in issues:
-                warnings.append(f"slide {index:02d} ({title}): {issue}")
-
-        return {
-            "status": "review" if warnings else "ok",
-            "warning_count": len(warnings),
-            "warnings": warnings,
-            "slides": slide_reviews,
-        }
+        return review_presentation(spec, asset_root=self.asset_root, theme_name=self.theme.name)
 
     def _render_heading(self, draw: ImageDraw.ImageDraw, slide_spec: Slide, *, eyebrow_default: str | None = None) -> int:
         colors = self.theme.colors

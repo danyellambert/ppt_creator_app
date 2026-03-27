@@ -327,6 +327,20 @@ python -m ppt_creator.cli render examples/ai_sales.json outputs/ai_sales.pptx \
   --dry-run --report-json outputs/ai_sales_report.json --check-assets
 ```
 
+Se quiser já embutir uma revisão heurística de qualidade no relatório do render:
+
+```bash
+python -m ppt_creator.cli render examples/ai_sales.json outputs/ai_sales.pptx \
+  --dry-run --review --report-json outputs/ai_sales_report.json
+```
+
+Esse relatório agora pode incluir:
+
+- `severity_counts`
+- `overflow_risk_count`
+- `balance_warning_count`
+- análise por slide
+
 Rodar uma revisão heurística de qualidade:
 
 ```bash
@@ -490,6 +504,8 @@ Endpoints disponíveis:
 - `POST /validate`
 - `POST /render`
 - `POST /template`
+
+O endpoint `POST /render` também pode receber `include_review: true` para devolver a revisão heurística junto com o resultado do render/dry-run.
 
 Exemplo de validação por API:
 

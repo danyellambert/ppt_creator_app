@@ -35,6 +35,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     render_parser.add_argument("--report-json", help="Optional path to write a JSON render report")
     render_parser.add_argument(
+        "--review",
+        action="store_true",
+        help="Include heuristic QA review summary in the render report",
+    )
+    render_parser.add_argument(
         "--check-assets",
         action="store_true",
         help="Warn when referenced image assets cannot be resolved",
@@ -120,6 +125,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     batch_parser.add_argument("--report-json", help="Optional path to write a JSON batch report")
     batch_parser.add_argument(
+        "--review",
+        action="store_true",
+        help="Include heuristic QA review summaries for each rendered presentation",
+    )
+    batch_parser.add_argument(
         "--check-assets",
         action="store_true",
         help="Warn when referenced image assets cannot be resolved",
@@ -186,6 +196,7 @@ def build_report(
     dry_run: bool,
     rendered: bool,
     missing_assets: list[str],
+    quality_review: dict[str, object] | None = None,
 ) -> dict[str, object]:
     return {
         "mode": mode,
@@ -198,6 +209,7 @@ def build_report(
         "rendered": rendered,
         "missing_asset_count": len(missing_assets),
         "missing_assets": missing_assets,
+        "quality_review": quality_review,
     }
 
 
@@ -296,6 +308,7 @@ def render_one(
     secondary_color: str | None = None,
     dry_run: bool = False,
     check_assets: bool = False,
+    review: bool = False,
 ) -> dict[str, object]:
     input_path = Path(input_json)
     print_info(f"Loading input: {input_path}")
@@ -313,11 +326,22 @@ def render_one(
     output_path = renderer.validate_output_path(output_pptx)
     print_info(f"Planned output: {output_path}")
     missing_assets = renderer.collect_missing_assets(spec)
+    quality_review = (
+        review_presentation(spec, asset_root=resolved_asset_root, theme_name=effective_theme)
+        if review
+        else None
+    )
 
     if check_assets and missing_assets:
         emit_missing_asset_warnings(missing_assets)
     elif check_assets:
         print_info("Asset check complete: no missing assets")
+
+    if quality_review is not None:
+        print_info(
+            "QA review: "
+            f"{quality_review['issue_count']} issue(s), average score {quality_review['average_score']}"
+        )
 
     if dry_run:
         print(f"[OK] Dry run: {input_path} -> {output_path} ({len(spec.slides)} slides)")
@@ -330,6 +354,7 @@ def render_one(
             dry_run=True,
             rendered=False,
             missing_assets=missing_assets,
+            quality_review=quality_review,
         )
 
     rendered_output = renderer.render(spec, output_path)
@@ -343,6 +368,7 @@ def render_one(
         dry_run=False,
         rendered=True,
         missing_assets=missing_assets,
+        quality_review=quality_review,
     )
 
 
@@ -499,6 +525,7 @@ def main(argv: list[str] | None = None) -> int:
                         secondary_color=args.secondary_color,
                         dry_run=args.dry_run,
                         check_assets=args.check_assets,
+                        review=args.review,
                     )
                 )
 
@@ -511,6 +538,17 @@ def main(argv: list[str] | None = None) -> int:
                 "rendered_count": sum(1 for result in results if result["rendered"]),
                 "dry_run": args.dry_run,
                 "missing_asset_count": sum(int(result["missing_asset_count"]) for result in results),
+                "review_enabled": args.review,
+                "review_average_score": int(
+                    sum(
+                        int(result["quality_review"]["average_score"])
+                        for result in results
+                        if result["quality_review"] is not None
+                    )
+                    / max(1, sum(1 for result in results if result["quality_review"] is not None))
+                )
+                if args.review
+                else None,
                 "results": results,
             }
             if args.report_json:
@@ -531,6 +569,7 @@ def main(argv: list[str] | None = None) -> int:
             secondary_color=args.secondary_color,
             dry_run=args.dry_run,
             check_assets=args.check_assets,
+            review=args.review,
         )
         if args.report_json:
             write_report(args.report_json, report)

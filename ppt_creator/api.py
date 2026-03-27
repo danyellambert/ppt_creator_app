@@ -78,6 +78,7 @@ def render_spec_payload(
     secondary_color: str | None = None,
     dry_run: bool = False,
     check_assets: bool = False,
+    include_review: bool = False,
 ) -> dict[str, object]:
     spec = PresentationInput.model_validate(spec_payload)
     effective_theme = theme_name or spec.presentation.theme
@@ -89,6 +90,15 @@ def render_spec_payload(
     )
     destination = renderer.validate_output_path(output_path)
     missing_assets = renderer.collect_missing_assets(spec)
+    quality_review = (
+        review_presentation(
+            spec,
+            theme_name=effective_theme,
+            asset_root=_resolve_service_asset_root(asset_root),
+        )
+        if include_review
+        else None
+    )
 
     if dry_run:
         return {
@@ -101,6 +111,7 @@ def render_spec_payload(
             "slide_count": len(spec.slides),
             "missing_asset_count": len(missing_assets) if check_assets else 0,
             "missing_assets": missing_assets if check_assets else [],
+            "quality_review": quality_review,
         }
 
     rendered_output = renderer.render(spec, destination)
@@ -114,6 +125,7 @@ def render_spec_payload(
         "slide_count": len(spec.slides),
         "missing_asset_count": len(missing_assets) if check_assets else 0,
         "missing_assets": missing_assets if check_assets else [],
+        "quality_review": quality_review,
     }
 
 
@@ -262,6 +274,7 @@ class PptCreatorAPIHandler(BaseHTTPRequestHandler):
                     secondary_color=str(payload["secondary_color"]) if payload.get("secondary_color") else None,
                     dry_run=bool(payload.get("dry_run", False)),
                     check_assets=bool(payload.get("check_assets", False)),
+                    include_review=bool(payload.get("include_review", False)),
                 )
                 self._json_response(HTTPStatus.OK, {"result": result})
                 return
