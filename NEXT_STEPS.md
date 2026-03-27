@@ -185,6 +185,8 @@ Mesmo com a Fase 1 concluída, ainda há uma camada importante de refinamento vi
 - [ ] substituir coordenadas mais rígidas por primitives de layout e constraints semânticas
 - [ ] criar stacks/rows/columns reutilizáveis para reduzir desalinhamentos entre layouts
 - [ ] adicionar auto-fit tipográfico e controle de overflow por bloco
+  - [x] primeira camada de auto-fit em títulos, subtitles e caixas homogêneas críticas
+  - [ ] expandir auto-fit para todos os layouts e blocos compostos
 - [ ] balancear melhor colunas, cards e painéis quando o conteúdo variar
 - [ ] formalizar baseline vertical e anchors consistentes por tipo de slide
 - [ ] revisar visualmente, slide a slide, os layouts `title`, `metrics`, `comparison`, `table`, `faq`, `summary` e `closing`
@@ -462,6 +464,8 @@ Se a meta for perseguir o nível “deck quase pronto sem retoque manual”, a o
 - [ ] primitives de layout (`stack`, `grid`, `two-column`, `panel row`)
 - [ ] constraints semânticas em vez de posições excessivamente rígidas
 - [ ] auto-fit real de texto por caixa
+  - [x] primeira camada aplicada em caixas homogêneas críticas
+  - [ ] expansão para caixas compostas, grids e painéis complexos
 - [ ] balanceamento automático de alturas e colunas
 - [ ] prevenção mais forte de overflow visual
 

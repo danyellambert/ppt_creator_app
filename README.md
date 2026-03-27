@@ -626,4 +626,6 @@ O projeto agora também começou a ganhar uma primeira camada de QA visual heur�
 - revisão heurística de densidade e risco visual no relatório de preview
 - comando/endpoint dedicado de review heurístico para QA do deck
 
+Também começou a entrar uma primeira camada de **auto-fit tipográfico** em caixas homogêneas mais críticas, especialmente para reduzir overflow em títulos, subtitles, narrative boxes e painéis executivos mais sensíveis.
+
 O próximo passo mais importante continua sendo evoluir de preview sintético para preview fiel ao `.pptx` real.

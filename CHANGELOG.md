@@ -7,6 +7,7 @@ The format is inspired by Keep a Changelog, and the project aims to follow Seman
 ## [Unreleased]
 
 ### Added
+- initial typographic auto-fit for critical homogeneous text boxes in rendered slides
 - dedicated heuristic `review` flow in CLI/API for deck QA
 - local GGUF/`llama.cpp` provider (`pptagent_local`) for the optional briefing layer
 - provider interface for the optional briefing layer, with initial `heuristic` provider

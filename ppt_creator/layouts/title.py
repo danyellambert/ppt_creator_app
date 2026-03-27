@@ -56,6 +56,7 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
                 size=t.body_size,
                 color=colors.text,
             )
+            renderer.fit_text_frame(body_box.text_frame, max_size=t.body_size)
 
         highlight_panel_left = 9.35
         renderer.add_panel(
@@ -111,6 +112,7 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
             size=t.body_size,
             color=colors.text,
         )
+        renderer.fit_text_frame(body_box.text_frame, max_size=t.body_size)
 
     renderer.add_panel(
         slide,

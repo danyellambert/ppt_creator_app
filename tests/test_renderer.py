@@ -79,3 +79,23 @@ def test_collect_missing_assets_reports_missing_brand_logo() -> None:
     missing_assets = renderer.collect_missing_assets(spec)
 
     assert missing_assets == ["presentation branding: missing asset 'missing-logo.png'"]
+
+
+def test_fit_text_frame_reduces_font_size_for_tight_box() -> None:
+    presentation = Presentation()
+    slide = presentation.slides.add_slide(presentation.slide_layouts[6])
+    renderer = PresentationRenderer(asset_root="examples")
+
+    shape = renderer.textbox(slide, 1.0, 1.0, 2.4, 0.45)
+    renderer.write_paragraph(
+        shape.text_frame,
+        "This is a deliberately long title that should shrink to fit the box.",
+        size=28,
+        color=renderer.theme.colors.navy,
+        bold=True,
+    )
+    renderer.fit_text_frame(shape.text_frame, max_size=28, bold=True)
+
+    run = shape.text_frame.paragraphs[0].runs[0]
+    assert run.font.size is not None
+    assert run.font.size.pt <= 28

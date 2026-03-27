@@ -155,6 +155,11 @@ class PresentationRenderer:
             bold=True,
             align=align,
         )
+        self.fit_text_frame(
+            title_box.text_frame,
+            max_size=title_size or self.theme.typography.title_size,
+            bold=True,
+        )
 
         if subtitle:
             subtitle_box = self.textbox(slide, left, top + 0.78, subtitle_width or width, 0.45)
@@ -165,6 +170,28 @@ class PresentationRenderer:
                 color=self.theme.colors.muted,
                 align=align,
             )
+            self.fit_text_frame(
+                subtitle_box.text_frame,
+                max_size=self.theme.typography.subtitle_size,
+            )
+
+    def fit_text_frame(
+        self,
+        text_frame: "TextFrame",
+        *,
+        max_size: int,
+        bold: bool = False,
+        italic: bool = False,
+    ) -> None:
+        try:
+            text_frame.fit_text(
+                font_family=self.theme.typography.font_name,
+                max_size=max_size,
+                bold=bold,
+                italic=italic,
+            )
+        except Exception:
+            return
 
     def panel_content_box(
         self,
@@ -204,6 +231,10 @@ class PresentationRenderer:
                 attribution,
                 size=self.theme.typography.body_size - 1,
                 color=self.theme.colors.muted,
+            )
+            self.fit_text_frame(
+                attribution_box.text_frame,
+                max_size=self.theme.typography.body_size - 1,
             )
 
     def set_run_style(
