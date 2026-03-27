@@ -7,6 +7,7 @@ The format is inspired by Keep a Changelog, and the project aims to follow Seman
 ## [Unreleased]
 
 ### Added
+- optional office-aware preview backend selection with automatic fallback to synthetic previews
 - initial layout primitive helpers for panel inner bounds and stacked vertical regions
 - initial application of layout primitives to comparison, faq, cards, and two-column slides
 - initial typographic auto-fit for critical homogeneous text boxes in rendered slides

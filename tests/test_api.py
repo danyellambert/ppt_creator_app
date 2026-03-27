@@ -101,6 +101,8 @@ def test_api_validate_render_and_template_endpoints(tmp_path: Path) -> None:
         assert status == 200
         assert preview_payload["result"]["preview_count"] == len(spec_payload["slides"])
         assert preview_payload["result"]["quality_review"]["status"] in {"ok", "review"}
+        assert preview_payload["result"]["backend_requested"] == "auto"
+        assert preview_payload["result"]["backend_used"] in {"synthetic", "office"}
         assert Path(preview_payload["result"]["thumbnail_sheet"]).exists()
     finally:
         server.shutdown()

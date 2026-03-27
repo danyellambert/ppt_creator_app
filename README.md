@@ -449,6 +449,21 @@ Isso ajuda a diagnosticar:
 - header/body anchors
 - linhas-guia de composição
 
+Também existe agora uma seleção explícita de backend de preview:
+
+```bash
+python -m ppt_creator.cli preview examples/ai_sales.json outputs/previews \
+  --backend auto
+```
+
+Opções disponíveis:
+
+- `auto` → tenta usar backend Office quando disponível, com fallback para o sintético
+- `synthetic` → força o preview em Pillow
+- `office` → exige runtime compatível (`soffice`/`libreoffice`) para tentar previews mais fiéis ao `.pptx`
+
+Hoje, se o runtime de Office não estiver instalado, o sistema cai automaticamente no backend sintético quando você usa `auto`.
+
 ## Modo API / serviço
 
 Também existe um modo HTTP simples para integrar o `ppt_creator` em outros fluxos:
@@ -649,5 +664,7 @@ Essa base já começou a ser aplicada em layouts compostos mais exigentes, como:
 - `two_column`
 
 Isso ainda não é um layout engine completo, mas já é o primeiro passo para sair de coordenadas excessivamente rígidas e caminhar para composição mais resiliente.
+
+Também já existe uma primeira infraestrutura para um backend de preview mais fiel ao `.pptx` quando um runtime de Office estiver disponível localmente, mantendo fallback limpo para o preview sintético.
 
 O próximo passo mais importante continua sendo evoluir de preview sintético para preview fiel ao `.pptx` real.

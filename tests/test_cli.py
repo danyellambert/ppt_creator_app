@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from ppt_creator.cli import main
@@ -172,3 +173,26 @@ def test_cli_preview_accepts_debug_overlays(tmp_path: Path) -> None:
 
     assert result == 0
     assert sorted(output_dir.glob("*.png"))
+
+
+def test_cli_preview_auto_backend_reports_synthetic_fallback(tmp_path: Path, monkeypatch) -> None:
+    from ppt_creator import preview as preview_module
+
+    monkeypatch.setattr(preview_module, "find_office_runtime", lambda: None)
+    output_dir = tmp_path / "preview_auto_output"
+    report_path = tmp_path / "preview_auto_report.json"
+
+    result = main(
+        [
+            "preview",
+            "examples/ai_sales.json",
+            str(output_dir),
+            "--report-json",
+            str(report_path),
+        ]
+    )
+
+    assert result == 0
+    payload = json.loads(report_path.read_text(encoding="utf-8"))
+    assert payload["backend_requested"] == "auto"
+    assert payload["backend_used"] == "synthetic"

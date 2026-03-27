@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 import re
+import shutil
+import subprocess
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from PIL import Image, ImageDraw, ImageFont
 
+from ppt_creator.renderer import PresentationRenderer
 from ppt_creator.schema import PresentationInput, PresentationMeta, Slide, SlideType
 from ppt_creator.theme import get_theme
 
@@ -13,6 +17,14 @@ PREVIEW_HEIGHT = 720
 THUMBNAIL_WIDTH = 320
 THUMBNAIL_HEIGHT = 180
 CONTACT_SHEET_COLUMNS = 3
+
+
+def find_office_runtime() -> str | None:
+    for candidate in ("soffice", "libreoffice"):
+        resolved = shutil.which(candidate)
+        if resolved:
+            return resolved
+    return None
 
 
 def _rgb_tuple(hex_value: str) -> tuple[int, int, int]:
@@ -73,6 +85,7 @@ class PreviewRenderer:
         secondary_color: str | None = None,
         debug_grid: bool = False,
         debug_safe_areas: bool = False,
+        backend: str = "auto",
     ):
         self.requested_theme_name = theme_name
         self.requested_primary_color = primary_color
@@ -80,6 +93,7 @@ class PreviewRenderer:
         self.asset_root = Path(asset_root or ".").resolve()
         self.debug_grid = debug_grid
         self.debug_safe_areas = debug_safe_areas
+        self.backend = backend
         self.theme = get_theme(theme_name, primary_color=primary_color, secondary_color=secondary_color)
 
     def render(self, spec: PresentationInput, output_dir: str | Path, *, basename: str | None = None) -> dict[str, object]:
@@ -91,14 +105,27 @@ class PreviewRenderer:
         destination = Path(output_dir)
         destination.mkdir(parents=True, exist_ok=True)
         base = basename or _safe_basename(spec.presentation.title)
+        runtime = find_office_runtime() if self.backend in {"auto", "office"} else None
+        backend_used = "synthetic"
+        fallback_reason: str | None = None
 
-        preview_paths: list[str] = []
-        total_slides = len(spec.slides)
-        for index, slide_spec in enumerate(spec.slides, start=1):
-            image = self.render_slide(spec.presentation, slide_spec, index, total_slides)
-            preview_path = destination / f"{base}-{index:02d}.png"
-            image.save(preview_path)
-            preview_paths.append(str(preview_path))
+        if self.backend == "office":
+            if not runtime:
+                raise RuntimeError("Office preview backend requested but no 'soffice' or 'libreoffice' executable was found")
+            preview_paths = self.render_office_previews(spec, destination, base, runtime=runtime)
+            backend_used = "office"
+        elif self.backend == "auto" and runtime:
+            try:
+                preview_paths = self.render_office_previews(spec, destination, base, runtime=runtime)
+                backend_used = "office"
+            except Exception as exc:  # noqa: BLE001
+                fallback_reason = f"Office preview unavailable, falling back to synthetic preview: {exc}"
+                preview_paths = self.render_synthetic_previews(spec, destination, base)
+                backend_used = "synthetic"
+        else:
+            if self.backend == "auto" and not runtime:
+                fallback_reason = "Office runtime not found; using synthetic preview backend"
+            preview_paths = self.render_synthetic_previews(spec, destination, base)
 
         contact_sheet_path = destination / f"{base}-thumbnails.png"
         self.render_contact_sheet(spec.presentation, spec.slides, preview_paths, contact_sheet_path)
@@ -112,7 +139,76 @@ class PreviewRenderer:
             "quality_review": self.build_preview_quality_review(spec),
             "debug_grid": self.debug_grid,
             "debug_safe_areas": self.debug_safe_areas,
+            "backend_requested": self.backend,
+            "backend_used": backend_used,
+            "backend_fallback_reason": fallback_reason,
+            "office_runtime": runtime,
         }
+
+    def render_synthetic_previews(
+        self,
+        spec: PresentationInput,
+        destination: Path,
+        base: str,
+    ) -> list[str]:
+        preview_paths: list[str] = []
+        total_slides = len(spec.slides)
+        for index, slide_spec in enumerate(spec.slides, start=1):
+            image = self.render_slide(spec.presentation, slide_spec, index, total_slides)
+            preview_path = destination / f"{base}-{index:02d}.png"
+            image.save(preview_path)
+            preview_paths.append(str(preview_path))
+        return preview_paths
+
+    def render_office_previews(
+        self,
+        spec: PresentationInput,
+        destination: Path,
+        base: str,
+        *,
+        runtime: str,
+    ) -> list[str]:
+        with TemporaryDirectory(prefix="ppt_creator_preview_") as tmpdir:
+            temp_root = Path(tmpdir)
+            pptx_path = temp_root / f"{base}.pptx"
+            renderer = PresentationRenderer(
+                theme_name=self.requested_theme_name or spec.presentation.theme,
+                asset_root=self.asset_root,
+                primary_color=self.requested_primary_color or spec.presentation.primary_color,
+                secondary_color=self.requested_secondary_color or spec.presentation.secondary_color,
+            )
+            renderer.render(spec, pptx_path)
+
+            command = [
+                runtime,
+                "--headless",
+                "--convert-to",
+                "png",
+                "--outdir",
+                str(temp_root),
+                str(pptx_path),
+            ]
+            completed = subprocess.run(command, capture_output=True, text=True, check=False)
+            if completed.returncode != 0:
+                stderr = (completed.stderr or completed.stdout or "").strip()
+                raise RuntimeError(stderr or f"office conversion failed with exit code {completed.returncode}")
+
+            converted_pngs = sorted(
+                path for path in temp_root.glob("*.png") if path.name != f"{base}-thumbnails.png"
+            )
+            if not converted_pngs:
+                raise RuntimeError("office conversion did not produce PNG previews")
+            if len(converted_pngs) != len(spec.slides):
+                raise RuntimeError(
+                    f"office conversion produced {len(converted_pngs)} PNG(s) for {len(spec.slides)} slide(s)"
+                )
+
+            preview_paths: list[str] = []
+            for index, source_path in enumerate(converted_pngs, start=1):
+                target_path = destination / f"{base}-{index:02d}.png"
+                shutil.copy2(source_path, target_path)
+                preview_paths.append(str(target_path))
+            return preview_paths
 
     def render_slide(self, meta: PresentationMeta, slide_spec: Slide, index: int, total_slides: int) -> Image.Image:
         colors = self.theme.colors
@@ -689,6 +785,7 @@ def render_previews(
     basename: str | None = None,
     debug_grid: bool = False,
     debug_safe_areas: bool = False,
+    backend: str = "auto",
 ) -> dict[str, object]:
     renderer = PreviewRenderer(
         theme_name=theme_name,
@@ -697,5 +794,6 @@ def render_previews(
         secondary_color=secondary_color,
         debug_grid=debug_grid,
         debug_safe_areas=debug_safe_areas,
+        backend=backend,
     )
     return renderer.render(spec, output_dir, basename=basename)

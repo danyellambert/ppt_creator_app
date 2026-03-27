@@ -142,6 +142,7 @@ def preview_spec_payload(
     basename: str | None = None,
     debug_grid: bool = False,
     debug_safe_areas: bool = False,
+    backend: str = "auto",
 ) -> dict[str, object]:
     spec = PresentationInput.model_validate(spec_payload)
     effective_theme = theme_name or spec.presentation.theme
@@ -155,6 +156,7 @@ def preview_spec_payload(
         basename=basename,
         debug_grid=debug_grid,
         debug_safe_areas=debug_safe_areas,
+        backend=backend,
     )
 
 
@@ -288,6 +290,7 @@ class PptCreatorAPIHandler(BaseHTTPRequestHandler):
                     basename=str(payload["basename"]) if payload.get("basename") else None,
                     debug_grid=bool(payload.get("debug_grid", False)),
                     debug_safe_areas=bool(payload.get("debug_safe_areas", False)),
+                    backend=str(payload["preview_backend"]) if payload.get("preview_backend") else "auto",
                 )
                 self._json_response(HTTPStatus.OK, {"result": result})
                 return

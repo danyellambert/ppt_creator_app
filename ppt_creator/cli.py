@@ -55,6 +55,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     preview_parser.add_argument("--basename", help="Optional base name for generated preview files")
     preview_parser.add_argument(
+        "--backend",
+        choices=["auto", "synthetic", "office"],
+        default="auto",
+        help="Preview backend: synthetic Pillow renderer, office-based conversion, or auto fallback",
+    )
+    preview_parser.add_argument(
         "--debug-grid",
         action="store_true",
         help="Overlay layout guide lines on preview images",
@@ -343,6 +349,7 @@ def preview_one(
     basename: str | None = None,
     debug_grid: bool = False,
     debug_safe_areas: bool = False,
+    backend: str = "auto",
 ) -> dict[str, object]:
     input_path = Path(input_json)
     print_info(f"Loading input: {input_path}")
@@ -365,6 +372,7 @@ def preview_one(
         basename=basename,
         debug_grid=debug_grid,
         debug_safe_areas=debug_safe_areas,
+        backend=backend,
     )
     print(
         f"[OK] Generated previews: {result['preview_count']} slide image(s) + thumbnail sheet"
@@ -451,6 +459,7 @@ def main(argv: list[str] | None = None) -> int:
                 basename=args.basename,
                 debug_grid=args.debug_grid,
                 debug_safe_areas=args.debug_safe_areas,
+                backend=args.backend,
             )
             if args.report_json:
                 write_report(args.report_json, report)
