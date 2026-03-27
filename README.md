@@ -691,4 +691,12 @@ Isso ainda não é um layout engine completo, mas já é o primeiro passo para s
 
 Também já existe uma primeira infraestrutura para um backend de preview mais fiel ao `.pptx` quando um runtime de Office estiver disponível localmente, mantendo fallback limpo para o preview sintético.
 
+Na camada de review heurístico, o projeto também começou a ganhar sinais mais fortes de **risco visual**, incluindo:
+
+- contagem por severidade (`high` / `medium` / `low`)
+- sinais agregados de risco de overflow
+- sinais agregados de desbalanceamento entre painéis/colunas
+
+Esses sinais ainda são heurísticos, mas ajudam a transformar o review em algo mais próximo de um QA de composição, não só de validação estrutural.
+
 O próximo passo mais importante continua sendo evoluir de preview sintético para preview fiel ao `.pptx` real.

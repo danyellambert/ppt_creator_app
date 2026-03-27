@@ -44,6 +44,10 @@ def test_cli_review_generates_report(tmp_path: Path, capsys) -> None:
     assert result == 0
     assert report_path.exists()
     assert "Review completed" in captured.out
+    payload = json.loads(report_path.read_text(encoding="utf-8"))
+    assert "severity_counts" in payload
+    assert "overflow_risk_count" in payload
+    assert "balance_warning_count" in payload
 
 
 def test_cli_validate_emits_informational_logs(capsys) -> None:

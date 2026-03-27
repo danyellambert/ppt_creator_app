@@ -77,6 +77,9 @@ def test_api_validate_render_and_template_endpoints(tmp_path: Path) -> None:
         assert status == 200
         assert review_payload["result"]["slide_count"] == len(spec_payload["slides"])
         assert review_payload["result"]["status"] in {"ok", "review", "attention"}
+        assert "severity_counts" in review_payload["result"]
+        assert "overflow_risk_count" in review_payload["result"]
+        assert "balance_warning_count" in review_payload["result"]
 
         status, template_payload = _request_json(
             f"{base_url}/template",

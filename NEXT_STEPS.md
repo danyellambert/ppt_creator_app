@@ -338,6 +338,8 @@ Como a qualidade percebida do deck depende muito da inspeção visual, existe um
 - [ ] gerar preview a partir do `.pptx` real em vez de uma reconstrução paralela em Pillow
 - [ ] adicionar regressão visual baseada em previews reais/golden files
 - [ ] criar detectores mais fortes de colisão, overflow e clipping
+  - [x] primeira camada heurística de risco de overflow e desbalanceamento exposta no review/QA
+  - [ ] evoluir para detectores mais próximos de colisão/clipping real com base em preview/layout final
 
 Racional:
 

@@ -272,6 +272,14 @@ def review_one(
     print(
         f"[OK] Review completed: {result['issue_count']} issue(s), average score {result['average_score']}"
     )
+    if result["overflow_risk_count"]:
+        print_info(
+            f"Overflow risk heuristics flagged {result['overflow_risk_count']} signal(s) across the deck"
+        )
+    if result["balance_warning_count"]:
+        print_info(
+            f"Balance heuristics flagged {result['balance_warning_count']} signal(s) across the deck"
+        )
     return {
         "input_path": str(input_path),
         **result,
