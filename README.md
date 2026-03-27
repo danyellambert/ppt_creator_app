@@ -487,6 +487,8 @@ Opções disponíveis:
 
 Hoje, se o runtime de Office não estiver instalado, o sistema cai automaticamente no backend sintético quando você usa `auto`.
 
+A folha de thumbnails também começou a incorporar sinais do review heurístico, destacando slides mais arriscados com badges de risco e regiões prováveis de overflow.
+
 ## Modo API / serviço
 
 Também existe um modo HTTP simples para integrar o `ppt_creator` em outros fluxos:
@@ -702,6 +704,8 @@ Além disso, alguns layouts já começaram a ganhar um primeiro balanceamento au
 Layouts narrativos com mistura de corpo + bullets, como `comparison`, `two_column` e `image_text`, também começaram a usar stacks verticais reequilibradas por peso de conteúdo para reduzir divisão rígida de espaço.
 
 Essa mesma abordagem começou a se espalhar também para outros layouts executivos, como `agenda`, `bullets` e `closing`, que agora usam divisões mais semânticas e menos rígidas para texto, painéis e blocos auxiliares.
+
+O rollout também já começou a alcançar layouts que ainda estavam mais rígidos, como `title`, `section`, `chart` e `timeline`, especialmente com splits ponderados, stacks internas mais semânticas e cobertura adicional de auto-fit em blocos sensíveis.
 
 Isso ainda não é um layout engine completo, mas já é o primeiro passo para sair de coordenadas excessivamente rígidas e caminhar para composição mais resiliente.
 

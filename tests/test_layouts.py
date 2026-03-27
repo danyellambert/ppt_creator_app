@@ -409,6 +409,53 @@ def test_long_content_layouts_render_with_initial_autofit(tmp_path: Path) -> Non
                         },
                     ],
                 },
+                {
+                    "type": "title",
+                    "layout_variant": "hero_cover",
+                    "title": "A longer title cover that should still stay readable after more semantic split logic and autofit are applied",
+                    "subtitle": "A similarly long subtitle helps exercise the evolved title layout.",
+                    "body": "This body text is intentionally verbose so the title slide also participates in the latest semantic layout rollout.",
+                },
+                {
+                    "type": "section",
+                    "title": "A section divider with a long title that should still feel visually balanced",
+                    "subtitle": "Section subtitle with additional context for stress testing.",
+                    "section_label": "Strategic section",
+                },
+                {
+                    "type": "chart",
+                    "title": "Chart stress case",
+                    "body": "Longer narrative context above the chart validates that the chart region and intro region now rebalance more semantically.",
+                    "chart_categories": ["Q1", "Q2", "Q3", "Q4", "Q5", "Q6"],
+                    "chart_series": [
+                        {"name": "Adoption", "values": [1, 2, 3, 5, 8, 13]},
+                        {"name": "Revenue", "values": [2, 3, 5, 8, 13, 21]},
+                    ],
+                },
+                {
+                    "type": "timeline",
+                    "title": "Timeline stress case",
+                    "timeline_items": [
+                        {
+                            "title": "Diagnose the real operational bottleneck",
+                            "body": "A longer body helps validate adaptive panel widths and internal vertical balancing.",
+                            "tag": "Week 1",
+                            "footer": "Start narrow",
+                        },
+                        {
+                            "title": "Pilot the first constrained workflow",
+                            "body": "Another intentionally verbose body ensures the panels cannot rely on rigid geometry alone.",
+                            "tag": "Week 2",
+                            "footer": "Measure fast",
+                        },
+                        {
+                            "title": "Scale only after signal is clear",
+                            "body": "The final step also includes more text to keep the stress test realistic.",
+                            "tag": "Week 3",
+                            "footer": "Codify learnings",
+                        },
+                    ],
+                },
             ],
         }
     )
@@ -419,4 +466,4 @@ def test_long_content_layouts_render_with_initial_autofit(tmp_path: Path) -> Non
 
     assert rendered.exists()
     presentation = Presentation(str(rendered))
-    assert len(presentation.slides) == 7
+    assert len(presentation.slides) == 11

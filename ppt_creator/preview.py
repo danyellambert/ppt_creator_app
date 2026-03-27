@@ -20,6 +20,14 @@ THUMBNAIL_HEIGHT = 180
 CONTACT_SHEET_COLUMNS = 3
 
 
+def _risk_badge_fill(*, status: str | None, risk_level: str | None) -> tuple[int, int, int]:
+    if risk_level == "high" or status == "attention":
+        return (184, 103, 87)
+    if risk_level == "medium" or status == "review":
+        return (176, 139, 91)
+    return (97, 114, 135)
+
+
 def find_office_runtime() -> str | None:
     for candidate in ("soffice", "libreoffice"):
         resolved = shutil.which(candidate)
@@ -128,8 +136,15 @@ class PreviewRenderer:
                 fallback_reason = "Office runtime not found; using synthetic preview backend"
             preview_paths = self.render_synthetic_previews(spec, destination, base)
 
+        quality_review = self.build_preview_quality_review(spec)
         contact_sheet_path = destination / f"{base}-thumbnails.png"
-        self.render_contact_sheet(spec.presentation, spec.slides, preview_paths, contact_sheet_path)
+        self.render_contact_sheet(
+            spec.presentation,
+            spec.slides,
+            preview_paths,
+            contact_sheet_path,
+            quality_review=quality_review,
+        )
 
         return {
             "mode": "preview",
@@ -137,7 +152,7 @@ class PreviewRenderer:
             "preview_count": len(preview_paths),
             "previews": preview_paths,
             "thumbnail_sheet": str(contact_sheet_path),
-            "quality_review": self.build_preview_quality_review(spec),
+            "quality_review": quality_review,
             "debug_grid": self.debug_grid,
             "debug_safe_areas": self.debug_safe_areas,
             "backend_requested": self.backend,
@@ -245,6 +260,8 @@ class PreviewRenderer:
         slides: list[Slide],
         preview_paths: list[str],
         output_path: str | Path,
+        *,
+        quality_review: dict[str, object] | None = None,
     ) -> Path:
         columns = min(CONTACT_SHEET_COLUMNS, max(1, len(preview_paths)))
         rows = (len(preview_paths) + columns - 1) // columns
@@ -282,6 +299,11 @@ class PreviewRenderer:
             width=2,
         )
 
+        slide_review_lookup = {
+            int(review["slide_number"]): review
+            for review in (quality_review or {}).get("slides", [])
+        }
+
         for idx, preview_path in enumerate(preview_paths):
             image = Image.open(preview_path).convert("RGB")
             image.thumbnail((THUMBNAIL_WIDTH, THUMBNAIL_HEIGHT))
@@ -313,6 +335,30 @@ class PreviewRenderer:
             slide_type = slides[idx].type.value.replace("_", " ")
             draw.text((x + 16, y + THUMBNAIL_HEIGHT + 24), slide_title, fill=_rgb_tuple(self.theme.colors.navy), font=card_title_font)
             draw.text((x + 16, y + THUMBNAIL_HEIGHT + 46), slide_type, fill=_rgb_tuple(self.theme.colors.muted), font=card_meta_font)
+
+            review = slide_review_lookup.get(idx + 1)
+            if review:
+                status = str(review.get("status") or "ok")
+                risk_level = str(review.get("risk_level") or "low")
+                issue_count = len(review.get("issues") or [])
+                badge_fill = _risk_badge_fill(status=status, risk_level=risk_level)
+                badge_text = f"{risk_level.upper()} • {issue_count}"
+                badge_box = (x + card_width - 120, y + THUMBNAIL_HEIGHT + 38, x + card_width - 16, y + THUMBNAIL_HEIGHT + 60)
+                draw.rounded_rectangle(badge_box, radius=10, fill=badge_fill)
+                draw.text((badge_box[0] + 10, badge_box[1] + 4), badge_text, fill=(255, 255, 255), font=card_meta_font)
+
+                overflow_regions = review.get("likely_overflow_regions") or []
+                if overflow_regions:
+                    overflow_text = _truncate_text(
+                        ", ".join(str(region) for region in overflow_regions),
+                        max_chars=34,
+                    )
+                    draw.text(
+                        (x + 16, y + THUMBNAIL_HEIGHT + 64),
+                        overflow_text,
+                        fill=_rgb_tuple(self.theme.colors.muted),
+                        font=_load_font(11),
+                    )
 
         destination = Path(output_path)
         destination.parent.mkdir(parents=True, exist_ok=True)

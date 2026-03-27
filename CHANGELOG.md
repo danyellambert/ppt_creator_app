@@ -18,6 +18,8 @@ The format is inspired by Keep a Changelog, and the project aims to follow Seman
 - stronger heuristic QA signals for severity, overflow risk, and panel-balance risk in review outputs
 - optional render/report integration for heuristic QA summaries across CLI, API, and preview outputs
 - richer QA reporting with clipping-risk signals, top-risk-slide summaries, and batch-level review aggregates
+- semantic layout rollout extended into title, section, chart, and timeline slides with more adaptive splits/stacks
+- preview contact sheets now surface QA risk badges and likely overflow hotspots per slide
 - optional office-aware preview backend selection with automatic fallback to synthetic previews
 - initial layout primitive helpers for panel inner bounds and stacked vertical regions
 - initial application of layout primitives to comparison, faq, cards, and two-column slides

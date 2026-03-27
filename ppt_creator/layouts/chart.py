@@ -30,28 +30,62 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
         subtitle_width=7.0,
     )
 
-    top = 2.2
+    chart_regions: list[dict[str, float | str]] = []
     if slide_spec.body:
-        body_box = renderer.textbox(slide, g.content_left, top, g.content_width, 0.6)
-        renderer.write_paragraph(
-            body_box.text_frame,
-            slide_spec.body,
-            size=t.body_size - 1,
-            color=colors.text,
+        chart_regions.append(
+            {
+                "kind": "body",
+                "min_height": 0.52,
+                "flex": 1.0,
+                "content_weight": renderer.estimate_content_weight(body=slide_spec.body),
+            }
         )
-        top += 0.75
+    chart_regions.append(
+        {
+            "kind": "chart",
+            "min_height": 2.85,
+            "flex": 1.0,
+            "content_weight": max(1.0, len(slide_spec.chart_categories) * 0.45 + len(slide_spec.chart_series) * 0.8),
+        }
+    )
+
+    chart_top = 2.2
+    chart_height = 4.05
+    chart_bounds: tuple[float, float, float, float] | None = None
+    for region, (region_top, region_height) in renderer.build_content_stack(
+        top=chart_top,
+        height=chart_height,
+        regions=chart_regions,
+        gap=0.18,
+        min_flex=0.9,
+        max_flex=1.3,
+    ):
+        if region["kind"] == "body":
+            body_box = renderer.textbox(slide, g.content_left, region_top, g.content_width, region_height)
+            renderer.write_paragraph(
+                body_box.text_frame,
+                slide_spec.body or "",
+                size=t.body_size - 1,
+                color=colors.text,
+            )
+            renderer.fit_text_frame(body_box.text_frame, max_size=t.body_size - 1)
+        else:
+            chart_bounds = (g.content_left, region_top, g.content_width, region_height)
 
     chart_data = CategoryChartData()
     chart_data.categories = slide_spec.chart_categories
     for series in slide_spec.chart_series:
         chart_data.add_series(series.name, series.values)
 
+    assert chart_bounds is not None
+    chart_left, chart_top, chart_width, chart_height = chart_bounds
+
     chart_frame = slide.shapes.add_chart(
         CHART_TYPES[variant],
-        Inches(g.content_left),
-        Inches(top),
-        Inches(g.content_width),
-        Inches(3.35),
+        Inches(chart_left),
+        Inches(chart_top),
+        Inches(chart_width),
+        Inches(chart_height),
         chart_data,
     )
     chart = chart_frame.chart
@@ -75,7 +109,8 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
 
     plot = chart.plots[0]
     if hasattr(plot, "gap_width"):
-        plot.gap_width = 55
+        category_count = len(slide_spec.chart_categories)
+        plot.gap_width = 70 if category_count <= 4 else 55 if category_count <= 6 else 38
 
     palette = [colors.navy, colors.accent, colors.text, colors.muted]
     for idx, series in enumerate(chart.series):

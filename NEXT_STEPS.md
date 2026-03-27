@@ -191,11 +191,13 @@ Mesmo com a Fase 1 concluída, ainda há uma camada importante de refinamento vi
   - [ ] expandir primitives para stacks/rows/columns semânticos de uso geral
   - [x] primeira stack vertical guiada por conteúdo aplicada em regiões narrativas mistas (`comparison`, `two_column`, `image_text`)
   - [x] expansão inicial dessas stacks/weights para `agenda`, `bullets` e `closing`
+  - [x] primeira expansão adicional para `title`, `section`, `chart` e `timeline`
   - [ ] expandir stacks semânticas reutilizáveis para mais layouts e regiões internas
 - [ ] criar stacks/rows/columns reutilizáveis para reduzir desalinhamentos entre layouts
 - [ ] adicionar auto-fit tipográfico e controle de overflow por bloco
   - [x] primeira camada de auto-fit em títulos, subtitles e caixas homogêneas críticas
   - [x] expansão inicial para layouts com maior risco de overflow (`agenda`, `metrics`, `faq`, `table`, `image_text`)
+  - [x] expansão adicional para `title`, `section`, `chart` e `timeline`
   - [ ] expandir auto-fit para todos os layouts e blocos compostos
 - [ ] balancear melhor colunas, cards e painéis quando o conteúdo variar
   - [x] primeira camada de balanceamento adaptativo por peso de conteúdo em `metrics`, `cards`, `table`, `comparison`, `two_column`, `faq` e `summary`
@@ -333,6 +335,7 @@ Como a qualidade percebida do deck depende muito da inspeção visual, existe um
 - [x] melhorar a folha de thumbnails com composição mais legível e metadados por slide
 - [x] adicionar overlays opcionais de debug para grid e safe areas no preview sintético
 - [x] adicionar uma primeira revisão heurística de qualidade visual no relatório de preview
+- [x] enriquecer a thumbnail sheet com sinais de risco vindos do review heurístico
 - [x] expor revisão heurística dedicada via CLI/API para QA do deck
 - [x] reaproveitar a revisão heurística também em relatórios de preview e render/dry-run
 - [x] preparar seleção de backend com tentativa de preview via runtime Office e fallback limpo para o sintético

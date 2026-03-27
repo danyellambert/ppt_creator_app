@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pptx.enum.shapes import MSO_AUTO_SHAPE_TYPE
 from pptx.enum.text import PP_ALIGN
-from pptx.util import Inches, Pt
+from pptx.util import Inches
 
 from ppt_creator.theme import rgb
 
@@ -24,30 +24,52 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
     )
 
     items = slide_spec.timeline_items
-    count = len(items)
     gap = 0.24
-    item_width = (g.content_width - (gap * (count - 1))) / count
     marker_y = 2.28
     panel_top = 2.55
     panel_height = 2.9
 
+    panel_bounds = renderer.build_weighted_panel_row_bounds(
+        left=g.content_left,
+        top=panel_top,
+        width=g.content_width,
+        height=panel_height,
+        gap=gap,
+        weights=[
+            renderer.estimate_content_weight(
+                title=item.title,
+                body=item.body,
+                footer=item.footer,
+                tag=item.tag,
+            )
+            for item in items
+        ],
+        min_width=1.85,
+        min_flex=0.9,
+        max_flex=1.25,
+        kind_prefix="timeline",
+    )
+
+    line_start = panel_bounds[0][0] + (panel_bounds[0][2] / 2)
+    line_end = panel_bounds[-1][0] + (panel_bounds[-1][2] / 2)
+
     renderer.add_rule(
         slide,
-        g.content_left + 0.18,
+        line_start,
         marker_y,
-        g.content_right - 0.18,
+        line_end,
         marker_y,
         color=colors.line,
         width_pt=1.4,
     )
 
-    for idx, item in enumerate(items):
-        left = g.content_left + idx * (item_width + gap)
+    for idx, (item, (left, _, item_width, item_height)) in enumerate(zip(items, panel_bounds, strict=True)):
         marker_color = colors.navy if idx % 2 == 0 else colors.accent
+        marker_center = left + (item_width / 2)
 
         marker = slide.shapes.add_shape(
             MSO_AUTO_SHAPE_TYPE.OVAL,
-            Inches(left + (item_width / 2) - 0.12),
+            Inches(marker_center - 0.12),
             Inches(marker_y - 0.12),
             Inches(0.24),
             Inches(0.24),
@@ -65,13 +87,14 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
             bold=True,
             align=PP_ALIGN.CENTER,
         )
+        renderer.fit_text_frame(label_box.text_frame, max_size=t.small_size, bold=True)
 
         renderer.add_panel(
             slide,
             left,
             panel_top,
             item_width,
-            panel_height,
+            item_height,
             fill_color=colors.surface,
             line_color=colors.line,
         )
@@ -84,37 +107,58 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
             color=marker_color,
         )
 
-        box = renderer.panel_content_box(
-            slide,
+        content_left, content_top, content_width, content_height = renderer.panel_inner_bounds(
             left=left,
             top=panel_top,
             width=item_width,
-            height=panel_height,
+            height=item_height,
             padding=0.22,
         )
-        tf = box.text_frame
-        renderer.write_paragraph(
-            tf,
-            item.title,
-            size=t.body_size - 1,
-            color=colors.navy,
-            bold=True,
-            space_after=8,
-        )
+        regions = [{"kind": "title", "height": 0.34}]
         if item.body:
-            renderer.write_paragraph(
-                tf,
-                item.body,
-                size=t.small_size + 1,
-                color=colors.text,
-                space_after=8,
+            regions.append(
+                {
+                    "kind": "body",
+                    "min_height": 0.92,
+                    "flex": 1.0,
+                    "content_weight": renderer.estimate_content_weight(body=item.body),
+                }
             )
         if item.footer:
-            paragraph = renderer.write_paragraph(
-                tf,
-                item.footer,
-                size=t.small_size,
-                color=marker_color,
-                bold=True,
-            )
-            paragraph.space_before = Pt(4)
+            regions.append({"kind": "footer", "height": 0.22})
+
+        for region, (region_top, region_height) in renderer.build_content_stack(
+            top=content_top,
+            height=content_height,
+            regions=regions,
+            gap=0.08,
+            min_flex=0.9,
+            max_flex=1.25,
+        ):
+            box = renderer.textbox(slide, content_left, region_top, content_width, region_height)
+            if region["kind"] == "title":
+                renderer.write_paragraph(
+                    box.text_frame,
+                    item.title,
+                    size=t.body_size - 1,
+                    color=colors.navy,
+                    bold=True,
+                )
+                renderer.fit_text_frame(box.text_frame, max_size=t.body_size - 1, bold=True)
+            elif region["kind"] == "body":
+                renderer.write_paragraph(
+                    box.text_frame,
+                    item.body or "",
+                    size=t.small_size + 1,
+                    color=colors.text,
+                )
+                renderer.fit_text_frame(box.text_frame, max_size=t.small_size + 1)
+            else:
+                renderer.write_paragraph(
+                    box.text_frame,
+                    item.footer or "",
+                    size=t.small_size,
+                    color=marker_color,
+                    bold=True,
+                )
+                renderer.fit_text_frame(box.text_frame, max_size=t.small_size, bold=True)
