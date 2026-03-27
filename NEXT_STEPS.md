@@ -356,6 +356,8 @@ Qualquer camada de IA deve ser opcional.
 - [x] sugerir imagens ou placeholders automáticos
 - [x] revisar densidade de conteúdo por slide
 - [ ] integrar provedores reais de LLM de forma opcional (`OpenAI`, `Anthropic`, `Ollama`, etc.)
+  - [x] provider local via GGUF/`llama.cpp` para modelos como `PPTAgent`
+  - [ ] providers remotos (`OpenAI`, `Anthropic`) e/ou locais adicionais (`Ollama`)
 - [ ] usar LLM para revisão iterativa de narrativa após o primeiro deck ser gerado
 - [ ] usar LLM para reescrever títulos, subtitles e summaries em tom mais executivo
 - [ ] usar LLM para crítica slide a slide combinando briefing + QA visual
@@ -481,6 +483,7 @@ Se a meta for perseguir o nível “deck quase pronto sem retoque manual”, a o
 ### Prioridade 5 — LLM opcional de conteúdo e revisão
 
 - [x] provider layer para múltiplas LLMs
+- [x] provider local GGUF via `llama.cpp` para experimentar com `PPTAgent`
 - [ ] geração de outline e narrativa a partir de briefing livre
 - [ ] reescrita executiva de conteúdo fraco
 - [ ] revisão iterativa do deck após renderização e QA

@@ -53,6 +53,11 @@ def test_briefing_analysis_provides_image_suggestions_and_density_review() -> No
 
 
 def test_provider_registry_exposes_heuristic_provider() -> None:
-    assert list_provider_names() == ["heuristic"]
+    assert list_provider_names() == ["heuristic", "pptagent_local"]
     provider = get_provider("heuristic")
     assert provider.name == "heuristic"
+
+
+def test_provider_registry_exposes_local_pptagent_provider() -> None:
+    provider = get_provider("pptagent_local")
+    assert provider.name == "pptagent_local"

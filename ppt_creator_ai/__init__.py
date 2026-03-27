@@ -15,6 +15,7 @@ from ppt_creator_ai.briefing import (
 )
 from ppt_creator_ai.providers import (
     HeuristicBriefingProvider,
+    PPTAgentLocalProvider,
     get_provider,
     list_provider_names,
 )
@@ -32,6 +33,7 @@ __all__ = [
     "suggest_image_queries_from_briefing",
     "summarize_text_to_executive_bullets",
     "HeuristicBriefingProvider",
+    "PPTAgentLocalProvider",
     "get_provider",
     "list_provider_names",
 ]

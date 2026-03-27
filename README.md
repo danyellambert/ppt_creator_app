@@ -381,6 +381,29 @@ python -m ppt_creator_ai.cli generate examples/briefing_sales.json outputs/brief
   --provider heuristic
 ```
 
+Se você quiser usar o seu GGUF local com `llama.cpp`/`llama-cli`, já existe um provider preparado para isso:
+
+```bash
+python -m ppt_creator_ai.cli generate examples/briefing_sales.json outputs/briefing_sales_deck.json \
+  --provider pptagent_local
+```
+
+Por padrão ele tenta resolver um modelo contendo `PPTAgent` dentro de `models/`. Você pode controlar isso com variáveis de ambiente:
+
+```bash
+export PPT_CREATOR_AI_GGUF_MODEL=PPTAgent
+export PPT_CREATOR_AI_CTX_SIZE=8192
+export PPT_CREATOR_AI_MAX_TOKENS=1800
+export PPT_CREATOR_AI_GPU_LAYERS=-1
+export PPT_CREATOR_AI_TEMPERATURE=0.2
+```
+
+Pré-requisito:
+
+```bash
+brew install llama.cpp
+```
+
 Os comandos da CLI agora também emitem logs mais claros com prefixos como:
 
 - `[INFO]`
@@ -577,6 +600,8 @@ Essa camada tenta:
 Ela **não depende de LLM** nesta fase: é um gerador heurístico, útil como ponto de partida para pipelines futuros.
 
 Para preparar a futura entrada de LLM real, a camada opcional agora já possui uma interface de provider. Hoje existe apenas o provider `heuristic`, mas a arquitetura foi organizada para receber providers futuros sem acoplar o núcleo do `ppt_creator`.
+
+Ela agora também já inclui um provider local via GGUF/`llama.cpp` para experimentar modelos como o seu `PPTAgent` sem depender de APIs externas.
 
 ## Evolução visual e QA
 
