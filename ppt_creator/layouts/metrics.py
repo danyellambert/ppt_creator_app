@@ -3,6 +3,7 @@ from __future__ import annotations
 
 def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
     c = renderer.theme.canvas
+    g = renderer.theme.grid
     t = renderer.theme.typography
     components = renderer.theme.components
     colors = renderer.theme.colors
@@ -23,19 +24,23 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
         renderer.fit_text_frame(subtitle_box.text_frame, max_size=t.subtitle_size)
 
     metrics = slide_spec.metrics
-    count = len(metrics)
     gap = 0.28
-    total_width = 11.63
-    card_width = (total_width - gap * (count - 1)) / count
-    left = c.margin_x
+    left = g.content_left
+    total_width = g.content_width
     top = 2.55 if variant == "standard" else 2.35
     panel_height = 2.7 if variant == "standard" else 2.15
     value_size = t.metric_value_size if variant == "standard" else t.metric_value_size - 4
     label_size = t.metric_label_size + 1 if variant == "standard" else t.metric_label_size
     detail_size = t.small_size + 1 if variant == "standard" else t.small_size
 
-    for idx, metric in enumerate(metrics):
-        x = left + idx * (card_width + gap)
+    metric_regions = renderer.stack_horizontal_regions(
+        left=left,
+        width=total_width,
+        regions=[{"kind": "metric", "min_width": 1.8, "flex": 1.0} for _ in metrics],
+        gap=gap,
+    )
+
+    for idx, (metric, (_, (x, card_width))) in enumerate(zip(metrics, metric_regions, strict=True)):
         renderer.add_panel(slide, x, top, card_width, panel_height, fill_color=colors.surface, line_color=colors.line)
         renderer.add_accent_bar(slide, x, top, card_width, components.accent_bar_height, color=colors.navy if idx % 2 == 0 else colors.accent)
 

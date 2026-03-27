@@ -250,6 +250,38 @@ class PresentationRenderer:
             cursor_top += region_height + gap
         return bounds
 
+    def stack_horizontal_regions(
+        self,
+        *,
+        left: float,
+        width: float,
+        regions: list[dict[str, float | str]],
+        gap: float,
+    ) -> list[tuple[dict[str, float | str], tuple[float, float]]]:
+        if not regions:
+            return []
+
+        base_widths: list[float] = []
+        flex_total = 0.0
+        for region in regions:
+            base_width = float(region.get("width") or region.get("min_width") or 0.0)
+            base_widths.append(base_width)
+            flex_total += float(region.get("flex") or 0.0)
+
+        gap_total = gap * max(0, len(regions) - 1)
+        remaining = max(0.0, width - sum(base_widths) - gap_total)
+
+        bounds: list[tuple[dict[str, float | str], tuple[float, float]]] = []
+        cursor_left = left
+        for region, base_width in zip(regions, base_widths, strict=True):
+            extra = 0.0
+            if flex_total > 0 and float(region.get("flex") or 0.0) > 0:
+                extra = remaining * (float(region.get("flex") or 0.0) / flex_total)
+            region_width = base_width + extra
+            bounds.append((region, (cursor_left, region_width)))
+            cursor_left += region_width + gap
+        return bounds
+
     def add_quote_block(
         self,
         slide: "PptxSlide",

@@ -118,3 +118,22 @@ def test_stack_vertical_regions_distributes_flexible_space() -> None:
     assert len(regions) == 3
     body_bounds = regions[1][1]
     assert body_bounds[1] > 0.4
+
+
+def test_stack_horizontal_regions_distributes_flexible_space() -> None:
+    renderer = PresentationRenderer(asset_root="examples")
+
+    regions = renderer.stack_horizontal_regions(
+        left=1.0,
+        width=4.0,
+        regions=[
+            {"kind": "left", "width": 0.8},
+            {"kind": "center", "min_width": 0.8, "flex": 1.0},
+            {"kind": "right", "width": 0.8},
+        ],
+        gap=0.1,
+    )
+
+    assert len(regions) == 3
+    center_bounds = regions[1][1]
+    assert center_bounds[1] > 0.8

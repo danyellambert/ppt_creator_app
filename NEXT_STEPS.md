@@ -185,6 +185,7 @@ Mesmo com a Fase 1 concluída, ainda há uma camada importante de refinamento vi
 - [ ] substituir coordenadas mais rígidas por primitives de layout e constraints semânticas
   - [x] primeira primitive utilitária para bounds internos de painéis e distribuição vertical de regiões
   - [x] primeira aplicação dessas primitives em layouts compostos (`comparison`, `faq`, `cards`, `two_column`)
+  - [x] distribuição horizontal reutilizável para rows/columns, aplicada em `metrics`, `cards` e `table`
   - [ ] expandir primitives para stacks/rows/columns semânticos de uso geral
 - [ ] criar stacks/rows/columns reutilizáveis para reduzir desalinhamentos entre layouts
 - [ ] adicionar auto-fit tipográfico e controle de overflow por bloco
@@ -471,6 +472,7 @@ Se a meta for perseguir o nível “deck quase pronto sem retoque manual”, a o
 - [ ] primitives de layout (`stack`, `grid`, `two-column`, `panel row`)
   - [x] primeira base utilitária para inner bounds e distribuição vertical de regiões
   - [x] primeira aplicação em layouts compostos já existentes
+  - [x] primeira distribuição horizontal reutilizável aplicada em rows/columns executivos
   - [ ] consolidar primitives reutilizáveis de mais alto nível
 - [ ] constraints semânticas em vez de posições excessivamente rígidas
 - [ ] auto-fit real de texto por caixa

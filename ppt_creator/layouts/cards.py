@@ -16,13 +16,17 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
         width=7.2,
     )
 
-    left = g.content_left
     top = 2.55
-    card_width = 3.73
     gap = 0.35
 
-    for idx, card in enumerate(slide_spec.cards):
-        x = left + idx * (card_width + gap)
+    card_regions = renderer.stack_horizontal_regions(
+        left=g.content_left,
+        width=g.content_width,
+        regions=[{"kind": "card", "min_width": 3.0, "flex": 1.0} for _ in slide_spec.cards],
+        gap=gap,
+    )
+
+    for idx, (card, (_, (x, card_width))) in enumerate(zip(slide_spec.cards, card_regions, strict=True)):
         renderer.add_panel(slide, x, top, card_width, 2.95, fill_color=colors.surface, line_color=colors.line)
         renderer.add_accent_bar(slide, x, top, card_width, renderer.theme.components.accent_bar_height, color=colors.accent if idx == 1 else colors.navy)
 

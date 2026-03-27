@@ -664,6 +664,7 @@ Também começou a entrar uma base bem inicial de **layout primitives** dentro d
 
 - calcular bounds internos de painéis de forma consistente
 - distribuir regiões verticais dentro de painéis compostos
+- distribuir regiões horizontais para rows/columns de forma reutilizável
 
 Essa base já começou a ser aplicada em layouts compostos mais exigentes, como:
 
@@ -671,6 +672,8 @@ Essa base já começou a ser aplicada em layouts compostos mais exigentes, como:
 - `faq`
 - `cards`
 - `two_column`
+- `metrics`
+- `table`
 
 Isso ainda não é um layout engine completo, mas já é o primeiro passo para sair de coordenadas excessivamente rígidas e caminhar para composição mais resiliente.
 
