@@ -13,6 +13,7 @@ The format is inspired by Keep a Changelog, and the project aims to follow Seman
 - simple grid composition helpers built on top of layout primitives, now applied to comparison, two-column, FAQ, and summary layouts
 - higher-level semantic layout helpers for columns, panel rows, and panel grids, now reused across multiple executive layouts
 - initial content-aware balancing for widths/heights in metrics, cards, table, comparison, two-column, FAQ, and summary layouts
+- content-aware vertical stack balancing for mixed narrative regions such as comparison, two-column, and image-text slides
 - optional office-aware preview backend selection with automatic fallback to synthetic previews
 - initial layout primitive helpers for panel inner bounds and stacked vertical regions
 - initial application of layout primitives to comparison, faq, cards, and two-column slides

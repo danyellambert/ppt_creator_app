@@ -429,6 +429,47 @@ class PresentationRenderer:
             for weight in weights
         ]
 
+    def rebalance_flexible_regions(
+        self,
+        regions: list[dict[str, float | str]],
+        *,
+        min_flex: float = 0.9,
+        max_flex: float = 1.35,
+    ) -> list[dict[str, float | str]]:
+        balanced_regions = [dict(region) for region in regions]
+        flexible_indices = [
+            index for index, region in enumerate(balanced_regions) if float(region.get("flex") or 0.0) > 0.0
+        ]
+        if len(flexible_indices) <= 1:
+            return balanced_regions
+
+        weights = [
+            float(balanced_regions[index].get("content_weight") or balanced_regions[index].get("flex") or 1.0)
+            for index in flexible_indices
+        ]
+        flexes = self.normalize_content_flexes(weights, min_flex=min_flex, max_flex=max_flex)
+        for index, flex in zip(flexible_indices, flexes, strict=True):
+            balanced_regions[index]["flex"] = flex
+            balanced_regions[index].pop("content_weight", None)
+        return balanced_regions
+
+    def build_content_stack(
+        self,
+        *,
+        top: float,
+        height: float,
+        regions: list[dict[str, float | str]],
+        gap: float,
+        min_flex: float = 0.9,
+        max_flex: float = 1.35,
+    ) -> list[tuple[dict[str, float | str], tuple[float, float]]]:
+        return self.stack_vertical_regions(
+            top=top,
+            height=height,
+            regions=self.rebalance_flexible_regions(regions, min_flex=min_flex, max_flex=max_flex),
+            gap=gap,
+        )
+
     def build_grid_bounds(
         self,
         *,

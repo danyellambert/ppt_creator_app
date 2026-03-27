@@ -81,17 +81,36 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
             regions.append({"kind": "tag", "height": 0.20})
         regions.append({"kind": "title", "height": 0.42})
         if column.body:
-            regions.append({"kind": "body", "height": 0.82 if column.bullets else 1.48})
+            if column.bullets:
+                regions.append(
+                    {
+                        "kind": "body",
+                        "min_height": 0.72,
+                        "flex": 1.0,
+                        "content_weight": renderer.estimate_content_weight(body=column.body),
+                    }
+                )
+            else:
+                regions.append({"kind": "body", "height": 1.48})
         if column.bullets:
-            regions.append({"kind": "bullets", "min_height": 0.44, "flex": 1.0})
+            regions.append(
+                {
+                    "kind": "bullets",
+                    "min_height": 0.44,
+                    "flex": 1.0,
+                    "content_weight": renderer.estimate_content_weight(bullets=column.bullets),
+                }
+            )
         if column.footer:
             regions.append({"kind": "footer", "height": 0.22})
 
-        for region, (region_top, region_height) in renderer.stack_vertical_regions(
+        for region, (region_top, region_height) in renderer.build_content_stack(
             top=content_top,
             height=content_height,
             regions=regions,
             gap=0.06,
+            min_flex=0.9,
+            max_flex=1.35,
         ):
             kind = region["kind"]
             if kind == "tag":

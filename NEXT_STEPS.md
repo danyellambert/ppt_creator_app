@@ -189,6 +189,8 @@ Mesmo com a Fase 1 concluída, ainda há uma camada importante de refinamento vi
   - [x] composição simples de grids multi-painel aplicada em `comparison`, `two_column`, `faq` e `summary`
   - [x] primeiros helpers mais semânticos (`columns`, `panel rows`, `panel grids`) reaproveitados em múltiplos layouts
   - [ ] expandir primitives para stacks/rows/columns semânticos de uso geral
+  - [x] primeira stack vertical guiada por conteúdo aplicada em regiões narrativas mistas (`comparison`, `two_column`, `image_text`)
+  - [ ] expandir stacks semânticas reutilizáveis para mais layouts e regiões internas
 - [ ] criar stacks/rows/columns reutilizáveis para reduzir desalinhamentos entre layouts
 - [ ] adicionar auto-fit tipográfico e controle de overflow por bloco
   - [x] primeira camada de auto-fit em títulos, subtitles e caixas homogêneas críticas

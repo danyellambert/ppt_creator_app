@@ -229,3 +229,21 @@ def test_normalize_content_flexes_returns_scaled_values() -> None:
     assert min(flexes) >= 0.8
     assert max(flexes) <= 1.4
     assert flexes[0] < flexes[-1]
+
+
+def test_build_content_stack_allocates_more_height_to_heavier_region() -> None:
+    renderer = PresentationRenderer(asset_root="examples")
+
+    regions = renderer.build_content_stack(
+        top=1.0,
+        height=3.0,
+        regions=[
+            {"kind": "body", "min_height": 0.6, "flex": 1.0, "content_weight": 1.0},
+            {"kind": "bullets", "min_height": 0.6, "flex": 1.0, "content_weight": 3.0},
+        ],
+        gap=0.1,
+        min_flex=0.9,
+        max_flex=1.4,
+    )
+
+    assert regions[1][1][1] > regions[0][1][1]
