@@ -477,6 +477,34 @@ ollama serve
 ollama pull llama3.1
 ```
 
+Também já existem providers remotos opcionais para **OpenAI** e **Anthropic**:
+
+```bash
+python -m ppt_creator_ai.cli generate examples/briefing_sales.json outputs/briefing_sales_deck.json \
+  --provider openai
+
+python -m ppt_creator_ai.cli generate examples/briefing_sales.json outputs/briefing_sales_deck.json \
+  --provider anthropic
+```
+
+Variáveis úteis do OpenAI:
+
+```bash
+export OPENAI_API_KEY=...
+export PPT_CREATOR_AI_OPENAI_MODEL=gpt-4o-mini
+export PPT_CREATOR_AI_OPENAI_TIMEOUT_SECONDS=180
+export PPT_CREATOR_AI_OPENAI_RAW_OUTPUT_PATH=outputs/openai_raw_output.txt
+```
+
+Variáveis úteis do Anthropic:
+
+```bash
+export ANTHROPIC_API_KEY=...
+export PPT_CREATOR_AI_ANTHROPIC_MODEL=claude-3-5-haiku-latest
+export PPT_CREATOR_AI_ANTHROPIC_TIMEOUT_SECONDS=180
+export PPT_CREATOR_AI_ANTHROPIC_RAW_OUTPUT_PATH=outputs/anthropic_raw_output.txt
+```
+
 Se você quiser usar o seu GGUF local com `llama.cpp`/`llama-cli`, já existe um provider preparado para isso:
 
 ```bash
@@ -736,6 +764,8 @@ Ela **não depende de LLM** nesta fase: é um gerador heurístico, útil como po
 Para preparar a futura entrada de LLM real, a camada opcional agora já possui uma interface de provider. Hoje existe apenas o provider `heuristic`, mas a arquitetura foi organizada para receber providers futuros sem acoplar o núcleo do `ppt_creator`.
 
 Ela agora já inclui tanto um provider local via GGUF/`llama.cpp` quanto um provider local via **Ollama**, permitindo experimentar modelos locais sem depender de APIs externas.
+
+Também já existem providers remotos opcionais para **OpenAI** e **Anthropic**, mantendo a mesma interface de provider da camada opcional.
 
 Além disso, a CLI dessa camada opcional já começa a suportar um primeiro fluxo mais próximo de pipeline completo, com geração, revisão e renderização em sequência.
 

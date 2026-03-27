@@ -14,8 +14,10 @@ from ppt_creator_ai.briefing import (
     summarize_text_to_executive_bullets,
 )
 from ppt_creator_ai.providers import (
+    AnthropicBriefingProvider,
     HeuristicBriefingProvider,
     OllamaBriefingProvider,
+    OpenAIBriefingProvider,
     PPTAgentLocalProvider,
     get_provider,
     list_provider_names,
@@ -33,8 +35,10 @@ __all__ = [
     "review_presentation_density",
     "suggest_image_queries_from_briefing",
     "summarize_text_to_executive_bullets",
+    "AnthropicBriefingProvider",
     "HeuristicBriefingProvider",
     "OllamaBriefingProvider",
+    "OpenAIBriefingProvider",
     "PPTAgentLocalProvider",
     "get_provider",
     "list_provider_names",

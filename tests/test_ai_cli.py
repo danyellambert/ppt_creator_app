@@ -35,7 +35,7 @@ def test_ai_cli_lists_available_providers(tmp_path: Path, capsys) -> None:
 
     payload = json.loads(report.read_text(encoding="utf-8"))
     provider_names = [provider["name"] for provider in payload["providers"]]
-    assert provider_names == ["heuristic", "ollama", "pptagent_local"]
+    assert provider_names == ["anthropic", "heuristic", "ollama", "openai", "pptagent_local"]
 
 
 def test_ai_cli_can_write_analysis_report(tmp_path: Path) -> None:
@@ -275,6 +275,96 @@ def test_ai_cli_can_use_ollama_provider_when_mocked(tmp_path: Path, monkeypatch)
     assert spec.presentation.title == "AI copilots for sales teams"
 
 
+def test_ai_cli_can_use_openai_provider_when_mocked(tmp_path: Path, monkeypatch) -> None:
+    output = tmp_path / "generated_openai_deck.json"
+    provider = get_provider("openai")
+
+    fake_payload = {
+        "presentation": {
+            "title": "AI copilots for sales teams",
+            "theme": "executive_premium_minimal",
+        },
+        "slides": [
+            {"type": "title", "title": "AI copilots for sales teams"},
+            {"type": "agenda", "title": "Agenda", "bullets": ["Context", "Decision"]},
+            {"type": "closing", "title": "Closing", "quote": "Done."},
+        ],
+    }
+    fake_analysis = {
+        "image_suggestions": ["sales leadership dashboard"],
+        "density_review": {"status": "ok", "warning_count": 0, "warnings": [], "slides": []},
+    }
+
+    monkeypatch.setattr(
+        provider,
+        "generate",
+        lambda briefing, theme_name=None: BriefingGenerationResult(
+            provider_name="openai",
+            payload=fake_payload,
+            analysis=fake_analysis,
+        ),
+    )
+
+    result = main(
+        [
+            "generate",
+            "examples/briefing_sales.json",
+            str(output),
+            "--provider",
+            "openai",
+        ]
+    )
+
+    assert result == 0
+    spec = PresentationInput.from_path(output)
+    assert spec.presentation.title == "AI copilots for sales teams"
+
+
+def test_ai_cli_can_use_anthropic_provider_when_mocked(tmp_path: Path, monkeypatch) -> None:
+    output = tmp_path / "generated_anthropic_deck.json"
+    provider = get_provider("anthropic")
+
+    fake_payload = {
+        "presentation": {
+            "title": "AI copilots for sales teams",
+            "theme": "executive_premium_minimal",
+        },
+        "slides": [
+            {"type": "title", "title": "AI copilots for sales teams"},
+            {"type": "agenda", "title": "Agenda", "bullets": ["Context", "Decision"]},
+            {"type": "closing", "title": "Closing", "quote": "Done."},
+        ],
+    }
+    fake_analysis = {
+        "image_suggestions": ["sales leadership dashboard"],
+        "density_review": {"status": "ok", "warning_count": 0, "warnings": [], "slides": []},
+    }
+
+    monkeypatch.setattr(
+        provider,
+        "generate",
+        lambda briefing, theme_name=None: BriefingGenerationResult(
+            provider_name="anthropic",
+            payload=fake_payload,
+            analysis=fake_analysis,
+        ),
+    )
+
+    result = main(
+        [
+            "generate",
+            "examples/briefing_sales.json",
+            str(output),
+            "--provider",
+            "anthropic",
+        ]
+    )
+
+    assert result == 0
+    spec = PresentationInput.from_path(output)
+    assert spec.presentation.title == "AI copilots for sales teams"
+
+
 def test_local_provider_timeout_surfaces_clear_error(monkeypatch) -> None:
     provider = get_provider("pptagent_local")
 
@@ -426,3 +516,85 @@ def test_ollama_provider_surfaces_connection_error(monkeypatch) -> None:
         assert "ollama serve" in str(exc)
     else:
         raise AssertionError("Expected RuntimeError when Ollama is unreachable")
+
+
+def test_openai_provider_normalizes_mocked_json_payload(monkeypatch) -> None:
+    provider = get_provider("openai")
+    briefing = BriefingInput.from_path("examples/briefing_sales.json")
+
+    monkeypatch.setattr(
+        provider,
+        "request_generation",
+        lambda prompt, model_name: json.dumps(
+            {
+                "presentation": {
+                    "title": "AI copilots for sales teams",
+                    "slides": [
+                        {"slide": "title", "data": {"title": "AI copilots for sales teams"}},
+                        {"slide": "agenda", "data": {"title": "Agenda", "bullets": ["Context", "Decision"]}},
+                        {"slide": "closing", "data": {"closing_quote": "Stay structured."}},
+                    ],
+                }
+            }
+        ),
+    )
+
+    result = provider.generate(briefing)
+
+    spec = PresentationInput.model_validate(result.payload)
+    assert spec.presentation.title == "AI copilots for sales teams"
+    assert any(slide.type.value == "agenda" for slide in spec.slides)
+
+
+def test_openai_provider_requires_api_key(monkeypatch) -> None:
+    provider = get_provider("openai")
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("PPT_CREATOR_AI_OPENAI_API_KEY", raising=False)
+
+    try:
+        provider.request_generation("prompt", model_name="gpt-4o-mini")
+    except RuntimeError as exc:
+        assert "OpenAI API key" in str(exc)
+    else:
+        raise AssertionError("Expected RuntimeError when OpenAI API key is missing")
+
+
+def test_anthropic_provider_normalizes_mocked_json_payload(monkeypatch) -> None:
+    provider = get_provider("anthropic")
+    briefing = BriefingInput.from_path("examples/briefing_sales.json")
+
+    monkeypatch.setattr(
+        provider,
+        "request_generation",
+        lambda prompt, model_name: json.dumps(
+            {
+                "presentation": {
+                    "title": "AI copilots for sales teams",
+                    "slides": [
+                        {"slide": "title", "data": {"title": "AI copilots for sales teams"}},
+                        {"slide": "agenda", "data": {"title": "Agenda", "bullets": ["Context", "Decision"]}},
+                        {"slide": "closing", "data": {"closing_quote": "Stay structured."}},
+                    ],
+                }
+            }
+        ),
+    )
+
+    result = provider.generate(briefing)
+
+    spec = PresentationInput.model_validate(result.payload)
+    assert spec.presentation.title == "AI copilots for sales teams"
+    assert any(slide.type.value == "agenda" for slide in spec.slides)
+
+
+def test_anthropic_provider_requires_api_key(monkeypatch) -> None:
+    provider = get_provider("anthropic")
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("PPT_CREATOR_AI_ANTHROPIC_API_KEY", raising=False)
+
+    try:
+        provider.request_generation("prompt", model_name="claude-3-5-haiku-latest")
+    except RuntimeError as exc:
+        assert "Anthropic API key" in str(exc)
+    else:
+        raise AssertionError("Expected RuntimeError when Anthropic API key is missing")

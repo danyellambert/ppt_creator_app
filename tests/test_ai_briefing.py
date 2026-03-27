@@ -53,14 +53,24 @@ def test_briefing_analysis_provides_image_suggestions_and_density_review() -> No
 
 
 def test_provider_registry_exposes_heuristic_provider() -> None:
-    assert list_provider_names() == ["heuristic", "ollama", "pptagent_local"]
+    assert list_provider_names() == ["anthropic", "heuristic", "ollama", "openai", "pptagent_local"]
     provider = get_provider("heuristic")
     assert provider.name == "heuristic"
+
+
+def test_provider_registry_exposes_anthropic_provider() -> None:
+    provider = get_provider("anthropic")
+    assert provider.name == "anthropic"
 
 
 def test_provider_registry_exposes_ollama_provider() -> None:
     provider = get_provider("ollama")
     assert provider.name == "ollama"
+
+
+def test_provider_registry_exposes_openai_provider() -> None:
+    provider = get_provider("openai")
+    assert provider.name == "openai"
 
 
 def test_provider_registry_exposes_local_pptagent_provider() -> None:
