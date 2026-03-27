@@ -596,6 +596,14 @@ python -m ppt_creator.cli preview examples/ai_sales.json outputs/previews \
 
 Isso permite comparar os previews atuais contra um diretório baseline, gerar scores de diferença por slide e opcionalmente salvar imagens de diff para inspeção.
 
+Também já existe um caminho explícito para gerar preview a partir de um **`.pptx` real**:
+
+```bash
+python -m ppt_creator.cli preview-pptx outputs/ai_sales.pptx outputs/ai_sales_real_previews
+```
+
+Esse fluxo ajuda a aproximar ainda mais a inspeção visual do artefato final gerado.
+
 ## Modo API / serviço
 
 Também existe um modo HTTP simples para integrar o `ppt_creator` em outros fluxos:

@@ -7,7 +7,7 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from ppt_creator.preview import render_previews
+from ppt_creator.preview import render_previews, render_previews_from_pptx
 from ppt_creator.qa import review_presentation
 from ppt_creator.renderer import PresentationRenderer
 from ppt_creator.schema import PresentationInput
@@ -88,6 +88,28 @@ def build_parser() -> argparse.ArgumentParser:
         help="Write per-slide diff images when running baseline comparison",
     )
     preview_parser.add_argument("--report-json", help="Optional path to write a JSON preview report")
+
+    preview_pptx_parser = subparsers.add_parser(
+        "preview-pptx",
+        help="Generate PNG previews directly from an existing .pptx file via the Office backend",
+    )
+    preview_pptx_parser.add_argument("input_pptx", help="Path to the input .pptx file")
+    preview_pptx_parser.add_argument("output_dir", help="Directory where PNG previews will be written")
+    preview_pptx_parser.add_argument("--theme", help="Optional theme used only for preview report/contact-sheet styling")
+    preview_pptx_parser.add_argument("--basename", help="Optional base name for generated preview files")
+    preview_pptx_parser.add_argument("--baseline-dir", help="Optional directory of golden preview PNGs for regression comparison")
+    preview_pptx_parser.add_argument(
+        "--diff-threshold",
+        type=float,
+        default=0.01,
+        help="Threshold used to flag preview regressions against baseline images",
+    )
+    preview_pptx_parser.add_argument(
+        "--write-diff-images",
+        action="store_true",
+        help="Write per-slide diff images when running baseline comparison",
+    )
+    preview_pptx_parser.add_argument("--report-json", help="Optional path to write a JSON PPTX preview report")
 
     validate_parser = subparsers.add_parser("validate", help="Validate JSON without rendering")
     validate_parser.add_argument("input_json", help="Path to the structured JSON input")
@@ -458,6 +480,45 @@ def preview_one(
     )
 
 
+def preview_pptx_one(
+    input_pptx: str | Path,
+    output_dir: str | Path,
+    *,
+    theme_name: str | None = None,
+    basename: str | None = None,
+    baseline_dir: str | None = None,
+    diff_threshold: float = 0.01,
+    write_diff_images: bool = False,
+) -> dict[str, object]:
+    input_path = Path(input_pptx)
+    output_path = Path(output_dir)
+    print_info(f"Loading PPTX input: {input_path}")
+    print_info(f"Preview output directory: {output_path}")
+    result = render_previews_from_pptx(
+        input_path,
+        output_path,
+        theme_name=theme_name,
+        basename=basename,
+        baseline_dir=baseline_dir,
+        diff_threshold=diff_threshold,
+        write_diff_images=write_diff_images,
+    )
+    print(f"[OK] Generated PPTX previews: {result['preview_count']} slide image(s) + thumbnail sheet")
+    if result["preview_artifact_review"]["status"] != "ok":
+        print_info(
+            "PPTX preview artifact review: "
+            f"{result['preview_artifact_review']['edge_contact_count']} edge-contact signal(s), "
+            f"{result['preview_artifact_review']['edge_density_warning_count']} edge-density signal(s)"
+        )
+    if result["visual_regression"] is not None:
+        print_info(
+            "PPTX preview regression check: "
+            f"{result['visual_regression']['diff_count']} diff(s), "
+            f"{result['visual_regression']['missing_baseline_count']} missing baseline(s)"
+        )
+    return result
+
+
 def collect_batch_inputs(input_dir: str | Path, pattern: str) -> tuple[Path, list[Path]]:
     root = Path(input_dir)
     if not root.exists():
@@ -528,6 +589,20 @@ def main(argv: list[str] | None = None) -> int:
                 debug_grid=args.debug_grid,
                 debug_safe_areas=args.debug_safe_areas,
                 backend=args.backend,
+                baseline_dir=args.baseline_dir,
+                diff_threshold=args.diff_threshold,
+                write_diff_images=args.write_diff_images,
+            )
+            if args.report_json:
+                write_report(args.report_json, report)
+            return 0
+
+        if args.command == "preview-pptx":
+            report = preview_pptx_one(
+                args.input_pptx,
+                args.output_dir,
+                theme_name=args.theme,
+                basename=args.basename,
                 baseline_dir=args.baseline_dir,
                 diff_threshold=args.diff_threshold,
                 write_diff_images=args.write_diff_images,

@@ -26,6 +26,7 @@ The format is inspired by Keep a Changelog, and the project aims to follow Seman
 - AI briefing CLI can now emit generated-deck QA reviews and optionally render the generated `.pptx` in the same flow
 - AI briefing CLI now supports an initial automatic refine loop driven by heuristic QA feedback
 - AI briefing CLI can now also generate previews/reports, while preview outputs expose initial image-space artifact checks
+- explicit PPTX-to-preview flow via CLI/API, allowing office-backed previews from an already rendered `.pptx`
 - optional office-aware preview backend selection with automatic fallback to synthetic previews
 - initial layout primitive helpers for panel inner bounds and stacked vertical regions
 - initial application of layout primitives to comparison, faq, cards, and two-column slides

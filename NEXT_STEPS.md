@@ -340,6 +340,8 @@ Como a qualidade percebida do deck depende muito da inspeção visual, existe um
 - [x] reaproveitar a revisão heurística também em relatórios de preview e render/dry-run
 - [x] preparar seleção de backend com tentativa de preview via runtime Office e fallback limpo para o sintético
 - [ ] gerar preview a partir do `.pptx` real em vez de uma reconstrução paralela em Pillow
+  - [x] primeiro fluxo explícito de preview a partir de `.pptx` real via CLI/API
+  - [ ] evoluir para usar isso como caminho preferencial em mais cenários de QA/regressão
 - [ ] adicionar regressão visual baseada em previews reais/golden files
   - [x] primeira camada de comparação contra golden previews com diffs opcionais
   - [ ] evoluir para comparação baseada preferencialmente em preview do `.pptx` real

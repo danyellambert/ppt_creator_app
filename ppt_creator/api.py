@@ -8,7 +8,7 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from ppt_creator.preview import render_previews
+from ppt_creator.preview import render_previews, render_previews_from_pptx
 from ppt_creator.qa import review_presentation
 from ppt_creator.renderer import PresentationRenderer
 from ppt_creator.schema import PresentationInput
@@ -178,6 +178,27 @@ def preview_spec_payload(
     )
 
 
+def preview_pptx_payload(
+    input_pptx: str | Path,
+    *,
+    output_dir: str | Path,
+    theme_name: str | None = None,
+    basename: str | None = None,
+    baseline_dir: str | Path | None = None,
+    diff_threshold: float = 0.01,
+    write_diff_images: bool = False,
+) -> dict[str, object]:
+    return render_previews_from_pptx(
+        input_pptx,
+        output_dir,
+        theme_name=theme_name,
+        basename=basename,
+        baseline_dir=baseline_dir,
+        diff_threshold=diff_threshold,
+        write_diff_images=write_diff_images,
+    )
+
+
 def build_api_server(
     host: str = "127.0.0.1",
     port: int = 8787,
@@ -310,6 +331,23 @@ class PptCreatorAPIHandler(BaseHTTPRequestHandler):
                     debug_grid=bool(payload.get("debug_grid", False)),
                     debug_safe_areas=bool(payload.get("debug_safe_areas", False)),
                     backend=str(payload["preview_backend"]) if payload.get("preview_backend") else "auto",
+                    baseline_dir=payload.get("baseline_dir"),
+                    diff_threshold=float(payload.get("diff_threshold", 0.01)),
+                    write_diff_images=bool(payload.get("write_diff_images", False)),
+                )
+                self._json_response(HTTPStatus.OK, {"result": result})
+                return
+
+            if self.path == "/preview-pptx":
+                if "input_pptx" not in payload:
+                    raise APIRequestError("'input_pptx' is required for /preview-pptx")
+                if "output_dir" not in payload:
+                    raise APIRequestError("'output_dir' is required for /preview-pptx")
+                result = preview_pptx_payload(
+                    str(payload["input_pptx"]),
+                    output_dir=str(payload["output_dir"]),
+                    theme_name=str(payload["theme_name"]) if payload.get("theme_name") else None,
+                    basename=str(payload["basename"]) if payload.get("basename") else None,
                     baseline_dir=payload.get("baseline_dir"),
                     diff_threshold=float(payload.get("diff_threshold", 0.01)),
                     write_diff_images=bool(payload.get("write_diff_images", False)),

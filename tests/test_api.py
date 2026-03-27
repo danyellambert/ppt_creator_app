@@ -5,7 +5,11 @@ from pathlib import Path
 from threading import Thread
 from urllib import request
 
+from PIL import Image
+from pptx import Presentation as PptxPresentation
+
 from ppt_creator.api import build_api_server
+from ppt_creator.renderer import PresentationRenderer
 from ppt_creator.schema import PresentationInput
 
 
@@ -38,6 +42,8 @@ def test_api_health_and_templates_endpoints() -> None:
 
 
 def test_api_validate_render_and_template_endpoints(tmp_path: Path) -> None:
+    from ppt_creator import preview as preview_module
+
     server = build_api_server("127.0.0.1", 0, asset_root="examples")
     thread = Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -144,6 +150,41 @@ def test_api_validate_render_and_template_endpoints(tmp_path: Path) -> None:
         assert status == 200
         assert regression_preview_payload["result"]["visual_regression"] is not None
         assert regression_preview_payload["result"]["visual_regression"]["diff_count"] == 0
+
+        pptx_path = tmp_path / "api_preview_source.pptx"
+        PresentationRenderer(asset_root="examples").render(PresentationInput.model_validate(spec_payload), pptx_path)
+
+        def _fake_run(command, capture_output, text, check):
+            outdir = Path(command[command.index("--outdir") + 1])
+            source_pptx = Path(command[-1])
+            slide_count = len(PptxPresentation(str(source_pptx)).slides)
+            outdir.mkdir(parents=True, exist_ok=True)
+            for index in range(1, slide_count + 1):
+                Image.new("RGB", (1280, 720), (245, 245, 245)).save(outdir / f"api-mock-{index:02d}.png")
+
+            class _Completed:
+                returncode = 0
+                stdout = ""
+                stderr = ""
+
+            return _Completed()
+
+        preview_module.find_office_runtime = lambda: "/usr/bin/soffice"
+        preview_module.subprocess.run = _fake_run
+
+        pptx_preview_dir = tmp_path / "api_preview_pptx_output"
+        status, pptx_preview_payload = _request_json(
+            f"{base_url}/preview-pptx",
+            {
+                "input_pptx": str(pptx_path),
+                "output_dir": str(pptx_preview_dir),
+            },
+            method="POST",
+        )
+        assert status == 200
+        assert pptx_preview_payload["result"]["mode"] == "preview-pptx"
+        assert pptx_preview_payload["result"]["preview_count"] == len(spec_payload["slides"])
+        assert pptx_preview_payload["result"]["backend_used"] == "office"
     finally:
         server.shutdown()
         server.server_close()

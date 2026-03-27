@@ -7,6 +7,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from PIL import Image, ImageChops, ImageDraw, ImageFont, ImageStat
+from pptx import Presentation
 
 from ppt_creator.qa import review_presentation
 from ppt_creator.renderer import PresentationRenderer
@@ -284,6 +285,88 @@ class PreviewRenderer:
                 shutil.copy2(source_path, target_path)
                 preview_paths.append(str(target_path))
             return preview_paths
+
+    def render_pptx_previews(
+        self,
+        input_pptx: str | Path,
+        output_dir: str | Path,
+        *,
+        basename: str | None = None,
+    ) -> dict[str, object]:
+        runtime = find_office_runtime()
+        if not runtime:
+            raise RuntimeError("PPTX preview requires a local 'soffice' or 'libreoffice' runtime")
+
+        input_path = Path(input_pptx).resolve()
+        if not input_path.exists():
+            raise FileNotFoundError(f"Input PPTX not found: {input_path}")
+        if input_path.suffix.lower() != ".pptx":
+            raise ValueError(f"Input PPTX path must end with .pptx: {input_path}")
+
+        destination = Path(output_dir)
+        destination.mkdir(parents=True, exist_ok=True)
+        base = basename or _safe_basename(input_path.stem)
+        expected_slide_count = len(Presentation(str(input_path)).slides)
+
+        with TemporaryDirectory(prefix="ppt_creator_preview_pptx_") as tmpdir:
+            temp_root = Path(tmpdir)
+            temp_pptx = temp_root / f"{base}.pptx"
+            shutil.copy2(input_path, temp_pptx)
+
+            command = [
+                runtime,
+                "--headless",
+                "--convert-to",
+                "png",
+                "--outdir",
+                str(temp_root),
+                str(temp_pptx),
+            ]
+            completed = subprocess.run(command, capture_output=True, text=True, check=False)
+            if completed.returncode != 0:
+                stderr = (completed.stderr or completed.stdout or "").strip()
+                raise RuntimeError(stderr or f"office conversion failed with exit code {completed.returncode}")
+
+            converted_pngs = sorted(path for path in temp_root.glob("*.png"))
+            if not converted_pngs:
+                raise RuntimeError("office conversion did not produce PNG previews from the PPTX input")
+            if len(converted_pngs) != expected_slide_count:
+                raise RuntimeError(
+                    f"office conversion produced {len(converted_pngs)} PNG(s) for {expected_slide_count} slide(s)"
+                )
+
+            preview_paths: list[str] = []
+            for index, source_path in enumerate(converted_pngs, start=1):
+                target_path = destination / f"{base}-{index:02d}.png"
+                shutil.copy2(source_path, target_path)
+                preview_paths.append(str(target_path))
+
+        contact_sheet_path = destination / f"{base}-thumbnails.png"
+        meta = PresentationMeta.model_construct(title=input_path.stem, subtitle="PPTX preview")
+        slides = [
+            Slide.model_construct(type=SlideType.TITLE, title=f"Slide {index:02d}")
+            for index in range(1, len(preview_paths) + 1)
+        ]
+        self.render_contact_sheet(meta, slides, preview_paths, contact_sheet_path)
+
+        visual_regression = self.build_visual_regression_report(preview_paths, destination, base)
+        preview_artifact_review = self.build_preview_artifact_review(preview_paths)
+
+        return {
+            "mode": "preview-pptx",
+            "input_pptx": str(input_path),
+            "output_dir": str(destination),
+            "preview_count": len(preview_paths),
+            "previews": preview_paths,
+            "thumbnail_sheet": str(contact_sheet_path),
+            "quality_review": None,
+            "preview_artifact_review": preview_artifact_review,
+            "visual_regression": visual_regression,
+            "backend_requested": "office",
+            "backend_used": "office",
+            "backend_fallback_reason": None,
+            "office_runtime": runtime,
+        }
 
     def render_slide(self, meta: PresentationMeta, slide_spec: Slide, index: int, total_slides: int) -> Image.Image:
         colors = self.theme.colors
@@ -976,3 +1059,23 @@ def render_previews(
         write_diff_images=write_diff_images,
     )
     return renderer.render(spec, output_dir, basename=basename)
+
+
+def render_previews_from_pptx(
+    input_pptx: str | Path,
+    output_dir: str | Path,
+    *,
+    theme_name: str | None = None,
+    basename: str | None = None,
+    baseline_dir: str | Path | None = None,
+    diff_threshold: float = 0.01,
+    write_diff_images: bool = False,
+) -> dict[str, object]:
+    renderer = PreviewRenderer(
+        theme_name=theme_name,
+        baseline_dir=baseline_dir,
+        diff_threshold=diff_threshold,
+        write_diff_images=write_diff_images,
+        backend="office",
+    )
+    return renderer.render_pptx_previews(input_pptx, output_dir, basename=basename)

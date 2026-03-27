@@ -3,7 +3,11 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from PIL import Image
+from pptx import Presentation as PptxPresentation
+
 from ppt_creator.cli import main
+from ppt_creator.renderer import PresentationRenderer
 from ppt_creator.schema import PresentationInput
 
 
@@ -294,3 +298,49 @@ def test_cli_preview_supports_visual_regression_against_baseline(tmp_path: Path)
     assert payload["visual_regression"]["diff_count"] == 0
     assert payload["visual_regression"]["compared_preview_count"] == 10
     assert len(payload["visual_regression"]["diff_images"]) == 10
+
+
+def test_cli_preview_pptx_generates_pngs_via_office_backend_mock(tmp_path: Path, monkeypatch) -> None:
+    from ppt_creator import preview as preview_module
+
+    pptx_path = tmp_path / "source_deck.pptx"
+    output_dir = tmp_path / "pptx_preview_output"
+    report_path = tmp_path / "pptx_preview_report.json"
+
+    spec = PresentationInput.from_path("examples/ai_sales.json")
+    PresentationRenderer(asset_root="examples").render(spec, pptx_path)
+
+    def _fake_run(command, capture_output, text, check):
+        outdir = Path(command[command.index("--outdir") + 1])
+        source_pptx = Path(command[-1])
+        slide_count = len(PptxPresentation(str(source_pptx)).slides)
+        outdir.mkdir(parents=True, exist_ok=True)
+        for index in range(1, slide_count + 1):
+            Image.new("RGB", (1280, 720), (245, 245, 245)).save(outdir / f"mock-{index:02d}.png")
+
+        class _Completed:
+            returncode = 0
+            stdout = ""
+            stderr = ""
+
+        return _Completed()
+
+    monkeypatch.setattr(preview_module, "find_office_runtime", lambda: "/usr/bin/soffice")
+    monkeypatch.setattr(preview_module.subprocess, "run", _fake_run)
+
+    result = main(
+        [
+            "preview-pptx",
+            str(pptx_path),
+            str(output_dir),
+            "--report-json",
+            str(report_path),
+        ]
+    )
+
+    assert result == 0
+    payload = json.loads(report_path.read_text(encoding="utf-8"))
+    assert payload["mode"] == "preview-pptx"
+    assert payload["preview_count"] == 10
+    assert payload["backend_used"] == "office"
+    assert payload["preview_artifact_review"]["status"] in {"ok", "review"}
