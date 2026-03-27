@@ -382,9 +382,10 @@ Qualquer camada de IA deve ser opcional.
 - [x] revisar densidade de conteúdo por slide
 - [ ] integrar provedores reais de LLM de forma opcional (`OpenAI`, `Anthropic`, `Ollama`, etc.)
   - [x] provider local via GGUF/`llama.cpp` para modelos como `PPTAgent`
+  - [x] provider local via `Ollama`
   - [x] endurecer execução local em modo não interativo com timeout e captura opcional de saída bruta
   - [x] adaptar payloads alternativos do PPTAgent local para o schema canônico do `ppt_creator`
-  - [ ] providers remotos (`OpenAI`, `Anthropic`) e/ou locais adicionais (`Ollama`)
+  - [ ] providers remotos (`OpenAI`, `Anthropic`) e/ou locais adicionais
 - [ ] usar LLM para revisão iterativa de narrativa após o primeiro deck ser gerado
 - [ ] usar LLM para reescrever títulos, subtitles e summaries em tom mais executivo
 - [ ] usar LLM para crítica slide a slide combinando briefing + QA visual
@@ -396,6 +397,8 @@ Qualquer camada de IA deve ser opcional.
 - tratar LLM como produtor de estrutura, não como renderizador
 - [x] criar interface de provider para alternar entre LLMs locais e remotos
 - [ ] manter um loop: briefing -> estrutura -> render -> QA -> revisão opcional -> nova iteração
+  - [x] primeira integração prática de generate + review + render dentro da CLI opcional de briefing
+  - [ ] evoluir para revisão opcional/regeração iterativa automática
 
 ### Resultado esperado
 

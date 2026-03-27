@@ -394,6 +394,21 @@ python -m ppt_creator_ai.cli generate examples/briefing_sales.json outputs/brief
   --analysis-json outputs/briefing_sales_analysis.json
 ```
 
+E agora também já dá para fazer um primeiro loop mais integrado de **geração + review + render**:
+
+```bash
+python -m ppt_creator_ai.cli generate examples/briefing_sales.json outputs/briefing_sales_deck.json \
+  --review-json outputs/briefing_sales_review.json \
+  --render-pptx outputs/briefing_sales_deck.pptx
+```
+
+Isso ajuda a aproximar o fluxo de:
+
+- briefing
+- geração de deck estruturado
+- QA heurístico do deck gerado
+- renderização final em `.pptx`
+
 Você também pode listar os providers disponíveis da camada opcional:
 
 ```bash
@@ -405,6 +420,31 @@ E escolher explicitamente o provider usado no pipeline:
 ```bash
 python -m ppt_creator_ai.cli generate examples/briefing_sales.json outputs/briefing_sales_deck.json \
   --provider heuristic
+```
+
+Também existe agora um provider opcional para **Ollama local**:
+
+```bash
+python -m ppt_creator_ai.cli generate examples/briefing_sales.json outputs/briefing_sales_deck.json \
+  --provider ollama
+```
+
+Variáveis úteis:
+
+```bash
+export PPT_CREATOR_AI_OLLAMA_BASE_URL=http://127.0.0.1:11434
+export PPT_CREATOR_AI_OLLAMA_MODEL=llama3.1
+export PPT_CREATOR_AI_OLLAMA_CTX_SIZE=8192
+export PPT_CREATOR_AI_OLLAMA_TEMPERATURE=0.2
+export PPT_CREATOR_AI_OLLAMA_TIMEOUT_SECONDS=180
+export PPT_CREATOR_AI_OLLAMA_RAW_OUTPUT_PATH=outputs/ollama_raw_output.txt
+```
+
+Pré-requisito típico:
+
+```bash
+ollama serve
+ollama pull llama3.1
 ```
 
 Se você quiser usar o seu GGUF local com `llama.cpp`/`llama-cli`, já existe um provider preparado para isso:
@@ -665,7 +705,9 @@ Ela **não depende de LLM** nesta fase: é um gerador heurístico, útil como po
 
 Para preparar a futura entrada de LLM real, a camada opcional agora já possui uma interface de provider. Hoje existe apenas o provider `heuristic`, mas a arquitetura foi organizada para receber providers futuros sem acoplar o núcleo do `ppt_creator`.
 
-Ela agora também já inclui um provider local via GGUF/`llama.cpp` para experimentar modelos como o seu `PPTAgent` sem depender de APIs externas.
+Ela agora já inclui tanto um provider local via GGUF/`llama.cpp` quanto um provider local via **Ollama**, permitindo experimentar modelos locais sem depender de APIs externas.
+
+Além disso, a CLI dessa camada opcional já começa a suportar um primeiro fluxo mais próximo de pipeline completo, com geração, revisão e renderização em sequência.
 
 ## Evolução visual e QA
 

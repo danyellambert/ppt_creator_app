@@ -3,8 +3,10 @@ from __future__ import annotations
 import json
 import subprocess
 from pathlib import Path
+from urllib import error
 
 from ppt_creator.schema import PresentationInput
+from ppt_creator_ai.briefing import BriefingInput
 from ppt_creator_ai.cli import main
 from ppt_creator_ai.providers import get_provider
 from ppt_creator_ai.providers.base import BriefingGenerationResult
@@ -33,7 +35,7 @@ def test_ai_cli_lists_available_providers(tmp_path: Path, capsys) -> None:
 
     payload = json.loads(report.read_text(encoding="utf-8"))
     provider_names = [provider["name"] for provider in payload["providers"]]
-    assert provider_names == ["heuristic", "pptagent_local"]
+    assert provider_names == ["heuristic", "ollama", "pptagent_local"]
 
 
 def test_ai_cli_can_write_analysis_report(tmp_path: Path) -> None:
@@ -55,6 +57,33 @@ def test_ai_cli_can_write_analysis_report(tmp_path: Path) -> None:
     payload = json.loads(analysis.read_text(encoding="utf-8"))
     assert payload["image_suggestions"]
     assert payload["density_review"]["status"] in {"ok", "review"}
+    assert payload["generated_deck_review"]["status"] in {"ok", "review", "attention"}
+
+
+def test_ai_cli_can_write_review_and_render_generated_pptx(tmp_path: Path) -> None:
+    output_json = tmp_path / "generated_deck.json"
+    review_json = tmp_path / "generated_deck_review.json"
+    output_pptx = tmp_path / "generated_deck.pptx"
+
+    result = main(
+        [
+            "generate",
+            "examples/briefing_sales.json",
+            str(output_json),
+            "--review-json",
+            str(review_json),
+            "--render-pptx",
+            str(output_pptx),
+        ]
+    )
+
+    assert result == 0
+    assert output_json.exists()
+    assert review_json.exists()
+    assert output_pptx.exists()
+
+    review_payload = json.loads(review_json.read_text(encoding="utf-8"))
+    assert review_payload["status"] in {"ok", "review", "attention"}
 
 
 def test_ai_cli_can_use_local_provider_when_mocked(tmp_path: Path, monkeypatch) -> None:
@@ -95,6 +124,52 @@ def test_ai_cli_can_use_local_provider_when_mocked(tmp_path: Path, monkeypatch) 
             str(output),
             "--provider",
             "pptagent_local",
+        ]
+    )
+
+    assert result == 0
+    spec = PresentationInput.from_path(output)
+    assert spec.presentation.title == "AI copilots for sales teams"
+
+
+def test_ai_cli_can_use_ollama_provider_when_mocked(tmp_path: Path, monkeypatch) -> None:
+    output = tmp_path / "generated_ollama_deck.json"
+    provider = get_provider("ollama")
+
+    fake_payload = {
+        "presentation": {
+            "title": "AI copilots for sales teams",
+            "theme": "executive_premium_minimal",
+        },
+        "slides": [
+            {"type": "title", "title": "AI copilots for sales teams"},
+            {"type": "agenda", "title": "Agenda", "bullets": ["Context", "Decision"]},
+            {"type": "summary", "title": "Summary", "bullets": ["Keep scope tight"]},
+            {"type": "closing", "title": "Closing", "quote": "Done."},
+        ],
+    }
+    fake_analysis = {
+        "image_suggestions": ["sales leadership dashboard"],
+        "density_review": {"status": "ok", "warning_count": 0, "warnings": [], "slides": []},
+    }
+
+    monkeypatch.setattr(
+        provider,
+        "generate",
+        lambda briefing, theme_name=None: BriefingGenerationResult(
+            provider_name="ollama",
+            payload=fake_payload,
+            analysis=fake_analysis,
+        ),
+    )
+
+    result = main(
+        [
+            "generate",
+            "examples/briefing_sales.json",
+            str(output),
+            "--provider",
+            "ollama",
         ]
     )
 
@@ -210,3 +285,47 @@ def test_local_provider_normalizes_pptagent_style_payload() -> None:
     assert any(slide.type.value == "timeline" for slide in spec.slides)
     assert any(slide.type.value == "faq" for slide in spec.slides)
     assert any(slide.type.value == "bullets" for slide in spec.slides)
+
+
+def test_ollama_provider_normalizes_mocked_json_payload(monkeypatch) -> None:
+    provider = get_provider("ollama")
+    briefing = BriefingInput.from_path("examples/briefing_sales.json")
+
+    monkeypatch.setattr(
+        provider,
+        "request_generation",
+        lambda prompt, model_name: json.dumps(
+            {
+                "presentation": {
+                    "title": "AI copilots for sales teams",
+                    "slides": [
+                        {"slide": "title", "data": {"title": "AI copilots for sales teams"}},
+                        {"slide": "agenda", "data": {"title": "Agenda", "bullets": ["Context", "Decision"]}},
+                        {"slide": "closing", "data": {"closing_quote": "Stay structured."}},
+                    ],
+                }
+            }
+        ),
+    )
+
+    result = provider.generate(briefing)
+
+    spec = PresentationInput.model_validate(result.payload)
+    assert spec.presentation.title == "AI copilots for sales teams"
+    assert any(slide.type.value == "agenda" for slide in spec.slides)
+
+
+def test_ollama_provider_surfaces_connection_error(monkeypatch) -> None:
+    provider = get_provider("ollama")
+
+    def _url_error(*args, **kwargs):
+        raise error.URLError("connection refused")
+
+    monkeypatch.setattr("urllib.request.urlopen", _url_error)
+
+    try:
+        provider.request_generation("prompt", model_name="llama3.1")
+    except RuntimeError as exc:
+        assert "ollama serve" in str(exc)
+    else:
+        raise AssertionError("Expected RuntimeError when Ollama is unreachable")

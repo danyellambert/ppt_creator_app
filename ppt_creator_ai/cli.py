@@ -7,6 +7,9 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
+from ppt_creator.qa import review_presentation
+from ppt_creator.renderer import PresentationRenderer
+from ppt_creator.schema import PresentationInput
 from ppt_creator_ai.briefing import (
     BriefingInput,
 )
@@ -30,6 +33,18 @@ def build_parser() -> argparse.ArgumentParser:
     generate_parser.add_argument(
         "--analysis-json",
         help="Optional path to write a JSON analysis report with summary bullets, image suggestions, and density review",
+    )
+    generate_parser.add_argument(
+        "--review-json",
+        help="Optional path to write a heuristic QA review for the generated deck JSON",
+    )
+    generate_parser.add_argument(
+        "--render-pptx",
+        help="Optional path to immediately render the generated deck into a .pptx file",
+    )
+    generate_parser.add_argument(
+        "--asset-root",
+        help="Optional asset root to use when rendering the generated deck or reviewing asset references",
     )
     generate_parser.add_argument("--report-json", help="Optional path to write a JSON generation report")
 
@@ -62,6 +77,9 @@ def generate_from_briefing(
     provider_name: str = "heuristic",
     theme_name: str | None = None,
     analysis_json: str | Path | None = None,
+    review_json: str | Path | None = None,
+    render_pptx: str | Path | None = None,
+    asset_root: str | Path | None = None,
 ) -> dict[str, object]:
     input_path = Path(input_briefing)
     print_info(f"Loading briefing: {input_path}")
@@ -70,12 +88,31 @@ def generate_from_briefing(
     print_info(f"Using provider: {provider.name}")
     result = provider.generate(briefing, theme_name=theme_name)
     payload = result.payload
+    spec = PresentationInput.model_validate(payload)
+    resolved_asset_root = Path(asset_root).resolve() if asset_root else input_path.parent.resolve()
     output_path = write_json(output_json, payload)
     analysis_path: str | None = None
     analysis = result.analysis
+    deck_review = review_presentation(spec, asset_root=resolved_asset_root, theme_name=spec.presentation.theme)
+    review_path: str | None = None
+    rendered_pptx_path: str | None = None
     if analysis_json:
-        analysis_output = write_json(analysis_json, analysis)
+        analysis_output = write_json(
+            analysis_json,
+            {
+                **analysis,
+                "generated_deck_review": deck_review,
+            },
+        )
         analysis_path = str(analysis_output)
+    if review_json:
+        review_output = write_json(review_json, deck_review)
+        review_path = str(review_output)
+    if render_pptx:
+        renderer = PresentationRenderer(theme_name=spec.presentation.theme, asset_root=resolved_asset_root)
+        rendered_output = renderer.render(spec, render_pptx)
+        rendered_pptx_path = str(rendered_output)
+        print_info(f"Rendered PPTX from generated deck: {rendered_output}")
     print(f"[OK] Generated deck JSON: {output_path} ({len(payload['slides'])} slides)")
     return {
         "mode": "briefing-generate",
@@ -86,8 +123,12 @@ def generate_from_briefing(
         "theme": payload["presentation"]["theme"],
         "slide_count": len(payload["slides"]),
         "analysis_output_json": analysis_path,
+        "review_output_json": review_path,
+        "render_output_pptx": rendered_pptx_path,
         "image_suggestion_count": len(analysis["image_suggestions"]),
         "density_review_status": analysis["density_review"]["status"],
+        "generated_deck_review_status": deck_review["status"],
+        "generated_deck_issue_count": deck_review["issue_count"],
     }
 
 
@@ -116,6 +157,9 @@ def main(argv: list[str] | None = None) -> int:
             provider_name=args.provider,
             theme_name=args.theme,
             analysis_json=args.analysis_json,
+            review_json=args.review_json,
+            render_pptx=args.render_pptx,
+            asset_root=args.asset_root,
         )
         if args.report_json:
             write_json(args.report_json, result)

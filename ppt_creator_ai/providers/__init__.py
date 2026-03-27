@@ -3,9 +3,11 @@ from __future__ import annotations
 from ppt_creator_ai.providers.base import BriefingGenerationResult, BriefingProvider
 from ppt_creator_ai.providers.heuristic import HeuristicBriefingProvider
 from ppt_creator_ai.providers.local_gguf import PPTAgentLocalProvider
+from ppt_creator_ai.providers.ollama import OllamaBriefingProvider
 
 PROVIDERS: dict[str, BriefingProvider] = {
     HeuristicBriefingProvider.name: HeuristicBriefingProvider(),
+    OllamaBriefingProvider.name: OllamaBriefingProvider(),
     PPTAgentLocalProvider.name: PPTAgentLocalProvider(),
 }
 
@@ -25,6 +27,7 @@ __all__ = [
     "BriefingGenerationResult",
     "BriefingProvider",
     "HeuristicBriefingProvider",
+    "OllamaBriefingProvider",
     "PPTAgentLocalProvider",
     "PROVIDERS",
     "get_provider",
