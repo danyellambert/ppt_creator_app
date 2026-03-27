@@ -187,6 +187,7 @@ Mesmo com a Fase 1 concluída, ainda há uma camada importante de refinamento vi
   - [x] primeira aplicação dessas primitives em layouts compostos (`comparison`, `faq`, `cards`, `two_column`)
   - [x] distribuição horizontal reutilizável para rows/columns, aplicada em `metrics`, `cards` e `table`
   - [x] composição simples de grids multi-painel aplicada em `comparison`, `two_column`, `faq` e `summary`
+  - [x] primeiros helpers mais semânticos (`columns`, `panel rows`, `panel grids`) reaproveitados em múltiplos layouts
   - [ ] expandir primitives para stacks/rows/columns semânticos de uso geral
 - [ ] criar stacks/rows/columns reutilizáveis para reduzir desalinhamentos entre layouts
 - [ ] adicionar auto-fit tipográfico e controle de overflow por bloco
@@ -475,6 +476,7 @@ Se a meta for perseguir o nível “deck quase pronto sem retoque manual”, a o
   - [x] primeira aplicação em layouts compostos já existentes
   - [x] primeira distribuição horizontal reutilizável aplicada em rows/columns executivos
   - [x] primeira composição simples de grids aplicada em layouts multi-painel
+  - [x] primeiros helpers semânticos de mais alto nível reaproveitados em layouts reais
   - [ ] consolidar primitives reutilizáveis de mais alto nível
 - [ ] constraints semânticas em vez de posições excessivamente rígidas
 - [ ] auto-fit real de texto por caixa

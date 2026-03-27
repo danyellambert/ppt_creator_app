@@ -19,22 +19,25 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
     top = 2.55
     gap = 0.35
 
-    card_regions = renderer.stack_horizontal_regions(
+    card_bounds = renderer.build_panel_row_bounds(
         left=g.content_left,
+        top=top,
         width=g.content_width,
-        regions=[{"kind": "card", "min_width": 3.0, "flex": 1.0} for _ in slide_spec.cards],
+        height=2.95,
         gap=gap,
+        count=len(slide_spec.cards),
+        min_width=3.0,
     )
 
-    for idx, (card, (_, (x, card_width))) in enumerate(zip(slide_spec.cards, card_regions, strict=True)):
-        renderer.add_panel(slide, x, top, card_width, 2.95, fill_color=colors.surface, line_color=colors.line)
-        renderer.add_accent_bar(slide, x, top, card_width, renderer.theme.components.accent_bar_height, color=colors.accent if idx == 1 else colors.navy)
+    for idx, (card, (x, panel_top, card_width, panel_height)) in enumerate(zip(slide_spec.cards, card_bounds, strict=True)):
+        renderer.add_panel(slide, x, panel_top, card_width, panel_height, fill_color=colors.surface, line_color=colors.line)
+        renderer.add_accent_bar(slide, x, panel_top, card_width, renderer.theme.components.accent_bar_height, color=colors.accent if idx == 1 else colors.navy)
 
         content_left, content_top, content_width, content_height = renderer.panel_inner_bounds(
             left=x,
-            top=top,
+            top=panel_top,
             width=card_width,
-            height=2.95,
+            height=panel_height,
         )
 
         regions = [

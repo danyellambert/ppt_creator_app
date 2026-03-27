@@ -282,6 +282,111 @@ class PresentationRenderer:
             cursor_left += region_width + gap
         return bounds
 
+    def build_columns(
+        self,
+        *,
+        left: float,
+        width: float,
+        gap: float,
+        count: int | None = None,
+        min_width: float = 0.0,
+        regions: list[dict[str, float | str]] | None = None,
+    ) -> list[tuple[float, float]]:
+        if regions is None:
+            if count is None:
+                raise ValueError("build_columns requires count or regions")
+            regions = [
+                {"kind": f"column_{index + 1}", "min_width": min_width, "flex": 1.0}
+                for index in range(count)
+            ]
+        return [bounds for _, bounds in self.stack_horizontal_regions(left=left, width=width, regions=regions, gap=gap)]
+
+    def build_rows(
+        self,
+        *,
+        top: float,
+        height: float,
+        gap: float,
+        count: int | None = None,
+        min_height: float = 0.0,
+        regions: list[dict[str, float | str]] | None = None,
+    ) -> list[tuple[float, float]]:
+        if regions is None:
+            if count is None:
+                raise ValueError("build_rows requires count or regions")
+            regions = [
+                {"kind": f"row_{index + 1}", "min_height": min_height, "flex": 1.0}
+                for index in range(count)
+            ]
+        return [bounds for _, bounds in self.stack_vertical_regions(top=top, height=height, regions=regions, gap=gap)]
+
+    def build_panel_row_bounds(
+        self,
+        *,
+        left: float,
+        top: float,
+        width: float,
+        height: float,
+        gap: float,
+        count: int | None = None,
+        min_width: float = 0.0,
+        regions: list[dict[str, float | str]] | None = None,
+    ) -> list[tuple[float, float, float, float]]:
+        columns = self.build_columns(
+            left=left,
+            width=width,
+            gap=gap,
+            count=count,
+            min_width=min_width,
+            regions=regions,
+        )
+        return [(column_left, top, column_width, height) for column_left, column_width in columns]
+
+    def build_panel_grid(
+        self,
+        *,
+        left: float,
+        top: float,
+        width: float,
+        height: float,
+        column_gap: float,
+        row_gap: float,
+        column_count: int | None = None,
+        row_count: int | None = None,
+        column_min_width: float = 0.0,
+        row_min_height: float = 0.0,
+        column_regions: list[dict[str, float | str]] | None = None,
+        row_regions: list[dict[str, float | str]] | None = None,
+    ) -> list[list[tuple[float, float, float, float]]]:
+        resolved_column_regions = column_regions
+        if resolved_column_regions is None:
+            if column_count is None:
+                raise ValueError("build_panel_grid requires column_count or column_regions")
+            resolved_column_regions = [
+                {"kind": f"column_{index + 1}", "min_width": column_min_width, "flex": 1.0}
+                for index in range(column_count)
+            ]
+
+        resolved_row_regions = row_regions
+        if resolved_row_regions is None:
+            if row_count is None:
+                raise ValueError("build_panel_grid requires row_count or row_regions")
+            resolved_row_regions = [
+                {"kind": f"row_{index + 1}", "min_height": row_min_height, "flex": 1.0}
+                for index in range(row_count)
+            ]
+
+        return self.build_grid_bounds(
+            left=left,
+            top=top,
+            width=width,
+            height=height,
+            column_regions=resolved_column_regions,
+            row_regions=resolved_row_regions,
+            column_gap=column_gap,
+            row_gap=row_gap,
+        )
+
     def build_grid_bounds(
         self,
         *,

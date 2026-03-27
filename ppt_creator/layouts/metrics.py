@@ -33,14 +33,15 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
     label_size = t.metric_label_size + 1 if variant == "standard" else t.metric_label_size
     detail_size = t.small_size + 1 if variant == "standard" else t.small_size
 
-    metric_regions = renderer.stack_horizontal_regions(
+    metric_columns = renderer.build_columns(
         left=left,
         width=total_width,
-        regions=[{"kind": "metric", "min_width": 1.8, "flex": 1.0} for _ in metrics],
         gap=gap,
+        count=len(metrics),
+        min_width=1.8,
     )
 
-    for idx, (metric, (_, (x, card_width))) in enumerate(zip(metrics, metric_regions, strict=True)):
+    for idx, (metric, (x, card_width)) in enumerate(zip(metrics, metric_columns, strict=True)):
         renderer.add_panel(slide, x, top, card_width, panel_height, fill_color=colors.surface, line_color=colors.line)
         renderer.add_accent_bar(slide, x, top, card_width, components.accent_bar_height, color=colors.navy if idx % 2 == 0 else colors.accent)
 

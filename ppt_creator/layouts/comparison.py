@@ -20,16 +20,15 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
     gap = 0.42
     top = 2.45
     height = 3.25
-    panel_bounds = renderer.build_grid_bounds(
+    panel_bounds = renderer.build_panel_row_bounds(
         left=g.content_left,
         top=top,
         width=g.content_width,
         height=height,
-        column_regions=[{"kind": "column", "min_width": 3.6, "flex": 1.0} for _ in slide_spec.comparison_columns],
-        row_regions=[{"kind": "row", "height": height}],
-        column_gap=gap,
-        row_gap=0.0,
-    )[0]
+        gap=gap,
+        count=len(slide_spec.comparison_columns),
+        min_width=3.6,
+    )
 
     for idx, (column, (left, panel_top, panel_width, panel_height)) in enumerate(zip(slide_spec.comparison_columns, panel_bounds, strict=True)):
         accent = colors.navy if idx == 0 else colors.accent

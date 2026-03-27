@@ -31,14 +31,15 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
     header_height = 0.48
     row_height = 0.52
 
-    column_regions = renderer.stack_horizontal_regions(
+    column_bounds = renderer.build_columns(
         left=g.content_left,
         width=g.content_width,
-        regions=[{"kind": "column", "min_width": 1.0, "flex": 1.0} for _ in columns],
         gap=gap,
+        count=len(columns),
+        min_width=1.0,
     )
 
-    for column, (_, (left, column_width)) in zip(columns, column_regions, strict=True):
+    for column, (left, column_width) in zip(columns, column_bounds, strict=True):
         renderer.add_panel(
             slide,
             left,
@@ -61,7 +62,7 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
 
     current_top = top + header_height + 0.08
     for row in rows:
-        for cell, (_, (left, column_width)) in zip(row, column_regions, strict=True):
+        for cell, (left, column_width) in zip(row, column_bounds, strict=True):
             renderer.add_panel(
                 slide,
                 left,

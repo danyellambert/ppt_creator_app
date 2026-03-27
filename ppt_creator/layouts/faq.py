@@ -24,15 +24,17 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
     top_start = 2.25
     row_count = (len(items) + columns - 1) // columns
     total_height = row_count * panel_height + max(0, row_count - 1) * 0.24
-    grid_bounds = renderer.build_grid_bounds(
+    grid_bounds = renderer.build_panel_grid(
         left=g.content_left,
         top=top_start,
         width=g.content_width,
         height=total_height,
-        column_regions=[{"kind": "column", "min_width": 3.2, "flex": 1.0} for _ in range(columns)],
-        row_regions=[{"kind": "row", "min_height": panel_height, "flex": 1.0} for _ in range(row_count)],
         column_gap=panel_gap,
         row_gap=0.24,
+        column_count=columns,
+        row_count=row_count,
+        column_min_width=3.2,
+        row_min_height=panel_height,
     )
 
     for idx, item in enumerate(items):

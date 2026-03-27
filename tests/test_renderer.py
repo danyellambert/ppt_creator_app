@@ -166,3 +166,42 @@ def test_build_grid_bounds_returns_expected_matrix() -> None:
     assert top >= 2.0
     assert width > 1.0
     assert height > 0.6
+
+
+def test_build_columns_returns_expected_bounds() -> None:
+    renderer = PresentationRenderer(asset_root="examples")
+
+    columns = renderer.build_columns(left=1.0, width=4.0, gap=0.1, count=3, min_width=0.8)
+
+    assert len(columns) == 3
+    assert columns[1][1] >= 0.8
+
+
+def test_build_panel_row_bounds_returns_rectangles() -> None:
+    renderer = PresentationRenderer(asset_root="examples")
+
+    bounds = renderer.build_panel_row_bounds(left=1.0, top=2.0, width=4.0, height=1.5, gap=0.1, count=2, min_width=1.2)
+
+    assert len(bounds) == 2
+    assert bounds[0][1] == 2.0
+    assert bounds[0][3] == 1.5
+
+
+def test_build_panel_grid_creates_matrix_from_counts() -> None:
+    renderer = PresentationRenderer(asset_root="examples")
+
+    grid = renderer.build_panel_grid(
+        left=1.0,
+        top=2.0,
+        width=4.0,
+        height=2.0,
+        column_gap=0.1,
+        row_gap=0.2,
+        column_count=2,
+        row_count=2,
+        column_min_width=1.0,
+        row_min_height=0.6,
+    )
+
+    assert len(grid) == 2
+    assert len(grid[0]) == 2

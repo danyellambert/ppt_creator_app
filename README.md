@@ -666,6 +666,7 @@ Também começou a entrar uma base bem inicial de **layout primitives** dentro d
 - distribuir regiões verticais dentro de painéis compostos
 - distribuir regiões horizontais para rows/columns de forma reutilizável
 - compor grids simples a partir dessas regiões para layouts multi-painel
+- expor helpers mais semânticos para `columns`, `rows`, `panel rows` e `panel grids`
 
 Essa base já começou a ser aplicada em layouts compostos mais exigentes, como:
 
