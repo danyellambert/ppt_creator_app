@@ -37,7 +37,9 @@ def test_review_presentation_reports_density_and_balance_signals() -> None:
     assert review["issue_count"] > 0
     assert review["overflow_risk_count"] >= 1
     assert review["balance_warning_count"] >= 1
+    assert review["clipping_risk_count"] >= 1
     assert review["severity_counts"]["medium"] >= 1
+    assert review["top_risk_slides"]
 
 
 def test_review_presentation_includes_slide_level_risk_metadata() -> None:
@@ -63,5 +65,8 @@ def test_review_presentation_includes_slide_level_risk_metadata() -> None:
 
     assert "content_weight" in slide
     assert "overflow_risk_count" in slide
+    assert "clipping_risk_count" in slide
     assert "balance_warning_count" in slide
     assert "severity_counts" in slide
+    assert "risk_level" in slide
+    assert "likely_overflow_regions" in slide

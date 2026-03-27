@@ -90,6 +90,34 @@ def test_cli_render_dry_run_can_include_quality_review(tmp_path: Path) -> None:
     assert payload["quality_review"] is not None
     assert "severity_counts" in payload["quality_review"]
     assert "overflow_risk_count" in payload["quality_review"]
+    assert "clipping_risk_count" in payload["quality_review"]
+    assert "top_risk_slides" in payload["quality_review"]
+
+
+def test_cli_render_batch_review_report_includes_aggregate_risk_fields(tmp_path: Path) -> None:
+    output_dir = tmp_path / "batch_review_output"
+    report_path = tmp_path / "batch_review_report.json"
+
+    result = main(
+        [
+            "render-batch",
+            "examples",
+            str(output_dir),
+            "--pattern",
+            "product_strategy.json",
+            "--dry-run",
+            "--review",
+            "--report-json",
+            str(report_path),
+        ]
+    )
+
+    assert result == 0
+    payload = json.loads(report_path.read_text(encoding="utf-8"))
+    assert payload["review_enabled"] is True
+    assert "review_overflow_risk_count" in payload
+    assert "review_clipping_risk_count" in payload
+    assert "review_balance_warning_count" in payload
 
 
 def test_cli_render_batch_generates_output_and_report(tmp_path: Path) -> None:

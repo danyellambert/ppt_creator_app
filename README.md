@@ -715,4 +715,10 @@ Na camada de review heurístico, o projeto também começou a ganhar sinais mais
 
 Esses sinais ainda são heurísticos, mas ajudam a transformar o review em algo mais próximo de um QA de composição, não só de validação estrutural.
 
+Os relatórios também passam a destacar melhor onde olhar primeiro, com campos como:
+
+- `clipping_risk_count`
+- `top_risk_slides`
+- `likely_overflow_regions` por slide
+
 O próximo passo mais importante continua sendo evoluir de preview sintético para preview fiel ao `.pptx` real.

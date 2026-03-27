@@ -17,6 +17,7 @@ The format is inspired by Keep a Changelog, and the project aims to follow Seman
 - semantic weighted row/column helpers plus expanded content-aware balancing across agenda, bullets, and closing layouts
 - stronger heuristic QA signals for severity, overflow risk, and panel-balance risk in review outputs
 - optional render/report integration for heuristic QA summaries across CLI, API, and preview outputs
+- richer QA reporting with clipping-risk signals, top-risk-slide summaries, and batch-level review aggregates
 - optional office-aware preview backend selection with automatic fallback to synthetic previews
 - initial layout primitive helpers for panel inner bounds and stacked vertical regions
 - initial application of layout primitives to comparison, faq, cards, and two-column slides

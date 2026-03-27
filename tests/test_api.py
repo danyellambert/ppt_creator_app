@@ -70,6 +70,7 @@ def test_api_validate_render_and_template_endpoints(tmp_path: Path) -> None:
         assert render_payload["result"]["rendered"] is False
         assert render_payload["result"]["output_path"].endswith("api_render_output.pptx")
         assert render_payload["result"]["quality_review"] is not None
+        assert "clipping_risk_count" in render_payload["result"]["quality_review"]
 
         status, review_payload = _request_json(
             f"{base_url}/review",
@@ -81,7 +82,9 @@ def test_api_validate_render_and_template_endpoints(tmp_path: Path) -> None:
         assert review_payload["result"]["status"] in {"ok", "review", "attention"}
         assert "severity_counts" in review_payload["result"]
         assert "overflow_risk_count" in review_payload["result"]
+        assert "clipping_risk_count" in review_payload["result"]
         assert "balance_warning_count" in review_payload["result"]
+        assert "top_risk_slides" in review_payload["result"]
 
         status, template_payload = _request_json(
             f"{base_url}/template",
@@ -107,6 +110,7 @@ def test_api_validate_render_and_template_endpoints(tmp_path: Path) -> None:
         assert preview_payload["result"]["preview_count"] == len(spec_payload["slides"])
         assert preview_payload["result"]["quality_review"]["status"] in {"ok", "review"}
         assert "severity_counts" in preview_payload["result"]["quality_review"]
+        assert "clipping_risk_count" in preview_payload["result"]["quality_review"]
         assert preview_payload["result"]["backend_requested"] == "auto"
         assert preview_payload["result"]["backend_used"] in {"synthetic", "office"}
         assert Path(preview_payload["result"]["thumbnail_sheet"]).exists()

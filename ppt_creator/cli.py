@@ -288,6 +288,10 @@ def review_one(
         print_info(
             f"Overflow risk heuristics flagged {result['overflow_risk_count']} signal(s) across the deck"
         )
+    if result["clipping_risk_count"]:
+        print_info(
+            f"Clipping risk heuristics flagged {result['clipping_risk_count']} signal(s) across the deck"
+        )
     if result["balance_warning_count"]:
         print_info(
             f"Balance heuristics flagged {result['balance_warning_count']} signal(s) across the deck"
@@ -546,6 +550,27 @@ def main(argv: list[str] | None = None) -> int:
                         if result["quality_review"] is not None
                     )
                     / max(1, sum(1 for result in results if result["quality_review"] is not None))
+                )
+                if args.review
+                else None,
+                "review_overflow_risk_count": sum(
+                    int(result["quality_review"]["overflow_risk_count"])
+                    for result in results
+                    if result["quality_review"] is not None
+                )
+                if args.review
+                else None,
+                "review_clipping_risk_count": sum(
+                    int(result["quality_review"]["clipping_risk_count"])
+                    for result in results
+                    if result["quality_review"] is not None
+                )
+                if args.review
+                else None,
+                "review_balance_warning_count": sum(
+                    int(result["quality_review"]["balance_warning_count"])
+                    for result in results
+                    if result["quality_review"] is not None
                 )
                 if args.review
                 else None,
