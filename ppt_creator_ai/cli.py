@@ -14,6 +14,7 @@ from ppt_creator.schema import PresentationInput
 from ppt_creator_ai.briefing import (
     BriefingInput,
     build_generation_feedback_from_review,
+    build_slide_critiques_from_review,
 )
 from ppt_creator_ai.providers import get_provider, list_provider_names
 from ppt_creator_ai.refine import refine_presentation_input
@@ -225,7 +226,7 @@ def generate_from_briefing(
 
     if auto_refine:
         current_spec = spec
-        current_review = initial_deck_review
+        current_review = deck_review
         for pass_index in range(max(1, refine_passes)):
             if current_review["issue_count"] == 0:
                 break
@@ -262,6 +263,8 @@ def generate_from_briefing(
         spec = current_spec
         deck_review = current_review
 
+    slide_critiques = build_slide_critiques_from_review(spec, deck_review)
+
     payload = spec.model_dump(mode="json")
     output_path = write_json(output_json, payload)
     review_path: str | None = None
@@ -277,6 +280,7 @@ def generate_from_briefing(
                 "generated_deck_review": deck_review,
                 "regeneration_history": regeneration_history,
                 "refinement_history": refinement_history,
+                "slide_critiques": slide_critiques,
             },
         )
         analysis_path = str(analysis_output)
@@ -332,6 +336,7 @@ def generate_from_briefing(
         "initial_generated_deck_issue_count": initial_deck_review["issue_count"],
         "generated_deck_review_status": deck_review["status"],
         "generated_deck_issue_count": deck_review["issue_count"],
+        "slide_critique_count": len(slide_critiques),
         "preview_quality_review_status": preview_result["quality_review"]["status"] if preview_result else None,
         "preview_artifact_review_status": preview_result["preview_artifact_review"]["status"] if preview_result else None,
         "preview_regression_status": preview_result["visual_regression"]["status"] if preview_result and preview_result["visual_regression"] else None,

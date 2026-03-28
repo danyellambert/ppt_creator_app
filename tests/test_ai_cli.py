@@ -58,6 +58,7 @@ def test_ai_cli_can_write_analysis_report(tmp_path: Path) -> None:
     assert payload["image_suggestions"]
     assert payload["density_review"]["status"] in {"ok", "review"}
     assert payload["generated_deck_review"]["status"] in {"ok", "review", "attention"}
+    assert isinstance(payload["slide_critiques"], list)
 
 
 def test_ai_cli_can_write_review_and_render_generated_pptx(tmp_path: Path) -> None:
@@ -238,6 +239,86 @@ def test_ai_cli_can_auto_regenerate_generated_deck(tmp_path: Path, monkeypatch) 
     assert report_payload["auto_regenerate_applied"] is True
     assert report_payload["generated_deck_issue_count"] < report_payload["initial_generated_deck_issue_count"]
     assert output_payload["slides"][1]["body"] == "Tighter intro for an executive audience."
+
+
+def test_ai_cli_combines_regeneration_and_refine_from_latest_review(tmp_path: Path, monkeypatch) -> None:
+    output = tmp_path / "generated_combo_deck.json"
+    report = tmp_path / "generated_combo_report.json"
+    provider = get_provider("heuristic")
+
+    long_bullet = (
+        "This bullet is intentionally too long and too detailed for a clean executive slide and should clearly trigger density review."
+    )
+    verbose_body = (
+        "This narrative paragraph is intentionally very long and repetitive so that the heuristic QA layer clearly flags it as too dense for an executive audience. "
+        "It keeps adding more words about scope, process, structure, coordination, metrics, enablement, adoption, alignment, sequencing, governance, and risk until the body crosses the density threshold for a single agenda slide."
+    )
+    first_payload = {
+        "presentation": {"title": "AI copilots for sales teams", "theme": "executive_premium_minimal"},
+        "slides": [
+            {"type": "title", "title": "AI copilots for sales teams"},
+            {
+                "type": "agenda",
+                "title": "Agenda",
+                "body": verbose_body,
+                "bullets": [long_bullet, long_bullet, long_bullet, long_bullet, long_bullet, long_bullet],
+            },
+            {"type": "closing", "title": "Closing", "quote": "Done."},
+        ],
+    }
+    regenerated_payload = {
+        "presentation": {"title": "AI copilots for sales teams", "theme": "executive_premium_minimal"},
+        "slides": [
+            {"type": "title", "title": "AI copilots for sales teams"},
+            {
+                "type": "agenda",
+                "title": "Agenda",
+                "body": (
+                    "Regenerated intro that is much better than the first draft but still a little too verbose for the final executive pass, so the refine step should shorten it further before export and remove excess narrative detail that still makes this agenda slide feel slightly denser than ideal for an executive audience."
+                ),
+                "bullets": [
+                    "Context and scope with extra wording for density",
+                    "Pilot design with more narrative detail",
+                    "Decision framing with more context than necessary",
+                    "Measurement plan with verbose explanation",
+                    "Risk controls with additional qualifiers",
+                ],
+            },
+            {"type": "closing", "title": "Closing", "quote": "Done."},
+        ],
+    }
+
+    def _generate(briefing, theme_name=None, feedback_messages=None):
+        payload = regenerated_payload if feedback_messages else first_payload
+        return BriefingGenerationResult(
+            provider_name="heuristic",
+            payload=payload,
+            analysis={
+                "image_suggestions": ["sales leadership dashboard"],
+                "density_review": {"status": "review", "warning_count": 2, "warnings": ["dense"], "slides": []},
+            },
+        )
+
+    monkeypatch.setattr(provider, "generate", _generate)
+
+    result = main(
+        [
+            "generate",
+            "examples/briefing_sales.json",
+            str(output),
+            "--auto-regenerate",
+            "--auto-refine",
+            "--report-json",
+            str(report),
+        ]
+    )
+
+    assert result == 0
+    output_payload = json.loads(output.read_text(encoding="utf-8"))
+    report_payload = json.loads(report.read_text(encoding="utf-8"))
+    assert report_payload["auto_regenerate_applied"] is True
+    assert report_payload["auto_refine_applied"] is True
+    assert len(output_payload["slides"][1]["bullets"]) <= 4
 
 
 def test_ai_cli_can_generate_previews_for_generated_deck(tmp_path: Path) -> None:
@@ -549,8 +630,6 @@ def test_local_provider_normalizes_pptagent_style_payload() -> None:
             ]
         }
     }
-
-    from ppt_creator_ai.briefing import BriefingInput
 
     briefing_input = BriefingInput.from_path("examples/briefing_sales.json")
     normalized = provider.normalize_generated_payload(raw_payload, briefing_input)

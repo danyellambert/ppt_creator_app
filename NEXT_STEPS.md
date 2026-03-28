@@ -394,6 +394,8 @@ Qualquer camada de IA deve ser opcional.
 - [ ] usar LLM para revisão iterativa de narrativa após o primeiro deck ser gerado
 - [ ] usar LLM para reescrever títulos, subtitles e summaries em tom mais executivo
 - [ ] usar LLM para crítica slide a slide combinando briefing + QA visual
+  - [x] primeira crítica slide a slide heurística derivada do review/QA nos relatórios da camada AI
+  - [ ] evoluir para crítica via LLM combinando briefing + QA visual
 
 ### Arquitetura recomendada
 

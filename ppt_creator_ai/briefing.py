@@ -388,6 +388,66 @@ def build_generation_feedback_from_review(
     return messages
 
 
+def build_slide_critiques_from_review(
+    spec: PresentationInput,
+    review: dict[str, object],
+    *,
+    max_critiques: int = 8,
+) -> list[dict[str, object]]:
+    critiques: list[dict[str, object]] = []
+    slide_lookup = {index: slide for index, slide in enumerate(spec.slides, start=1)}
+
+    def _guidance_for_slide(slide_type: str, slide_title: str, issues: list[str]) -> list[str]:
+        guidance: list[str] = []
+        if slide_type in {"agenda", "bullets", "summary", "image_text"}:
+            guidance.append("Keep at most 4 bullets and shorten each line to an executive takeaway.")
+            guidance.append("Reduce narrative text so the core message is readable in a few seconds.")
+        elif slide_type in {"comparison", "two_column"}:
+            guidance.append("Balance both columns and reduce text asymmetry between left and right panels.")
+            guidance.append("Prefer fewer bullets per column with sharper contrast between options.")
+        elif slide_type == "timeline":
+            guidance.append("Use fewer milestones or shorter milestone descriptions.")
+        elif slide_type == "table":
+            guidance.append("Reduce rows/columns and simplify cell text to key facts only.")
+        elif slide_type == "faq":
+            guidance.append("Keep fewer FAQ entries and shorten each answer to the essential decision point.")
+        elif slide_type == "metrics":
+            guidance.append("Trim supporting detail so each KPI remains visually dominant.")
+        else:
+            guidance.append("Tighten the narrative so the slide reads as an executive summary, not a draft note page.")
+
+        for issue in issues[:2]:
+            guidance.append(f"Address this review issue explicitly: {issue}.")
+        return guidance[:4]
+
+    for slide_review in review.get("slides", []) or []:
+        if len(critiques) >= max_critiques:
+            break
+        if not isinstance(slide_review, dict):
+            continue
+        issues = [str(issue) for issue in (slide_review.get("issues") or [])]
+        if not issues:
+            continue
+        slide_number = int(slide_review.get("slide_number") or 0)
+        slide = slide_lookup.get(slide_number)
+        slide_type = str(slide_review.get("slide_type") or (slide.type.value if slide else "slide"))
+        title = str(slide_review.get("title") or (slide.title if slide else slide_type) or slide_type)
+        likely_regions = [str(region) for region in (slide_review.get("likely_overflow_regions") or [])]
+        critiques.append(
+            {
+                "slide_number": slide_number,
+                "slide_type": slide_type,
+                "title": title,
+                "risk_level": slide_review.get("risk_level") or "low",
+                "issues": issues,
+                "likely_overflow_regions": likely_regions,
+                "rewrite_guidance": _guidance_for_slide(slide_type, title, issues),
+            }
+        )
+
+    return critiques
+
+
 def build_briefing_analysis(
     briefing: BriefingInput,
     *,
