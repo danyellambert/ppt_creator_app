@@ -931,3 +931,5 @@ Essa análise agora também começou a observar melhor o **corpo útil do slide*
 Também começou a entrar uma primeira camada de **crop/cover-fit mais inteligente** para imagens encaixadas em caixas fixas, especialmente no layout `image_text` e no preview correspondente, reduzindo distorção e melhorando o aproveitamento visual da área de imagem.
 
 Os placeholders de imagem também começaram a ganhar uma apresentação mais premium/estruturada, deixando mais claro quando um slide ainda espera um asset real sem parecer apenas um bloco vazio.
+
+Na camada opcional `ppt_creator_ai`, já existe agora uma **primeira etapa de revisão iterativa via provider** depois do QA heurístico. Em outras palavras: além de regenerar ou refinar heuristicamente, o pipeline já pode pedir a um provider real que **reescreva o deck gerado à luz do review e das críticas por slide**, retornando um novo JSON estruturado.

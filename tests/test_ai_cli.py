@@ -450,6 +450,91 @@ def test_ai_cli_combines_regeneration_and_refine_from_latest_review(tmp_path: Pa
     assert len(output_payload["slides"][1]["bullets"]) <= 4
 
 
+def test_ai_cli_can_run_provider_backed_llm_review_after_qa(tmp_path: Path, monkeypatch) -> None:
+    output = tmp_path / "generated_llm_review_deck.json"
+    report = tmp_path / "generated_llm_review_report.json"
+    provider = get_provider("openai")
+
+    long_bullet = (
+        "This bullet is intentionally too long and too detailed for a clean executive slide so the provider-backed review pass should tighten it significantly."
+    )
+    noisy_payload = {
+        "presentation": {"title": "AI copilots for sales teams", "theme": "executive_premium_minimal"},
+        "slides": [
+            {"type": "title", "title": "AI copilots for sales teams"},
+            {
+                "type": "agenda",
+                "title": "Agenda",
+                "body": "This introduction paragraph is intentionally verbose and dense so the LLM review loop has a clear reason to rewrite the deck.",
+                "bullets": [long_bullet, long_bullet, long_bullet, long_bullet, long_bullet, long_bullet],
+            },
+            {"type": "closing", "title": "Closing", "quote": "Done."},
+        ],
+    }
+    improved_payload = {
+        "presentation": {"title": "AI copilots for sales teams", "theme": "executive_premium_minimal"},
+        "slides": [
+            {"type": "title", "title": "AI copilots for sales teams"},
+            {
+                "type": "agenda",
+                "title": "Agenda",
+                "body": "Sharper intro for the decision meeting.",
+                "bullets": ["Context", "Pilot scope", "Decision", "Metrics"],
+            },
+            {"type": "closing", "title": "Closing", "quote": "Done."},
+        ],
+    }
+
+    monkeypatch.setattr(
+        provider,
+        "generate",
+        lambda briefing, theme_name=None, feedback_messages=None: BriefingGenerationResult(
+            provider_name="openai",
+            payload=noisy_payload,
+            analysis={
+                "image_suggestions": ["sales leadership dashboard"],
+                "density_review": {"status": "review", "warning_count": 2, "warnings": ["dense"], "slides": []},
+            },
+        ),
+    )
+    monkeypatch.setattr(
+        provider,
+        "revise_generated_deck",
+        lambda briefing, current_payload, review, slide_critiques, theme_name=None, feedback_messages=None: BriefingGenerationResult(
+            provider_name="openai",
+            payload=improved_payload,
+            analysis={
+                "image_suggestions": ["sales leadership dashboard"],
+                "density_review": {"status": "ok", "warning_count": 0, "warnings": [], "slides": []},
+                "revision_mode": "llm_review",
+            },
+        ),
+    )
+
+    result = main(
+        [
+            "generate",
+            "examples/briefing_sales.json",
+            str(output),
+            "--provider",
+            "openai",
+            "--auto-llm-review",
+            "--llm-review-passes",
+            "2",
+            "--report-json",
+            str(report),
+        ]
+    )
+
+    assert result == 0
+    output_payload = json.loads(output.read_text(encoding="utf-8"))
+    report_payload = json.loads(report.read_text(encoding="utf-8"))
+    assert report_payload["auto_llm_review_enabled"] is True
+    assert report_payload["auto_llm_review_applied"] is True
+    assert report_payload["generated_deck_issue_count"] <= report_payload["initial_generated_deck_issue_count"]
+    assert output_payload["slides"][1]["body"] == "Sharper intro for the decision meeting."
+
+
 def test_ai_cli_can_generate_previews_for_generated_deck(tmp_path: Path) -> None:
     output_json = tmp_path / "generated_deck.json"
     preview_dir = tmp_path / "generated_previews"

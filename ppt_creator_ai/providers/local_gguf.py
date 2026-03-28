@@ -92,6 +92,62 @@ class PPTAgentLocalProvider:
         )
         return prompt
 
+    def build_revision_prompt(
+        self,
+        briefing: BriefingInput,
+        current_payload: dict[str, object],
+        review: dict[str, object],
+        slide_critiques: list[dict[str, object]],
+        *,
+        theme_name: str | None = None,
+        feedback_messages: list[str] | None = None,
+    ) -> str:
+        effective_theme = theme_name or briefing.theme
+        review_summary = {
+            "status": review.get("status"),
+            "issue_count": review.get("issue_count"),
+            "average_score": review.get("average_score"),
+            "overflow_risk_count": review.get("overflow_risk_count"),
+            "clipping_risk_count": review.get("clipping_risk_count"),
+            "collision_risk_count": review.get("collision_risk_count"),
+            "balance_warning_count": review.get("balance_warning_count"),
+            "top_risk_slides": review.get("top_risk_slides"),
+        }
+        prompt = (
+            "You are revising an existing presentation JSON after QA review. "
+            "Return only valid JSON with top-level keys 'presentation' and 'slides'. "
+            "Do not wrap the result in markdown. Do not explain your reasoning. "
+            "Keep the output compatible with these slide types: title, section, agenda, bullets, cards, metrics, chart, image_text, timeline, comparison, two_column, table, faq, summary, closing. "
+            "Preserve the overall storyline, but tighten dense slides, reduce clipping/collision risk, and improve executive readability. "
+            f"Use theme '{effective_theme}'.\n\n"
+            "Structured briefing JSON:\n"
+            f"{json.dumps(briefing.model_dump(mode='json'), ensure_ascii=False, indent=2)}\n\n"
+            "Current presentation JSON:\n"
+            f"{json.dumps(current_payload, ensure_ascii=False, indent=2)}\n\n"
+            "QA review summary JSON:\n"
+            f"{json.dumps(review_summary, ensure_ascii=False, indent=2)}\n\n"
+            "Slide critique guidance JSON:\n"
+            f"{json.dumps(slide_critiques[:8], ensure_ascii=False, indent=2)}\n\n"
+        )
+        if feedback_messages:
+            prompt += "Additional revision guidance:\n- " + "\n- ".join(feedback_messages) + "\n\n"
+        prompt += "Return a single revised JSON object now."
+        return prompt
+
+    def validate_generated_payload(
+        self,
+        normalized_payload: dict[str, object],
+        briefing: BriefingInput,
+        *,
+        theme_name: str | None = None,
+        fallback_payload: dict[str, object] | None = None,
+    ) -> PresentationInput:
+        try:
+            return PresentationInput.model_validate(normalized_payload)
+        except Exception:
+            payload = fallback_payload or generate_presentation_payload_from_briefing(briefing, theme_name=theme_name)
+            return PresentationInput.model_validate(payload)
+
     def build_presentation_meta(
         self,
         presentation_payload: dict[str, object],
@@ -483,11 +539,7 @@ class PPTAgentLocalProvider:
         raw_output = self.run_model(model_path, prompt)
         payload = self.extract_json_payload(raw_output)
         normalized_payload = self.normalize_generated_payload(payload, briefing, theme_name=theme_name)
-        try:
-            spec = PresentationInput.model_validate(normalized_payload)
-        except Exception:
-            fallback_payload = generate_presentation_payload_from_briefing(briefing, theme_name=theme_name)
-            spec = PresentationInput.model_validate(fallback_payload)
+        spec = self.validate_generated_payload(normalized_payload, briefing, theme_name=theme_name)
         normalized_payload = spec.model_dump(mode="json")
 
         summary_source = " ".join(
@@ -506,6 +558,53 @@ class PPTAgentLocalProvider:
             "executive_summary_bullets": briefing.recommendations[:3]
             or summarize_text_to_executive_bullets(summary_source, max_bullets=3),
             "image_suggestions": suggest_image_queries_from_briefing(briefing),
+            "density_review": review_presentation_density(spec),
+        }
+        return BriefingGenerationResult(
+            provider_name=self.name,
+            payload=normalized_payload,
+            analysis=analysis,
+        )
+
+    def revise_generated_deck(
+        self,
+        briefing: BriefingInput,
+        current_payload: dict[str, object],
+        review: dict[str, object],
+        slide_critiques: list[dict[str, object]],
+        *,
+        theme_name: str | None = None,
+        feedback_messages: list[str] | None = None,
+    ) -> BriefingGenerationResult:
+        model_path = self.resolve_model_path()
+        prompt = self.build_revision_prompt(
+            briefing,
+            current_payload,
+            review,
+            slide_critiques,
+            theme_name=theme_name,
+            feedback_messages=feedback_messages,
+        )
+        raw_output = self.run_model(model_path, prompt)
+        payload = self.extract_json_payload(raw_output)
+        normalized_payload = self.normalize_generated_payload(payload, briefing, theme_name=theme_name)
+        spec = self.validate_generated_payload(
+            normalized_payload,
+            briefing,
+            theme_name=theme_name,
+            fallback_payload=current_payload,
+        )
+        normalized_payload = spec.model_dump(mode="json")
+        analysis = {
+            "briefing_title": briefing.title,
+            "provider": self.name,
+            "model_path": str(model_path),
+            "theme": spec.presentation.theme,
+            "generated_slide_count": len(spec.slides),
+            "feedback_messages": feedback_messages or [],
+            "revision_mode": "llm_review",
+            "source_issue_count": review.get("issue_count"),
+            "slide_critique_count": len(slide_critiques),
             "density_review": review_presentation_density(spec),
         }
         return BriefingGenerationResult(

@@ -6,6 +6,7 @@ from ppt_creator_ai.briefing import (
     generate_presentation_payload_from_briefing,
 )
 from ppt_creator_ai.providers.base import BriefingGenerationResult
+from ppt_creator_ai.refine import refine_presentation_payload
 
 
 class HeuristicBriefingProvider:
@@ -28,6 +29,36 @@ class HeuristicBriefingProvider:
             briefing,
             theme_name=theme_name,
             feedback_messages=feedback_messages,
+        )
+        return BriefingGenerationResult(
+            provider_name=self.name,
+            payload=payload,
+            analysis=analysis,
+        )
+
+    def revise_generated_deck(
+        self,
+        briefing: BriefingInput,
+        current_payload: dict[str, object],
+        review: dict[str, object],
+        slide_critiques: list[dict[str, object]],
+        *,
+        theme_name: str | None = None,
+        feedback_messages: list[str] | None = None,
+    ) -> BriefingGenerationResult:
+        payload = refine_presentation_payload(current_payload, review=review)
+        analysis = build_briefing_analysis(
+            briefing,
+            theme_name=theme_name,
+            feedback_messages=feedback_messages,
+        )
+        analysis.update(
+            {
+                "provider": self.name,
+                "revision_mode": "heuristic_review",
+                "source_issue_count": review.get("issue_count"),
+                "slide_critique_count": len(slide_critiques),
+            }
         )
         return BriefingGenerationResult(
             provider_name=self.name,

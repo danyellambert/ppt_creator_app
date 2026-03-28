@@ -46,16 +46,11 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
     panel_top = 1.55
     panel_height = 3.0
     renderer.add_panel(slide, panel_left, panel_top, panel_width, panel_height, fill_color=colors.surface, line_color=colors.line)
-    content_left, content_top, content_width, content_height = renderer.panel_inner_bounds(
+    for region, (content_left, region_top, content_width, region_height) in renderer.build_panel_content_stack_bounds(
         left=panel_left,
         top=panel_top,
         width=panel_width,
         height=panel_height,
-        padding=0.35,
-    )
-    for region, (region_top, region_height) in renderer.build_content_stack(
-        top=content_top,
-        height=content_height,
         regions=[
             {"kind": "heading", "height": 0.22},
             {
@@ -66,6 +61,7 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
             },
         ],
         gap=0.10,
+        padding=0.35,
         min_flex=0.9,
         max_flex=1.25,
     ):

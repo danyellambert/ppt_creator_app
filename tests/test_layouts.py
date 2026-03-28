@@ -465,6 +465,12 @@ def test_long_content_layouts_render_with_initial_autofit(tmp_path: Path) -> Non
                         },
                     ],
                 },
+                {
+                    "type": "closing",
+                    "title": "Closing stress case",
+                    "quote": "This closing quote is intentionally much longer than ideal so the shared quote block now needs to rely on stronger autofit behavior even in the final composed slide.",
+                    "attribution": "PPT Creator QA",
+                },
             ],
         }
     )
@@ -475,4 +481,4 @@ def test_long_content_layouts_render_with_initial_autofit(tmp_path: Path) -> Non
 
     assert rendered.exists()
     presentation = Presentation(str(rendered))
-    assert len(presentation.slides) == 12
+    assert len(presentation.slides) == 13

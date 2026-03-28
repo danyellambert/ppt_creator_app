@@ -104,6 +104,17 @@ def build_parser() -> argparse.ArgumentParser:
         default=1,
         help="Maximum number of heuristic refine passes to attempt when --auto-refine is enabled",
     )
+    generate_parser.add_argument(
+        "--auto-llm-review",
+        action="store_true",
+        help="Ask the selected provider to revise the generated deck using QA review + slide critiques",
+    )
+    generate_parser.add_argument(
+        "--llm-review-passes",
+        type=int,
+        default=1,
+        help="Maximum number of provider-backed post-QA review/revision passes to attempt when --auto-llm-review is enabled",
+    )
     generate_parser.add_argument("--report-json", help="Optional path to write a JSON generation report")
 
     providers_parser = subparsers.add_parser("providers", help="List available briefing providers")
@@ -227,6 +238,8 @@ def generate_from_briefing(
     regenerate_passes: int = 1,
     auto_refine: bool = False,
     refine_passes: int = 1,
+    auto_llm_review: bool = False,
+    llm_review_passes: int = 1,
 ) -> dict[str, object]:
     input_path = Path(input_briefing)
     output_json_path = Path(output_json)
@@ -421,6 +434,114 @@ def generate_from_briefing(
         spec = current_spec
         deck_review = current_review
 
+    llm_review_history: list[dict[str, object]] = []
+    llm_review_applied = False
+
+    if auto_llm_review:
+        revision_callable = getattr(provider, "revise_generated_deck", None)
+        if not callable(revision_callable):
+            raise ValueError(f"Provider '{provider.name}' does not support post-QA LLM review")
+
+        current_result = result
+        current_spec = spec
+        current_review = deck_review
+        current_preview_result, current_preview_feedback, current_preview_source = _build_preview_feedback_for_spec(
+            current_spec,
+            preview_enabled=preview_feedback_enabled,
+            prefer_rendered_pptx=preview_from_rendered_pptx or preview_backend != "synthetic",
+            resolved_asset_root=resolved_asset_root,
+            preview_backend=preview_backend,
+            preview_baseline_dir=preview_baseline_dir,
+            preview_write_diff_images=preview_write_diff_images,
+            basename=preview_feedback_basename,
+        )
+        current_preview_score = _preview_feedback_score(current_preview_result)
+
+        for pass_index in range(max(1, llm_review_passes)):
+            if current_review["issue_count"] == 0 and (current_preview_score is None or current_preview_score == 0):
+                break
+
+            current_slide_critiques = build_slide_critiques_from_review(current_spec, current_review)
+            feedback_messages = _merge_feedback_messages(
+                build_generation_feedback_from_review(current_review),
+                current_preview_feedback,
+            )
+            candidate_result = revision_callable(
+                briefing,
+                current_spec.model_dump(mode="json"),
+                current_review,
+                current_slide_critiques,
+                theme_name=theme_name,
+                feedback_messages=feedback_messages,
+            )
+            candidate_spec = PresentationInput.model_validate(candidate_result.payload)
+            candidate_review = review_presentation(
+                candidate_spec,
+                asset_root=resolved_asset_root,
+                theme_name=candidate_spec.presentation.theme,
+            )
+            candidate_preview_result, candidate_preview_feedback, candidate_preview_source = _build_preview_feedback_for_spec(
+                candidate_spec,
+                preview_enabled=preview_feedback_enabled,
+                prefer_rendered_pptx=preview_from_rendered_pptx or preview_backend != "synthetic",
+                resolved_asset_root=resolved_asset_root,
+                preview_backend=preview_backend,
+                preview_baseline_dir=preview_baseline_dir,
+                preview_write_diff_images=preview_write_diff_images,
+                basename=preview_feedback_basename,
+            )
+            candidate_preview_score = _preview_feedback_score(candidate_preview_result)
+            payload_changed = candidate_spec.model_dump(mode="json") != current_spec.model_dump(mode="json")
+            llm_review_history.append(
+                {
+                    "pass": pass_index + 1,
+                    "feedback_messages": feedback_messages,
+                    "slide_critique_count": len(current_slide_critiques),
+                    "before_issue_count": current_review["issue_count"],
+                    "after_issue_count": candidate_review["issue_count"],
+                    "before_average_score": current_review["average_score"],
+                    "after_average_score": candidate_review["average_score"],
+                    "preview_feedback_source": current_preview_source,
+                    "before_preview_score": current_preview_score,
+                    "after_preview_score": candidate_preview_score,
+                }
+            )
+            improved = (
+                candidate_review["issue_count"] < current_review["issue_count"]
+                or candidate_review["average_score"] > current_review["average_score"]
+                or (
+                    current_preview_score is not None
+                    and candidate_preview_score is not None
+                    and candidate_preview_score < current_preview_score
+                )
+                or (
+                    payload_changed
+                    and candidate_review["issue_count"] <= current_review["issue_count"]
+                    and candidate_review["average_score"] >= current_review["average_score"]
+                    and (
+                        current_preview_score is None
+                        or candidate_preview_score is None
+                        or candidate_preview_score <= current_preview_score
+                    )
+                )
+            )
+            if not improved:
+                break
+
+            current_result = candidate_result
+            current_spec = candidate_spec
+            current_review = candidate_review
+            current_preview_result = candidate_preview_result
+            current_preview_feedback = candidate_preview_feedback
+            current_preview_source = candidate_preview_source
+            current_preview_score = candidate_preview_score
+            llm_review_applied = True
+
+        result = current_result
+        analysis = current_result.analysis
+        spec = current_spec
+        deck_review = current_review
+
     slide_critiques = build_slide_critiques_from_review(spec, deck_review)
 
     payload = spec.model_dump(mode="json")
@@ -439,6 +560,7 @@ def generate_from_briefing(
                 "generated_deck_review": deck_review,
                 "regeneration_history": regeneration_history,
                 "refinement_history": refinement_history,
+                "llm_review_history": llm_review_history,
                 "slide_critiques": slide_critiques,
             },
         )
@@ -501,6 +623,10 @@ def generate_from_briefing(
         "auto_refine_applied": refine_applied,
         "refine_passes_requested": refine_passes if auto_refine else 0,
         "refine_passes_completed": len(refinement_history),
+        "auto_llm_review_enabled": auto_llm_review,
+        "auto_llm_review_applied": llm_review_applied,
+        "llm_review_passes_requested": llm_review_passes if auto_llm_review else 0,
+        "llm_review_passes_completed": len(llm_review_history),
         "image_suggestion_count": len(analysis["image_suggestions"]),
         "density_review_status": analysis["density_review"]["status"],
         "initial_generated_deck_review_status": initial_deck_review["status"],
@@ -552,6 +678,8 @@ def main(argv: list[str] | None = None) -> int:
             regenerate_passes=args.regenerate_passes,
             auto_refine=args.auto_refine,
             refine_passes=args.refine_passes,
+            auto_llm_review=args.auto_llm_review,
+            llm_review_passes=args.llm_review_passes,
         )
         if args.report_json:
             write_json(args.report_json, result)

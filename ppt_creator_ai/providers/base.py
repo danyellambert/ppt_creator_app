@@ -24,3 +24,14 @@ class BriefingProvider(Protocol):
         theme_name: str | None = None,
         feedback_messages: list[str] | None = None,
     ) -> BriefingGenerationResult: ...
+
+    def revise_generated_deck(
+        self,
+        briefing: BriefingInput,
+        current_payload: dict[str, object],
+        review: dict[str, object],
+        slide_critiques: list[dict[str, object]],
+        *,
+        theme_name: str | None = None,
+        feedback_messages: list[str] | None = None,
+    ) -> BriefingGenerationResult: ...

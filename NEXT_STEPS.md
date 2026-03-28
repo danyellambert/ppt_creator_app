@@ -513,6 +513,7 @@ Se a meta for perseguir o nível “deck quase pronto sem retoque manual”, a o
   - [x] primeira composição simples de grids aplicada em layouts multi-painel
   - [x] primeiros helpers semânticos de mais alto nível reaproveitados em layouts reais
   - [ ] consolidar primitives reutilizáveis de mais alto nível
+  - [x] primeira expansão com helpers semânticos adicionais para panel-grid ponderado e panel-content stacks reutilizáveis
 - [ ] constraints semânticas em vez de posições excessivamente rígidas
 - [ ] auto-fit real de texto por caixa
   - [x] primeira camada aplicada em caixas homogêneas críticas

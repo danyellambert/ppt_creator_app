@@ -168,3 +168,55 @@ class OpenAIBriefingProvider:
             payload=normalized_payload,
             analysis=analysis,
         )
+
+    def revise_generated_deck(
+        self,
+        briefing: BriefingInput,
+        current_payload: dict[str, object],
+        review: dict[str, object],
+        slide_critiques: list[dict[str, object]],
+        *,
+        theme_name: str | None = None,
+        feedback_messages: list[str] | None = None,
+    ) -> BriefingGenerationResult:
+        model_name = self.resolve_model_name()
+        prompt = self._structured_helper.build_revision_prompt(
+            briefing,
+            current_payload,
+            review,
+            slide_critiques,
+            theme_name=theme_name,
+            feedback_messages=feedback_messages,
+        )
+        raw_output = self.request_generation(prompt, model_name=model_name)
+        payload = self._structured_helper.extract_json_payload(raw_output)
+        normalized_payload = self._structured_helper.normalize_generated_payload(
+            payload,
+            briefing,
+            theme_name=theme_name,
+        )
+        spec = self._structured_helper.validate_generated_payload(
+            normalized_payload,
+            briefing,
+            theme_name=theme_name,
+            fallback_payload=current_payload,
+        )
+        normalized_payload = spec.model_dump(mode="json")
+        analysis = {
+            "briefing_title": briefing.title,
+            "provider": self.name,
+            "model_name": model_name,
+            "base_url": self.resolve_base_url(),
+            "theme": spec.presentation.theme,
+            "generated_slide_count": len(spec.slides),
+            "feedback_messages": feedback_messages or [],
+            "revision_mode": "llm_review",
+            "source_issue_count": review.get("issue_count"),
+            "slide_critique_count": len(slide_critiques),
+            "density_review": review_presentation_density(spec),
+        }
+        return BriefingGenerationResult(
+            provider_name=self.name,
+            payload=normalized_payload,
+            analysis=analysis,
+        )

@@ -68,14 +68,6 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
             color=accent,
         )
 
-        content_left, content_top, content_width, content_height = renderer.panel_inner_bounds(
-            left=left,
-            top=panel_top,
-            width=panel_width,
-            height=panel_height,
-            padding=0.26,
-        )
-
         regions: list[dict[str, float | str]] = []
         if column.tag:
             regions.append({"kind": "tag", "height": 0.20})
@@ -104,11 +96,14 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
         if column.footer:
             regions.append({"kind": "footer", "height": 0.22})
 
-        for region, (region_top, region_height) in renderer.build_content_stack(
-            top=content_top,
-            height=content_height,
+        for region, (content_left, region_top, content_width, region_height) in renderer.build_panel_content_stack_bounds(
+            left=left,
+            top=panel_top,
+            width=panel_width,
+            height=panel_height,
             regions=regions,
             gap=0.06,
+            padding=0.26,
             min_flex=0.9,
             max_flex=1.35,
         ):

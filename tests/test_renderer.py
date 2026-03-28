@@ -237,6 +237,49 @@ def test_build_weighted_rows_allocates_more_height_to_heavier_content() -> None:
     assert rows[1][1] > rows[0][1]
 
 
+def test_build_weighted_panel_grid_allocates_more_space_to_heavier_regions() -> None:
+    renderer = PresentationRenderer(asset_root="examples")
+
+    grid = renderer.build_weighted_panel_grid(
+        left=1.0,
+        top=2.0,
+        width=5.0,
+        height=3.0,
+        column_gap=0.1,
+        row_gap=0.2,
+        column_weights=[1.0, 2.5],
+        row_weights=[1.0, 2.0],
+        column_min_width=1.0,
+        row_min_height=0.8,
+    )
+
+    assert len(grid) == 2
+    assert len(grid[0]) == 2
+    assert grid[0][1][2] > grid[0][0][2]
+    assert grid[1][0][3] > grid[0][0][3]
+
+
+def test_build_panel_content_stack_bounds_uses_inner_padding() -> None:
+    renderer = PresentationRenderer(asset_root="examples")
+
+    regions = renderer.build_panel_content_stack_bounds(
+        left=1.0,
+        top=2.0,
+        width=4.0,
+        height=2.0,
+        padding=0.2,
+        regions=[
+            {"kind": "title", "height": 0.3},
+            {"kind": "body", "min_height": 0.6, "flex": 1.0, "content_weight": 2.0},
+        ],
+        gap=0.1,
+    )
+
+    assert len(regions) == 2
+    assert regions[0][1][0] == 1.2
+    assert regions[0][1][2] == 3.6
+
+
 def test_estimate_content_weight_increases_with_more_content() -> None:
     renderer = PresentationRenderer(asset_root="examples")
 

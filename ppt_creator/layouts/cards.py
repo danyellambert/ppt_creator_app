@@ -48,25 +48,27 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
         renderer.add_panel(slide, x, panel_top, card_width, panel_height, fill_color=colors.surface, line_color=colors.line)
         renderer.add_accent_bar(slide, x, panel_top, card_width, renderer.theme.components.accent_bar_height, color=colors.accent if idx == 1 else colors.navy)
 
-        content_left, content_top, content_width, content_height = renderer.panel_inner_bounds(
-            left=x,
-            top=panel_top,
-            width=card_width,
-            height=panel_height,
-        )
-
         regions = [
             {"kind": "title", "height": 0.38},
-            {"kind": "body", "min_height": 1.15, "flex": 1.0},
+            {
+                "kind": "body",
+                "min_height": 1.15,
+                "flex": 1.0,
+                "content_weight": renderer.estimate_content_weight(body=card.body),
+            },
         ]
         if card.footer:
             regions.append({"kind": "footer", "height": 0.22})
 
-        for region, (region_top, region_height) in renderer.stack_vertical_regions(
-            top=content_top,
-            height=content_height,
+        for region, (content_left, region_top, content_width, region_height) in renderer.build_panel_content_stack_bounds(
+            left=x,
+            top=panel_top,
+            width=card_width,
+            height=panel_height,
             regions=regions,
             gap=0.08,
+            min_flex=0.9,
+            max_flex=1.35,
         ):
             kind = region["kind"]
             if kind == "title":

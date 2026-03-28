@@ -483,6 +483,85 @@ class PresentationRenderer:
         )
         return [(column_left, top, column_width, height) for column_left, column_width in columns]
 
+    def build_weighted_panel_grid(
+        self,
+        *,
+        left: float,
+        top: float,
+        width: float,
+        height: float,
+        column_gap: float,
+        row_gap: float,
+        column_weights: list[float],
+        row_weights: list[float],
+        column_min_width: float = 0.0,
+        row_min_height: float = 0.0,
+        min_flex: float = 0.9,
+        max_flex: float = 1.35,
+        column_kind_prefix: str = "column",
+        row_kind_prefix: str = "row",
+    ) -> list[list[tuple[float, float, float, float]]]:
+        return self.build_grid_bounds(
+            left=left,
+            top=top,
+            width=width,
+            height=height,
+            column_regions=[
+                {
+                    "kind": f"{column_kind_prefix}_{index + 1}",
+                    "min_width": column_min_width,
+                    "flex": flex,
+                }
+                for index, flex in enumerate(
+                    self.normalize_content_flexes(column_weights, min_flex=min_flex, max_flex=max_flex)
+                )
+            ],
+            row_regions=[
+                {
+                    "kind": f"{row_kind_prefix}_{index + 1}",
+                    "min_height": row_min_height,
+                    "flex": flex,
+                }
+                for index, flex in enumerate(
+                    self.normalize_content_flexes(row_weights, min_flex=min_flex, max_flex=max_flex)
+                )
+            ],
+            column_gap=column_gap,
+            row_gap=row_gap,
+        )
+
+    def build_panel_content_stack_bounds(
+        self,
+        *,
+        left: float,
+        top: float,
+        width: float,
+        height: float,
+        regions: list[dict[str, float | str]],
+        gap: float,
+        padding: float | None = None,
+        min_flex: float = 0.9,
+        max_flex: float = 1.35,
+    ) -> list[tuple[dict[str, float | str], tuple[float, float, float, float]]]:
+        content_left, content_top, content_width, content_height = self.panel_inner_bounds(
+            left=left,
+            top=top,
+            width=width,
+            height=height,
+            padding=padding,
+        )
+        return [
+            (region, (content_left, region_top, content_width, region_height))
+            for region, (region_top, region_height) in self.build_content_stack(
+                top=content_top,
+                height=content_height,
+                regions=regions,
+                gap=gap,
+                min_flex=min_flex,
+                max_flex=max_flex,
+            )
+        ]
+
     def build_panel_grid(
         self,
         *,
@@ -661,6 +740,12 @@ class PresentationRenderer:
         run = paragraph.add_run()
         run.text = quote
         self.set_run_style(run, size=self.theme.typography.quote_size, color=self.theme.colors.navy, bold=True, italic=True)
+        self.fit_text_frame(
+            quote_box.text_frame,
+            max_size=self.theme.typography.quote_size,
+            bold=True,
+            italic=True,
+        )
 
         if attribution:
             attribution_box = self.textbox(slide, left, top + height + 0.3, min(width, 4.2), 0.35)
