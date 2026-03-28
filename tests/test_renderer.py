@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from PIL import Image
 from pptx import Presentation
 from pptx.util import Inches
 
@@ -275,3 +276,49 @@ def test_build_content_stack_allocates_more_height_to_heavier_region() -> None:
     )
 
     assert regions[1][1][1] > regions[0][1][1]
+
+
+def test_compute_cover_crop_crops_wide_images_horizontally() -> None:
+    renderer = PresentationRenderer(asset_root="examples")
+
+    crop_left, crop_top, crop_right, crop_bottom = renderer.compute_cover_crop(
+        image_width_px=400,
+        image_height_px=200,
+        box_width=2.0,
+        box_height=2.0,
+    )
+
+    assert crop_left > 0
+    assert crop_right == pytest.approx(crop_left)
+    assert crop_top == 0
+    assert crop_bottom == 0
+
+
+def test_compute_cover_crop_crops_tall_images_vertically() -> None:
+    renderer = PresentationRenderer(asset_root="examples")
+
+    crop_left, crop_top, crop_right, crop_bottom = renderer.compute_cover_crop(
+        image_width_px=200,
+        image_height_px=400,
+        box_width=2.0,
+        box_height=1.0,
+    )
+
+    assert crop_top > 0
+    assert crop_bottom == pytest.approx(crop_top)
+    assert crop_left == 0
+    assert crop_right == 0
+
+
+def test_add_image_cover_applies_crop_for_mismatched_aspect_ratio(tmp_path: Path) -> None:
+    image_path = tmp_path / "wide.png"
+    Image.new("RGB", (400, 200), (120, 140, 180)).save(image_path)
+
+    presentation = Presentation()
+    slide = presentation.slides.add_slide(presentation.slide_layouts[6])
+    renderer = PresentationRenderer(asset_root="examples")
+
+    picture = renderer.add_image_cover(slide, image_path, left=1.0, top=1.0, width=2.0, height=2.0)
+
+    assert picture.crop_left > 0
+    assert picture.crop_right == pytest.approx(picture.crop_left)

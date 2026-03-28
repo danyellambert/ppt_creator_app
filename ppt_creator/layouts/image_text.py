@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from pptx.enum.shapes import MSO_AUTO_SHAPE_TYPE
-from pptx.util import Inches
 
 
 def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
@@ -33,12 +32,13 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
     text_width = 5.4 if variant == "image_right" else 5.15
     asset = renderer.resolve_asset(slide_spec.image_path)
     if asset:
-        slide.shapes.add_picture(
-            str(asset),
-            Inches(image_left),
-            Inches(image_top),
-            width=Inches(image_width),
-            height=Inches(image_height),
+        renderer.add_image_cover(
+            slide,
+            asset,
+            left=image_left,
+            top=image_top,
+            width=image_width,
+            height=image_height,
         )
     else:
         panel = renderer.add_panel(slide, image_left, image_top, image_width, image_height, fill_color=colors.surface, line_color=colors.line)

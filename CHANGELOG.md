@@ -29,6 +29,7 @@ The format is inspired by Keep a Changelog, and the project aims to follow Seman
 - explicit PPTX-to-preview flow via CLI/API, allowing office-backed previews from an already rendered `.pptx`
 - AI briefing CLI now supports an initial automatic regeneration loop driven by heuristic review feedback
 - AI analysis reports now include initial slide-by-slide critique guidance derived from heuristic QA findings
+- initial cover-fit/crop handling for fixed image boxes, applied to image-text rendering and preview flows
 - optional office-aware preview backend selection with automatic fallback to synthetic previews
 - initial layout primitive helpers for panel inner bounds and stacked vertical regions
 - initial application of layout primitives to comparison, faq, cards, and two-column slides

@@ -527,6 +527,8 @@ Se a meta for perseguir o nível “deck quase pronto sem retoque manual”, a o
 ### Prioridade 4 — Pipeline de imagens e placeholders
 
 - [ ] crop mais inteligente
+  - [x] primeira camada de cover-fit/crop aplicada a caixas fixas de imagem (`image_text` + preview correspondente)
+  - [ ] expandir a estratégia para mais layouts e regras de focal point/contexto
 - [ ] placeholders mais premium e contextuais
 - [ ] sugestões de imagem por tipo de slide, não só por briefing geral
 - [ ] biblioteca básica de assets e estilos visuais

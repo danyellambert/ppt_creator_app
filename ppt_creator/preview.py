@@ -6,7 +6,7 @@ import subprocess
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from PIL import Image, ImageChops, ImageDraw, ImageFont, ImageStat
+from PIL import Image, ImageChops, ImageDraw, ImageFont, ImageOps, ImageStat
 from pptx import Presentation
 
 from ppt_creator.qa import review_presentation
@@ -929,8 +929,14 @@ class PreviewRenderer:
         asset = self.resolve_asset(slide_spec.image_path)
         if asset:
             loaded = Image.open(asset).convert("RGB")
-            loaded.thumbnail((box[2] - box[0], box[3] - box[1]))
-            image.paste(loaded, (box[0], box[1]))
+            resampling = getattr(getattr(Image, "Resampling", Image), "LANCZOS")
+            fitted = ImageOps.fit(
+                loaded,
+                (box[2] - box[0], box[3] - box[1]),
+                method=resampling,
+                centering=(0.5, 0.5),
+            )
+            image.paste(fitted, (box[0], box[1]))
         else:
             self._draw_panel(draw, box)
             draw.text((box[0] + 90, box[1] + 110), "Image unavailable", fill=_rgb_tuple(self.theme.colors.muted), font=_load_font(24, bold=True))

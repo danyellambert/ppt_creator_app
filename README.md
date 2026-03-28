@@ -861,3 +861,5 @@ Os relatórios também passam a destacar melhor onde olhar primeiro, com campos 
 O próximo passo mais importante continua sendo evoluir de preview sintético para preview fiel ao `.pptx` real.
 
 Também entrou uma primeira camada de análise de artefatos no próprio preview, com sinais como contato com bordas e densidade suspeita nas margens do slide.
+
+Também começou a entrar uma primeira camada de **crop/cover-fit mais inteligente** para imagens encaixadas em caixas fixas, especialmente no layout `image_text` e no preview correspondente, reduzindo distorção e melhorando o aproveitamento visual da área de imagem.

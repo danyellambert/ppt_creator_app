@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from PIL import Image as PILImage
 from pptx import Presentation
 from pptx.enum.shapes import MSO_AUTO_SHAPE_TYPE, MSO_CONNECTOR
 from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
@@ -217,6 +218,62 @@ class PresentationRenderer:
     ) -> tuple[float, float, float, float]:
         pad = padding if padding is not None else self.theme.components.panel_padding
         return left + pad, top + pad, width - (pad * 2), height - (pad * 2)
+
+    def compute_cover_crop(
+        self,
+        *,
+        image_width_px: int,
+        image_height_px: int,
+        box_width: float,
+        box_height: float,
+    ) -> tuple[float, float, float, float]:
+        if image_width_px <= 0 or image_height_px <= 0 or box_width <= 0 or box_height <= 0:
+            return 0.0, 0.0, 0.0, 0.0
+
+        image_aspect = image_width_px / image_height_px
+        box_aspect = box_width / box_height
+        if abs(image_aspect - box_aspect) <= 1e-6:
+            return 0.0, 0.0, 0.0, 0.0
+
+        if image_aspect > box_aspect:
+            keep_fraction = box_aspect / image_aspect
+            crop = max(0.0, (1.0 - keep_fraction) / 2.0)
+            return crop, 0.0, crop, 0.0
+
+        keep_fraction = image_aspect / box_aspect
+        crop = max(0.0, (1.0 - keep_fraction) / 2.0)
+        return 0.0, crop, 0.0, crop
+
+    def add_image_cover(
+        self,
+        slide: "PptxSlide",
+        image_path: str | Path,
+        *,
+        left: float,
+        top: float,
+        width: float,
+        height: float,
+    ):
+        resolved_path = Path(image_path)
+        picture = slide.shapes.add_picture(
+            str(resolved_path),
+            Inches(left),
+            Inches(top),
+            width=Inches(width),
+            height=Inches(height),
+        )
+        with PILImage.open(resolved_path) as image:
+            crop_left, crop_top, crop_right, crop_bottom = self.compute_cover_crop(
+                image_width_px=image.width,
+                image_height_px=image.height,
+                box_width=width,
+                box_height=height,
+            )
+        picture.crop_left = crop_left
+        picture.crop_top = crop_top
+        picture.crop_right = crop_right
+        picture.crop_bottom = crop_bottom
+        return picture
 
     def stack_vertical_regions(
         self,
