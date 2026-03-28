@@ -8,13 +8,15 @@ from tempfile import TemporaryDirectory
 
 from pydantic import ValidationError
 
+from ppt_creator.assets import get_asset_collection, list_asset_collections
 from ppt_creator.preview import (
     compare_pptx_artifacts,
     render_previews,
     render_previews_for_rendered_artifact,
     render_previews_from_pptx,
 )
-from ppt_creator.qa import review_presentation
+from ppt_creator.profiles import get_audience_profile, list_audience_profiles
+from ppt_creator.qa import augment_review_with_preview_artifacts, review_presentation
 from ppt_creator.renderer import PresentationRenderer
 from ppt_creator.schema import PresentationInput
 from ppt_creator.templates import build_domain_template, list_template_domains
@@ -162,6 +164,14 @@ def build_parser() -> argparse.ArgumentParser:
     )
     compare_pptx_parser.add_argument("--report-json", help="Optional path to write a JSON comparison report")
 
+    profiles_parser = subparsers.add_parser("profiles", help="List built-in audience profiles")
+    profiles_parser.add_argument("profile_name", nargs="?", help="Optional specific profile to inspect")
+    profiles_parser.add_argument("--report-json", help="Optional path to write a JSON profiles report")
+
+    assets_parser = subparsers.add_parser("assets", help="List built-in asset collections")
+    assets_parser.add_argument("collection_name", nargs="?", help="Optional specific collection to inspect")
+    assets_parser.add_argument("--report-json", help="Optional path to write a JSON asset-library report")
+
     validate_parser = subparsers.add_parser("validate", help="Validate JSON without rendering")
     validate_parser.add_argument("input_json", help="Path to the structured JSON input")
     validate_parser.add_argument("--asset-root", help="Base directory for resolving relative image paths")
@@ -207,6 +217,7 @@ def build_parser() -> argparse.ArgumentParser:
     template_parser.add_argument("domain", choices=list_template_domains(), help="Template domain to generate")
     template_parser.add_argument("output_json", help="Destination .json path")
     template_parser.add_argument("--theme", help="Override the default theme used by the template")
+    template_parser.add_argument("--audience-profile", help="Optional audience profile to adapt the starter deck")
 
     batch_parser = subparsers.add_parser(
         "render-batch",
@@ -448,6 +459,7 @@ def review_one(
             f"Balance heuristics flagged {result['balance_warning_count']} signal(s) across the deck"
         )
     if preview_result is not None:
+        result = augment_review_with_preview_artifacts(result, preview_result)
         print_info(
             "Preview-backed review: "
             f"source={preview_source}, backend={preview_result.get('backend_used')}, "
@@ -741,10 +753,11 @@ def generate_template(
     output_json: str | Path,
     *,
     theme_name: str | None = None,
+    audience_profile: str | None = None,
 ) -> dict[str, object]:
     output_path = validate_json_output_path(output_json)
     print_info(f"Generating template for domain: {domain}")
-    payload = build_domain_template(domain, theme_name=theme_name)
+    payload = build_domain_template(domain, theme_name=theme_name, audience_profile=audience_profile)
     write_json_payload(output_path, payload)
     print(f"[OK] Generated template: {output_path} ({len(payload['slides'])} slides)")
     return {
@@ -752,8 +765,29 @@ def generate_template(
         "domain": domain,
         "output_path": str(output_path),
         "theme": payload["presentation"]["theme"],
+        "audience_profile": audience_profile,
         "slide_count": len(payload["slides"]),
     }
+
+
+def list_profiles(profile_name: str | None = None) -> dict[str, object]:
+    if profile_name:
+        profile = get_audience_profile(profile_name)
+        print_info(f"Audience profile: {profile_name}")
+        return {"mode": "profiles", "profile": profile}
+    names = list_audience_profiles()
+    print_info(f"Available audience profiles: {', '.join(names)}")
+    return {"mode": "profiles", "profiles": [get_audience_profile(name) for name in names]}
+
+
+def list_assets(collection_name: str | None = None) -> dict[str, object]:
+    if collection_name:
+        collection = get_asset_collection(collection_name)
+        print_info(f"Asset collection: {collection_name}")
+        return {"mode": "assets", "collection": collection}
+    names = list_asset_collections()
+    print_info(f"Available asset collections: {', '.join(names)}")
+    return {"mode": "assets", "collections": [get_asset_collection(name) for name in names]}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -834,7 +868,24 @@ def main(argv: list[str] | None = None) -> int:
             return 0
 
         if args.command == "template":
-            generate_template(args.domain, args.output_json, theme_name=args.theme)
+            generate_template(
+                args.domain,
+                args.output_json,
+                theme_name=args.theme,
+                audience_profile=args.audience_profile,
+            )
+            return 0
+
+        if args.command == "profiles":
+            report = list_profiles(args.profile_name)
+            if args.report_json:
+                write_report(args.report_json, report)
+            return 0
+
+        if args.command == "assets":
+            report = list_assets(args.collection_name)
+            if args.report_json:
+                write_report(args.report_json, report)
             return 0
 
         if args.command == "render-batch":

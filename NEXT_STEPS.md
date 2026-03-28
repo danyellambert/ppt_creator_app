@@ -188,7 +188,7 @@ Mesmo com a Fase 1 concluída, ainda há uma camada importante de refinamento vi
   - [x] distribuição horizontal reutilizável para rows/columns, aplicada em `metrics`, `cards` e `table`
   - [x] composição simples de grids multi-painel aplicada em `comparison`, `two_column`, `faq` e `summary`
   - [x] primeiros helpers mais semânticos (`columns`, `panel rows`, `panel grids`) reaproveitados em múltiplos layouts
-  - [ ] expandir primitives para stacks/rows/columns semânticos de uso geral
+  - [x] expandir primitives para stacks/rows/columns semânticos de uso geral
   - [x] primeira stack vertical guiada por conteúdo aplicada em regiões narrativas mistas (`comparison`, `two_column`, `image_text`)
   - [x] expansão inicial dessas stacks/weights para `agenda`, `bullets` e `closing`
   - [x] primeira expansão adicional para `title`, `section`, `chart` e `timeline`
@@ -198,7 +198,7 @@ Mesmo com a Fase 1 concluída, ainda há uma camada importante de refinamento vi
   - [x] primeira camada de auto-fit em títulos, subtitles e caixas homogêneas críticas
   - [x] expansão inicial para layouts com maior risco de overflow (`agenda`, `metrics`, `faq`, `table`, `image_text`)
   - [x] expansão adicional para `title`, `section`, `chart` e `timeline`
-  - [ ] expandir auto-fit para todos os layouts e blocos compostos
+  - [x] expandir auto-fit para todos os layouts e blocos compostos
 - [ ] balancear melhor colunas, cards e painéis quando o conteúdo variar
   - [x] primeira camada de balanceamento adaptativo por peso de conteúdo em `metrics`, `cards`, `table`, `comparison`, `two_column`, `faq` e `summary`
   - [ ] expandir balanceamento para todos os layouts e heurísticas mais fortes
@@ -356,7 +356,7 @@ Como a qualidade percebida do deck depende muito da inspeção visual, existe um
   - [x] primeira análise de artefatos no próprio preview (edge contact / edge density)
   - [x] nova camada de sinais baseados no corpo útil do preview (safe-area intrusion, footer-boundary crowding, unsafe corner density)
   - [x] primeira camada de sinais de layout-pressure/collision aproximando regiões reais de composição por tipo de slide
-  - [ ] evoluir para detectores mais próximos de colisão/clipping real com base em preview/layout final
+  - [x] evoluir para detectores mais próximos de colisão/clipping real com base em preview/layout final
 
 Racional:
 
@@ -548,7 +548,7 @@ Se a meta for perseguir o nível “deck quase pronto sem retoque manual”, a o
 - [ ] sugestões de imagem por tipo de slide, não só por briefing geral
   - [x] primeira camada de sugestões mais granulares por slide/tipo na análise heurística de briefing
   - [x] evoluir para sugestões mais contextuais com focal point/asset style
-- [ ] biblioteca básica de assets e estilos visuais
+- [x] biblioteca básica de assets e estilos visuais
 
 ### Prioridade 5 — LLM opcional de conteúdo e revisão
 
@@ -565,7 +565,7 @@ Se a meta for perseguir o nível “deck quase pronto sem retoque manual”, a o
 - [ ] editor visual leve
 - [ ] playground local para gerar/editar/re-renderizar decks
 - [x] playground local para gerar/editar/re-renderizar decks
-- [ ] perfis de público (board, consulting, sales, product)
+- [x] perfis de público (board, consulting, sales, product)
 - [ ] integração com workflows comerciais e operacionais
 
 ---

@@ -259,6 +259,48 @@ def test_build_weighted_panel_grid_allocates_more_space_to_heavier_regions() -> 
     assert grid[1][0][3] > grid[0][0][3]
 
 
+def test_build_weighted_panel_row_content_bounds_returns_panel_and_inner_bounds() -> None:
+    renderer = PresentationRenderer(asset_root="examples")
+
+    bounds = renderer.build_weighted_panel_row_content_bounds(
+        left=1.0,
+        top=2.0,
+        width=5.0,
+        height=1.8,
+        gap=0.1,
+        weights=[1.0, 2.0],
+        min_width=1.2,
+        padding=0.2,
+    )
+
+    assert len(bounds) == 2
+    first_panel, first_content = bounds[0]
+    assert first_panel[0] == 1.0
+    assert first_content[0] == pytest.approx(first_panel[0] + 0.2)
+
+
+def test_build_panel_grid_content_bounds_returns_panel_and_inner_bounds() -> None:
+    renderer = PresentationRenderer(asset_root="examples")
+
+    grid = renderer.build_panel_grid_content_bounds(
+        left=1.0,
+        top=2.0,
+        width=4.0,
+        height=2.0,
+        column_gap=0.1,
+        row_gap=0.1,
+        column_count=2,
+        row_count=2,
+        column_min_width=1.0,
+        row_min_height=0.6,
+        padding=0.12,
+    )
+
+    assert len(grid) == 2
+    panel_bounds, content_bounds = grid[0][0]
+    assert content_bounds[0] == pytest.approx(panel_bounds[0] + 0.12)
+
+
 def test_build_panel_content_stack_bounds_uses_inner_padding() -> None:
     renderer = PresentationRenderer(asset_root="examples")
 

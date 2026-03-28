@@ -47,6 +47,7 @@ The format is inspired by Keep a Changelog, and the project aims to follow Seman
 - provider-backed post-QA review now also covers sharper executive rewrites for titles, subtitles, and summary messaging, while additional composite layouts reuse shared panel-stack helpers
 - CLI/API now support direct visual comparison between two rendered `.pptx` artifacts, helping operationalize real-artifact regression checks beyond manual baseline workflows
 - the review flow in CLI/API can now attach preview-backed QA artifacts and prefer real rendered decks when available, while the service also exposes a first local HTML playground at `/playground`
+- the project now exposes audience profiles and an initial asset-collection library, while review outputs can merge preview-final clipping/collision signals and more generic panel-content primitives now support metrics/table hardening
 - optional office-aware preview backend selection with automatic fallback to synthetic previews
 - initial layout primitive helpers for panel inner bounds and stacked vertical regions
 - initial application of layout primitives to comparison, faq, cards, and two-column slides

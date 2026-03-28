@@ -45,39 +45,75 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
         max_flex=1.25,
     )
 
-    metric_columns = renderer.build_columns(
+    metric_cards = renderer.build_weighted_panel_row_content_bounds(
         left=left,
+        top=top,
         width=total_width,
+        height=panel_height,
         gap=gap,
+        weights=metric_flexes,
         min_width=1.8,
-        regions=[
-            {"kind": f"metric_{index + 1}", "min_width": 1.8, "flex": flex}
-            for index, flex in enumerate(metric_flexes)
-        ],
+        padding=0.24,
+        kind_prefix="metric",
+        min_flex=0.95,
+        max_flex=1.25,
     )
 
-    for idx, (metric, (x, card_width)) in enumerate(zip(metrics, metric_columns, strict=True)):
-        renderer.add_panel(slide, x, top, card_width, panel_height, fill_color=colors.surface, line_color=colors.line)
-        renderer.add_accent_bar(slide, x, top, card_width, components.accent_bar_height, color=colors.navy if idx % 2 == 0 else colors.accent)
+    for idx, (metric, (panel_bounds, content_bounds)) in enumerate(zip(metrics, metric_cards, strict=True)):
+        panel_left, panel_top, panel_width, panel_height = panel_bounds
+        content_left, content_top, content_width, content_height = content_bounds
+        renderer.add_panel(
+            slide,
+            panel_left,
+            panel_top,
+            panel_width,
+            panel_height,
+            fill_color=colors.surface,
+            line_color=colors.line,
+        )
+        renderer.add_accent_bar(
+            slide,
+            panel_left,
+            panel_top,
+            panel_width,
+            components.accent_bar_height,
+            color=colors.navy if idx % 2 == 0 else colors.accent,
+        )
 
-        inner_left = x + 0.24
-        inner_width = card_width - 0.48
-
-        value_box = renderer.textbox(slide, inner_left, top + 0.30, inner_width, 0.52)
-        renderer.write_paragraph(value_box.text_frame, metric.value, size=value_size, color=colors.navy, bold=True)
-        renderer.fit_text_frame(value_box.text_frame, max_size=value_size, bold=True)
-
-        label_box = renderer.textbox(slide, inner_left, top + 0.92, inner_width, 0.34)
-        renderer.write_paragraph(label_box.text_frame, metric.label, size=label_size, color=colors.text, bold=True)
-        renderer.fit_text_frame(label_box.text_frame, max_size=label_size, bold=True)
-
-        details_top = top + 1.38
+        regions: list[dict[str, float | str]] = [
+            {"kind": "value", "height": 0.52},
+            {"kind": "label", "height": 0.34},
+        ]
         if metric.detail:
-            detail_box = renderer.textbox(slide, inner_left, details_top, inner_width, 0.38)
-            renderer.write_paragraph(detail_box.text_frame, metric.detail, size=detail_size, color=colors.muted)
-            renderer.fit_text_frame(detail_box.text_frame, max_size=detail_size)
-            details_top += 0.34
+            regions.append(
+                {
+                    "kind": "detail",
+                    "min_height": 0.28,
+                    "flex": 1.0,
+                    "content_weight": renderer.estimate_content_weight(body=metric.detail),
+                }
+            )
         if metric.trend:
-            trend_box = renderer.textbox(slide, inner_left, details_top, inner_width, 0.30)
-            renderer.write_paragraph(trend_box.text_frame, metric.trend, size=detail_size, color=colors.accent, bold=True)
-            renderer.fit_text_frame(trend_box.text_frame, max_size=detail_size, bold=True)
+            regions.append({"kind": "trend", "height": 0.30})
+
+        for region, (region_top, region_height) in renderer.build_content_stack(
+            top=content_top + 0.06,
+            height=max(0.4, content_height - 0.06),
+            regions=regions,
+            gap=0.08,
+            min_flex=0.9,
+            max_flex=1.35,
+        ):
+            box = renderer.textbox(slide, content_left, region_top, content_width, region_height)
+            if region["kind"] == "value":
+                renderer.write_paragraph(box.text_frame, metric.value, size=value_size, color=colors.navy, bold=True)
+                renderer.fit_text_frame(box.text_frame, max_size=value_size, bold=True)
+            elif region["kind"] == "label":
+                renderer.write_paragraph(box.text_frame, metric.label, size=label_size, color=colors.text, bold=True)
+                renderer.fit_text_frame(box.text_frame, max_size=label_size, bold=True)
+            elif region["kind"] == "detail":
+                renderer.write_paragraph(box.text_frame, metric.detail or "", size=detail_size, color=colors.muted)
+                renderer.fit_text_frame(box.text_frame, max_size=detail_size)
+            else:
+                renderer.write_paragraph(box.text_frame, metric.trend or "", size=detail_size, color=colors.accent, bold=True)
+                renderer.fit_text_frame(box.text_frame, max_size=detail_size, bold=True)

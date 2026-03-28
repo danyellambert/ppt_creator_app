@@ -9,13 +9,15 @@ from tempfile import TemporaryDirectory
 
 from pydantic import ValidationError
 
+from ppt_creator.assets import get_asset_collection, list_asset_collections
 from ppt_creator.preview import (
     compare_pptx_artifacts,
     render_previews,
     render_previews_for_rendered_artifact,
     render_previews_from_pptx,
 )
-from ppt_creator.qa import review_presentation
+from ppt_creator.profiles import get_audience_profile, list_audience_profiles
+from ppt_creator.qa import augment_review_with_preview_artifacts, review_presentation
 from ppt_creator.renderer import PresentationRenderer
 from ppt_creator.schema import PresentationInput
 from ppt_creator.templates import build_domain_template, list_template_domains
@@ -292,6 +294,7 @@ def review_spec_payload(
                 baseline_dir=preview_baseline_dir,
                 write_diff_images=preview_write_diff_images,
             )
+        review_result = augment_review_with_preview_artifacts(review_result, preview_result)
     return {
         **review_result,
         "preview_output_dir": str(preview_output_dir) if preview_output_dir else None,
@@ -457,6 +460,18 @@ class PptCreatorAPIHandler(BaseHTTPRequestHandler):
         if self.path == "/playground":
             self._html_response(HTTPStatus.OK, _build_playground_html())
             return
+        if self.path == "/profiles":
+            self._json_response(
+                HTTPStatus.OK,
+                {"profiles": [get_audience_profile(name) for name in list_audience_profiles()]},
+            )
+            return
+        if self.path == "/assets":
+            self._json_response(
+                HTTPStatus.OK,
+                {"collections": [get_asset_collection(name) for name in list_asset_collections()]},
+            )
+            return
         if self.path == "/templates":
             self._json_response(HTTPStatus.OK, {"domains": list_template_domains()})
             return
@@ -577,6 +592,7 @@ class PptCreatorAPIHandler(BaseHTTPRequestHandler):
                 template_payload = build_domain_template(
                     str(payload["domain"]),
                     theme_name=str(payload["theme_name"]) if payload.get("theme_name") else None,
+                    audience_profile=str(payload["audience_profile"]) if payload.get("audience_profile") else None,
                 )
                 self._json_response(HTTPStatus.OK, {"template": template_payload})
                 return

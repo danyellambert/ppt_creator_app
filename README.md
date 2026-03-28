@@ -400,12 +400,33 @@ Gerar um template inicial por domínio:
 python -m ppt_creator.cli template sales outputs/sales_template.json
 ```
 
+Você também pode adaptar o starter deck por **perfil de público**:
+
+```bash
+python -m ppt_creator.cli template sales outputs/board_sales_template.json \
+  --audience-profile board
+```
+
 Domínios disponíveis:
 
 - `sales`
 - `consulting`
 - `strategy`
 - `product`
+
+Perfis de público disponíveis:
+
+- `board`
+- `consulting`
+- `sales`
+- `product`
+
+Também já existe uma primeira **biblioteca de collections de assets** e perfis consultáveis pela CLI:
+
+```bash
+python -m ppt_creator.cli profiles
+python -m ppt_creator.cli assets
+```
 
 Gerar JSON inicial a partir de um briefing estruturado:
 
@@ -694,6 +715,8 @@ Endpoints disponíveis:
 
 - `GET /health`
 - `GET /templates`
+- `GET /profiles`
+- `GET /assets`
 - `POST /compare-pptx`
 - `POST /review`
 - `POST /preview`
@@ -940,6 +963,8 @@ Os relatórios também passam a destacar melhor onde olhar primeiro, com campos 
 - `collision_risk_count`
 - `top_risk_slides`
 - `likely_overflow_regions` por slide
+
+Quando o fluxo de review também gera preview, esses sinais agora podem ser enriquecidos por indícios do **preview final**, como crowding perto do footer, intrusão em safe areas e empacotamento agressivo nas bordas/cantos.
 
 O próximo passo mais importante continua sendo evoluir de preview sintético para preview fiel ao `.pptx` real.
 

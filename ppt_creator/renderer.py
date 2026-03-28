@@ -483,6 +483,84 @@ class PresentationRenderer:
         )
         return [(column_left, top, column_width, height) for column_left, column_width in columns]
 
+    def build_panel_row_content_bounds(
+        self,
+        *,
+        left: float,
+        top: float,
+        width: float,
+        height: float,
+        gap: float,
+        count: int | None = None,
+        min_width: float = 0.0,
+        regions: list[dict[str, float | str]] | None = None,
+        padding: float | None = None,
+    ) -> list[tuple[tuple[float, float, float, float], tuple[float, float, float, float]]]:
+        panel_bounds = self.build_panel_row_bounds(
+            left=left,
+            top=top,
+            width=width,
+            height=height,
+            gap=gap,
+            count=count,
+            min_width=min_width,
+            regions=regions,
+        )
+        return [
+            (
+                bounds,
+                self.panel_inner_bounds(
+                    left=bounds[0],
+                    top=bounds[1],
+                    width=bounds[2],
+                    height=bounds[3],
+                    padding=padding,
+                ),
+            )
+            for bounds in panel_bounds
+        ]
+
+    def build_weighted_panel_row_content_bounds(
+        self,
+        *,
+        left: float,
+        top: float,
+        width: float,
+        height: float,
+        gap: float,
+        weights: list[float],
+        min_width: float = 0.0,
+        padding: float | None = None,
+        min_flex: float = 0.9,
+        max_flex: float = 1.35,
+        kind_prefix: str = "panel",
+    ) -> list[tuple[tuple[float, float, float, float], tuple[float, float, float, float]]]:
+        panel_bounds = self.build_weighted_panel_row_bounds(
+            left=left,
+            top=top,
+            width=width,
+            height=height,
+            gap=gap,
+            weights=weights,
+            min_width=min_width,
+            min_flex=min_flex,
+            max_flex=max_flex,
+            kind_prefix=kind_prefix,
+        )
+        return [
+            (
+                bounds,
+                self.panel_inner_bounds(
+                    left=bounds[0],
+                    top=bounds[1],
+                    width=bounds[2],
+                    height=bounds[3],
+                    padding=padding,
+                ),
+            )
+            for bounds in panel_bounds
+        ]
+
     def build_weighted_panel_grid(
         self,
         *,
@@ -606,6 +684,54 @@ class PresentationRenderer:
             column_gap=column_gap,
             row_gap=row_gap,
         )
+
+    def build_panel_grid_content_bounds(
+        self,
+        *,
+        left: float,
+        top: float,
+        width: float,
+        height: float,
+        column_gap: float,
+        row_gap: float,
+        column_count: int | None = None,
+        row_count: int | None = None,
+        column_min_width: float = 0.0,
+        row_min_height: float = 0.0,
+        column_regions: list[dict[str, float | str]] | None = None,
+        row_regions: list[dict[str, float | str]] | None = None,
+        padding: float | None = None,
+    ) -> list[list[tuple[tuple[float, float, float, float], tuple[float, float, float, float]]]]:
+        grid = self.build_panel_grid(
+            left=left,
+            top=top,
+            width=width,
+            height=height,
+            column_gap=column_gap,
+            row_gap=row_gap,
+            column_count=column_count,
+            row_count=row_count,
+            column_min_width=column_min_width,
+            row_min_height=row_min_height,
+            column_regions=column_regions,
+            row_regions=row_regions,
+        )
+        return [
+            [
+                (
+                    bounds,
+                    self.panel_inner_bounds(
+                        left=bounds[0],
+                        top=bounds[1],
+                        width=bounds[2],
+                        height=bounds[3],
+                        padding=padding,
+                    ),
+                )
+                for bounds in row
+            ]
+            for row in grid
+        ]
 
     def estimate_content_weight(
         self,

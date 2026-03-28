@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 
+from ppt_creator.profiles import get_audience_profile
+
 DOMAIN_TEMPLATES: dict[str, dict[str, object]] = {
     "sales": {
         "presentation": {
@@ -202,12 +204,24 @@ def list_template_domains() -> list[str]:
     return sorted(DOMAIN_TEMPLATES)
 
 
-def build_domain_template(domain: str, *, theme_name: str | None = None) -> dict[str, object]:
+def build_domain_template(
+    domain: str,
+    *,
+    theme_name: str | None = None,
+    audience_profile: str | None = None,
+) -> dict[str, object]:
     normalized = domain.strip().lower().replace("-", "_")
     if normalized not in DOMAIN_TEMPLATES:
         raise ValueError(f"Unknown template domain: {domain}")
 
     payload = json.loads(json.dumps(DOMAIN_TEMPLATES[normalized]))
+    if audience_profile:
+        profile = get_audience_profile(audience_profile)
+        payload["presentation"]["footer_text"] = str(profile["footer_text"])
+        if payload["slides"] and payload["slides"][0].get("type") == "title":
+            payload["slides"][0]["eyebrow"] = str(profile["cover_eyebrow"])
+        if not theme_name:
+            payload["presentation"]["theme"] = str(profile["default_theme"])
     if theme_name:
         payload["presentation"]["theme"] = theme_name
     return payload

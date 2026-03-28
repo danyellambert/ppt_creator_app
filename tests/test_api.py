@@ -36,6 +36,14 @@ def test_api_health_and_templates_endpoints() -> None:
         assert status == 200
         assert templates_payload["domains"] == ["consulting", "product", "sales", "strategy"]
 
+        status, profiles_payload = _request_json(f"{base_url}/profiles")
+        assert status == 200
+        assert profiles_payload["profiles"]
+
+        status, assets_payload = _request_json(f"{base_url}/assets")
+        assert status == 200
+        assert assets_payload["collections"]
+
         req = request.Request(f"{base_url}/playground", method="GET")
         with request.urlopen(req, timeout=5) as response:
             html = response.read().decode("utf-8")
@@ -100,11 +108,12 @@ def test_api_validate_render_and_template_endpoints(tmp_path: Path) -> None:
 
         status, template_payload = _request_json(
             f"{base_url}/template",
-            {"domain": "sales", "theme_name": "consulting_clean"},
+            {"domain": "sales", "theme_name": "consulting_clean", "audience_profile": "board"},
             method="POST",
         )
         assert status == 200
         assert template_payload["template"]["presentation"]["theme"] == "consulting_clean"
+        assert template_payload["template"]["presentation"]["footer_text"] == "Board profile"
 
         preview_module.find_office_runtime = lambda: None
         preview_dir = tmp_path / "api_previews"

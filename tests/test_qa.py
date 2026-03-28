@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ppt_creator.qa import review_presentation
+from ppt_creator.qa import augment_review_with_preview_artifacts, review_presentation
 from ppt_creator.schema import PresentationInput
 
 
@@ -100,3 +100,44 @@ def test_review_presentation_reports_layout_pressure_for_agenda_rows() -> None:
 
     assert review["collision_risk_count"] >= 1
     assert review["slides"][0]["likely_collision_regions"]
+
+
+def test_augment_review_with_preview_artifacts_adds_final_preview_clipping_and_collision_signals() -> None:
+    spec = PresentationInput.model_validate(
+        {
+            "presentation": {"title": "Preview QA Deck", "theme": "executive_premium_minimal"},
+            "slides": [
+                {
+                    "type": "summary",
+                    "title": "Executive summary",
+                    "bullets": ["Keep the workflow tight", "Measure adoption", "Scale with discipline"],
+                }
+            ],
+        }
+    )
+
+    review = review_presentation(spec, asset_root="examples")
+    augmented = augment_review_with_preview_artifacts(
+        review,
+        {
+            "preview_artifact_review": {
+                "status": "review",
+                "slides": [
+                    {
+                        "slide_number": 1,
+                        "edge_contact": False,
+                        "safe_margin_warning": False,
+                        "body_edge_contact": True,
+                        "safe_area_intrusion": True,
+                        "footer_intrusion_warning": True,
+                        "edge_density_warning": True,
+                        "corner_density_warning": True,
+                    }
+                ],
+            }
+        },
+    )
+
+    assert augmented["clipping_risk_count"] > review["clipping_risk_count"]
+    assert augmented["collision_risk_count"] > review["collision_risk_count"]
+    assert any("final preview" in issue for issue in augmented["issues"])

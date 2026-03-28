@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from pathlib import Path
 
 from ppt_creator.renderer import PresentationRenderer
@@ -436,6 +437,192 @@ def _risk_score(slide_review: dict[str, object]) -> float:
     )
 
 
+def _recompute_slide_review(slide_review: dict[str, object]) -> dict[str, object]:
+    slide_review["severity_counts"] = _severity_counts(slide_review["issues"])
+    slide_review["score"] = _score_from_issues(slide_review["issues"])
+    if slide_review["score"] >= 90:
+        slide_review["status"] = "ok"
+    elif slide_review["score"] >= 70:
+        slide_review["status"] = "review"
+    else:
+        slide_review["status"] = "attention"
+
+    severity_counts = slide_review["severity_counts"]
+    risk_level = "low"
+    if (
+        int(slide_review["clipping_risk_count"]) >= 2
+        or int(slide_review["collision_risk_count"]) >= 2
+        or int(severity_counts["high"])
+    ):
+        risk_level = "high"
+    elif (
+        int(slide_review["overflow_risk_count"])
+        or int(slide_review["collision_risk_count"])
+        or int(slide_review["balance_warning_count"])
+    ):
+        risk_level = "medium"
+    slide_review["risk_level"] = risk_level
+    slide_review["likely_overflow_regions"] = sorted(set(slide_review["likely_overflow_regions"]))
+    slide_review["likely_collision_regions"] = sorted(set(slide_review["likely_collision_regions"]))
+    return slide_review
+
+
+def _rebuild_review_result(review: dict[str, object]) -> dict[str, object]:
+    slides = review["slides"]
+    all_issues = [
+        f"slide {slide['slide_number']:02d} ({slide['title']}): {issue['message']}"
+        for slide in slides
+        for issue in slide["issues"]
+    ]
+    average_score = int(sum(int(slide["score"]) for slide in slides) / len(slides)) if slides else 100
+    overall_status = "ok" if average_score >= 90 else "review" if average_score >= 70 else "attention"
+    severity_counts = {
+        "high": sum(int(slide["severity_counts"]["high"]) for slide in slides),
+        "medium": sum(int(slide["severity_counts"]["medium"]) for slide in slides),
+        "low": sum(int(slide["severity_counts"]["low"]) for slide in slides),
+    }
+    review.update(
+        {
+            "average_score": average_score,
+            "status": overall_status,
+            "issue_count": len(all_issues),
+            "warning_count": len(all_issues),
+            "severity_counts": severity_counts,
+            "overflow_risk_count": sum(int(slide["overflow_risk_count"]) for slide in slides),
+            "clipping_risk_count": sum(int(slide["clipping_risk_count"]) for slide in slides),
+            "collision_risk_count": sum(int(slide["collision_risk_count"]) for slide in slides),
+            "balance_warning_count": sum(int(slide["balance_warning_count"]) for slide in slides),
+            "top_risk_slides": [
+                {
+                    "slide_number": slide["slide_number"],
+                    "title": slide["title"],
+                    "risk_level": slide["risk_level"],
+                    "overflow_risk_count": slide["overflow_risk_count"],
+                    "clipping_risk_count": slide["clipping_risk_count"],
+                    "collision_risk_count": slide["collision_risk_count"],
+                    "balance_warning_count": slide["balance_warning_count"],
+                    "layout_pressure_score": slide["layout_pressure_score"],
+                }
+                for slide in sorted(slides, key=_risk_score, reverse=True)[:5]
+                if _risk_score(slide) > 0
+            ],
+            "issues": all_issues,
+            "warnings": all_issues,
+        }
+    )
+    return review
+
+
+def augment_review_with_preview_artifacts(
+    review: dict[str, object],
+    preview_result: dict[str, object] | None,
+) -> dict[str, object]:
+    artifact_review = (preview_result or {}).get("preview_artifact_review") or {}
+    artifact_slides = artifact_review.get("slides") or []
+    if not artifact_slides:
+        return review
+
+    merged = deepcopy(review)
+    slide_lookup = {int(slide["slide_number"]): slide for slide in merged.get("slides", [])}
+
+    def _append_issue(
+        slide_review: dict[str, object],
+        *,
+        severity: str,
+        message: str,
+        overflow_region: str | None = None,
+        collision_region: str | None = None,
+        clipping: int = 0,
+        collision: int = 0,
+    ) -> None:
+        if not any(issue["message"] == message for issue in slide_review["issues"]):
+            slide_review["issues"].append(_issue(severity, message))
+        slide_review["clipping_risk_count"] += clipping
+        slide_review["collision_risk_count"] += collision
+        if overflow_region:
+            slide_review["likely_overflow_regions"].append(overflow_region)
+            slide_review["overflow_risk_count"] += 1
+        if collision_region:
+            slide_review["likely_collision_regions"].append(collision_region)
+
+    for artifact_slide in artifact_slides:
+        if not isinstance(artifact_slide, dict):
+            continue
+        slide_review = slide_lookup.get(int(artifact_slide.get("slide_number") or 0))
+        if not slide_review:
+            continue
+
+        if artifact_slide.get("edge_contact"):
+            _append_issue(
+                slide_review,
+                severity="high",
+                message="final preview indicates content touching the slide edge",
+                overflow_region="preview_edge",
+                collision_region="preview_edge",
+                clipping=1,
+                collision=1,
+            )
+        elif artifact_slide.get("safe_margin_warning"):
+            _append_issue(
+                slide_review,
+                severity="low",
+                message="final preview indicates content approaching the outer slide margin",
+                overflow_region="preview_margin",
+                clipping=1,
+            )
+        if artifact_slide.get("body_edge_contact"):
+            _append_issue(
+                slide_review,
+                severity="high",
+                message="final preview indicates body content touching a boundary before the footer",
+                overflow_region="preview_body_edge",
+                collision_region="preview_body_edge",
+                clipping=1,
+                collision=1,
+            )
+        if artifact_slide.get("safe_area_intrusion"):
+            _append_issue(
+                slide_review,
+                severity="high",
+                message="final preview indicates unsafe margin intrusion",
+                overflow_region="preview_safe_area",
+                collision_region="preview_safe_area",
+                clipping=1,
+                collision=1,
+            )
+        if artifact_slide.get("footer_intrusion_warning"):
+            _append_issue(
+                slide_review,
+                severity="medium",
+                message="final preview indicates crowding near the footer boundary",
+                overflow_region="preview_footer",
+                collision_region="preview_footer",
+                clipping=1,
+                collision=1,
+            )
+        if artifact_slide.get("edge_density_warning"):
+            _append_issue(
+                slide_review,
+                severity="medium",
+                message="final preview indicates aggressive edge packing",
+                collision_region="preview_edge_density",
+                collision=1,
+            )
+        if artifact_slide.get("corner_density_warning"):
+            _append_issue(
+                slide_review,
+                severity="medium",
+                message="final preview indicates dense corner packing that may hide clipping or collisions",
+                collision_region="preview_corner_density",
+                collision=1,
+            )
+
+        _recompute_slide_review(slide_review)
+
+    merged["preview_artifact_review"] = artifact_review
+    return _rebuild_review_result(merged)
+
+
 def _review_slide(
     slide: Slide,
     *,
@@ -682,54 +869,13 @@ def review_presentation(
             )
         )
 
-    all_issues = [
-        f"slide {slide['slide_number']:02d} ({slide['title']}): {issue['message']}"
-        for slide in slides
-        for issue in slide["issues"]
-    ]
-    average_score = int(sum(slide["score"] for slide in slides) / len(slides)) if slides else 100
-    overall_status = "ok" if average_score >= 90 else "review" if average_score >= 70 else "attention"
-    severity_counts = {
-        "high": sum(int(slide["severity_counts"]["high"]) for slide in slides),
-        "medium": sum(int(slide["severity_counts"]["medium"]) for slide in slides),
-        "low": sum(int(slide["severity_counts"]["low"]) for slide in slides),
-    }
-    overflow_risk_count = sum(int(slide["overflow_risk_count"]) for slide in slides)
-    clipping_risk_count = sum(int(slide["clipping_risk_count"]) for slide in slides)
-    collision_risk_count = sum(int(slide["collision_risk_count"]) for slide in slides)
-    balance_warning_count = sum(int(slide["balance_warning_count"]) for slide in slides)
-    top_risk_slides = [
+    return _rebuild_review_result(
         {
-            "slide_number": slide["slide_number"],
-            "title": slide["title"],
-            "risk_level": slide["risk_level"],
-            "overflow_risk_count": slide["overflow_risk_count"],
-            "clipping_risk_count": slide["clipping_risk_count"],
-            "collision_risk_count": slide["collision_risk_count"],
-            "balance_warning_count": slide["balance_warning_count"],
-            "layout_pressure_score": slide["layout_pressure_score"],
-        }
-        for slide in sorted(slides, key=_risk_score, reverse=True)[:5]
-        if _risk_score(slide) > 0
-    ]
-
-    return {
         "mode": "review",
         "presentation_title": spec.presentation.title,
         "theme": spec.presentation.theme,
         "slide_count": len(spec.slides),
-        "average_score": average_score,
-        "status": overall_status,
-        "issue_count": len(all_issues),
-        "warning_count": len(all_issues),
-        "severity_counts": severity_counts,
-        "overflow_risk_count": overflow_risk_count,
-        "clipping_risk_count": clipping_risk_count,
-        "collision_risk_count": collision_risk_count,
-        "balance_warning_count": balance_warning_count,
-        "top_risk_slides": top_risk_slides,
-        "issues": all_issues,
-        "warnings": all_issues,
         "slides": slides,
         "missing_assets": missing_assets,
-    }
+        }
+    )

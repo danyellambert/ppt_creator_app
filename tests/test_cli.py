@@ -282,6 +282,28 @@ def test_cli_template_accepts_theme_override(tmp_path: Path) -> None:
     assert spec.presentation.theme == "consulting_clean"
 
 
+def test_cli_template_accepts_audience_profile(tmp_path: Path) -> None:
+    output = tmp_path / "board_template.json"
+    result = main(["template", "sales", str(output), "--audience-profile", "board"])
+
+    assert result == 0
+    spec = PresentationInput.from_path(output)
+    assert spec.presentation.footer_text == "Board profile"
+
+
+def test_cli_profiles_and_assets_commands_emit_reports(tmp_path: Path) -> None:
+    profiles_report = tmp_path / "profiles.json"
+    assets_report = tmp_path / "assets.json"
+
+    assert main(["profiles", "--report-json", str(profiles_report)]) == 0
+    assert main(["assets", "--report-json", str(assets_report)]) == 0
+
+    profiles_payload = json.loads(profiles_report.read_text(encoding="utf-8"))
+    assets_payload = json.loads(assets_report.read_text(encoding="utf-8"))
+    assert profiles_payload["profiles"]
+    assert assets_payload["collections"]
+
+
 def test_cli_preview_generates_pngs_and_thumbnail_sheet(tmp_path: Path, capsys) -> None:
     output_dir = tmp_path / "preview_output"
     report_path = tmp_path / "preview_report.json"
