@@ -341,6 +341,7 @@ Como a qualidade percebida do deck depende muito da inspeção visual, existe um
 - [x] preparar seleção de backend com tentativa de preview via runtime Office e fallback limpo para o sintético
 - [ ] gerar preview a partir do `.pptx` real em vez de uma reconstrução paralela em Pillow
   - [x] primeiro fluxo explícito de preview a partir de `.pptx` real via CLI/API
+  - [x] fallback mais robusto quando o Office não exporta um PNG por slide diretamente (`.pptx` -> `.pdf` -> PNG por página)
   - [ ] evoluir para usar isso como caminho preferencial em mais cenários de QA/regressão
 - [ ] adicionar regressão visual baseada em previews reais/golden files
   - [x] primeira camada de comparação contra golden previews com diffs opcionais

@@ -37,6 +37,10 @@ def find_office_runtime() -> str | None:
     return None
 
 
+def find_ghostscript_runtime() -> str | None:
+    return shutil.which("gs")
+
+
 def _rgb_tuple(hex_value: str) -> tuple[int, int, int]:
     normalized = hex_value.replace("#", "")
     return tuple(int(normalized[i : i + 2], 16) for i in (0, 2, 4))
@@ -156,6 +160,102 @@ class PreviewRenderer:
         self.write_diff_images = write_diff_images
         self.theme = get_theme(theme_name, primary_color=primary_color, secondary_color=secondary_color)
 
+    def _run_office_convert(
+        self,
+        runtime: str,
+        *,
+        source_path: Path,
+        outdir: Path,
+        target_format: str,
+    ) -> subprocess.CompletedProcess[str]:
+        command = [
+            runtime,
+            "--headless",
+            "--convert-to",
+            target_format,
+            "--outdir",
+            str(outdir),
+            str(source_path),
+        ]
+        completed = subprocess.run(command, capture_output=True, text=True, check=False)
+        if completed.returncode != 0:
+            stderr = (completed.stderr or completed.stdout or "").strip()
+            raise RuntimeError(stderr or f"office conversion failed with exit code {completed.returncode}")
+        return completed
+
+    def _rasterize_pdf_with_ghostscript(
+        self,
+        pdf_path: Path,
+        outdir: Path,
+        *,
+        basename: str,
+        expected_count: int,
+    ) -> list[Path]:
+        runtime = find_ghostscript_runtime()
+        if not runtime:
+            raise RuntimeError(
+                "office conversion produced a single export and Ghostscript ('gs') is not available for PDF-to-PNG page rasterization"
+            )
+
+        output_pattern = outdir / f"{basename}-%02d.png"
+        completed = subprocess.run(
+            [
+                runtime,
+                "-dSAFER",
+                "-dBATCH",
+                "-dNOPAUSE",
+                "-sDEVICE=png16m",
+                "-r160",
+                f"-sOutputFile={output_pattern}",
+                str(pdf_path),
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if completed.returncode != 0:
+            stderr = (completed.stderr or completed.stdout or "").strip()
+            raise RuntimeError(stderr or f"ghostscript rasterization failed with exit code {completed.returncode}")
+
+        rasterized = sorted(path for path in outdir.glob(f"{basename}-*.png") if path.is_file())
+        if len(rasterized) != expected_count:
+            raise RuntimeError(
+                f"ghostscript rasterization produced {len(rasterized)} PNG(s) for {expected_count} slide(s)"
+            )
+        return rasterized
+
+    def _convert_pptx_to_png_paths(
+        self,
+        *,
+        runtime: str,
+        pptx_path: Path,
+        outdir: Path,
+        basename: str,
+        expected_count: int,
+    ) -> tuple[list[Path], str]:
+        self._run_office_convert(runtime, source_path=pptx_path, outdir=outdir, target_format="png")
+        direct_pngs = sorted(path for path in outdir.glob("*.png") if path.is_file())
+        if len(direct_pngs) == expected_count:
+            return direct_pngs, "direct_png"
+
+        for path in direct_pngs:
+            path.unlink(missing_ok=True)
+
+        self._run_office_convert(runtime, source_path=pptx_path, outdir=outdir, target_format="pdf")
+        pdf_candidates = sorted(path for path in outdir.glob("*.pdf") if path.is_file())
+        if not pdf_candidates:
+            raise RuntimeError(
+                f"office conversion produced {len(direct_pngs)} PNG(s) for {expected_count} slide(s) and did not produce an intermediate PDF fallback"
+            )
+
+        rasterized = self._rasterize_pdf_with_ghostscript(
+            pdf_candidates[0],
+            outdir,
+            basename=basename,
+            expected_count=expected_count,
+        )
+        return rasterized, "pdf_via_ghostscript"
+
     def render(self, spec: PresentationInput, output_dir: str | Path, *, basename: str | None = None) -> dict[str, object]:
         self.theme = get_theme(
             self.requested_theme_name or spec.presentation.theme,
@@ -168,15 +268,16 @@ class PreviewRenderer:
         runtime = find_office_runtime() if self.backend in {"auto", "office"} else None
         backend_used = "synthetic"
         fallback_reason: str | None = None
+        office_conversion_strategy: str | None = None
 
         if self.backend == "office":
             if not runtime:
                 raise RuntimeError("Office preview backend requested but no 'soffice' or 'libreoffice' executable was found")
-            preview_paths = self.render_office_previews(spec, destination, base, runtime=runtime)
+            preview_paths, office_conversion_strategy = self.render_office_previews(spec, destination, base, runtime=runtime)
             backend_used = "office"
         elif self.backend == "auto" and runtime:
             try:
-                preview_paths = self.render_office_previews(spec, destination, base, runtime=runtime)
+                preview_paths, office_conversion_strategy = self.render_office_previews(spec, destination, base, runtime=runtime)
                 backend_used = "office"
             except Exception as exc:  # noqa: BLE001
                 fallback_reason = f"Office preview unavailable, falling back to synthetic preview: {exc}"
@@ -219,6 +320,7 @@ class PreviewRenderer:
             "backend_used": backend_used,
             "backend_fallback_reason": fallback_reason,
             "office_runtime": runtime,
+            "office_conversion_strategy": office_conversion_strategy,
         }
 
     def render_synthetic_previews(
@@ -243,7 +345,7 @@ class PreviewRenderer:
         base: str,
         *,
         runtime: str,
-    ) -> list[str]:
+    ) -> tuple[list[str], str]:
         with TemporaryDirectory(prefix="ppt_creator_preview_") as tmpdir:
             temp_root = Path(tmpdir)
             pptx_path = temp_root / f"{base}.pptx"
@@ -255,36 +357,20 @@ class PreviewRenderer:
             )
             renderer.render(spec, pptx_path)
 
-            command = [
-                runtime,
-                "--headless",
-                "--convert-to",
-                "png",
-                "--outdir",
-                str(temp_root),
-                str(pptx_path),
-            ]
-            completed = subprocess.run(command, capture_output=True, text=True, check=False)
-            if completed.returncode != 0:
-                stderr = (completed.stderr or completed.stdout or "").strip()
-                raise RuntimeError(stderr or f"office conversion failed with exit code {completed.returncode}")
-
-            converted_pngs = sorted(
-                path for path in temp_root.glob("*.png") if path.name != f"{base}-thumbnails.png"
+            converted_pngs, strategy = self._convert_pptx_to_png_paths(
+                runtime=runtime,
+                pptx_path=pptx_path,
+                outdir=temp_root,
+                basename=base,
+                expected_count=len(spec.slides),
             )
-            if not converted_pngs:
-                raise RuntimeError("office conversion did not produce PNG previews")
-            if len(converted_pngs) != len(spec.slides):
-                raise RuntimeError(
-                    f"office conversion produced {len(converted_pngs)} PNG(s) for {len(spec.slides)} slide(s)"
-                )
 
             preview_paths: list[str] = []
             for index, source_path in enumerate(converted_pngs, start=1):
                 target_path = destination / f"{base}-{index:02d}.png"
                 shutil.copy2(source_path, target_path)
                 preview_paths.append(str(target_path))
-            return preview_paths
+            return preview_paths, strategy
 
     def render_pptx_previews(
         self,
@@ -307,33 +393,20 @@ class PreviewRenderer:
         destination.mkdir(parents=True, exist_ok=True)
         base = basename or _safe_basename(input_path.stem)
         expected_slide_count = len(Presentation(str(input_path)).slides)
+        office_conversion_strategy: str | None = None
 
         with TemporaryDirectory(prefix="ppt_creator_preview_pptx_") as tmpdir:
             temp_root = Path(tmpdir)
             temp_pptx = temp_root / f"{base}.pptx"
             shutil.copy2(input_path, temp_pptx)
 
-            command = [
-                runtime,
-                "--headless",
-                "--convert-to",
-                "png",
-                "--outdir",
-                str(temp_root),
-                str(temp_pptx),
-            ]
-            completed = subprocess.run(command, capture_output=True, text=True, check=False)
-            if completed.returncode != 0:
-                stderr = (completed.stderr or completed.stdout or "").strip()
-                raise RuntimeError(stderr or f"office conversion failed with exit code {completed.returncode}")
-
-            converted_pngs = sorted(path for path in temp_root.glob("*.png"))
-            if not converted_pngs:
-                raise RuntimeError("office conversion did not produce PNG previews from the PPTX input")
-            if len(converted_pngs) != expected_slide_count:
-                raise RuntimeError(
-                    f"office conversion produced {len(converted_pngs)} PNG(s) for {expected_slide_count} slide(s)"
-                )
+            converted_pngs, office_conversion_strategy = self._convert_pptx_to_png_paths(
+                runtime=runtime,
+                pptx_path=temp_pptx,
+                outdir=temp_root,
+                basename=base,
+                expected_count=expected_slide_count,
+            )
 
             preview_paths: list[str] = []
             for index, source_path in enumerate(converted_pngs, start=1):
@@ -366,6 +439,7 @@ class PreviewRenderer:
             "backend_used": "office",
             "backend_fallback_reason": None,
             "office_runtime": runtime,
+            "office_conversion_strategy": office_conversion_strategy,
         }
 
     def render_slide(self, meta: PresentationMeta, slide_spec: Slide, index: int, total_slides: int) -> Image.Image:

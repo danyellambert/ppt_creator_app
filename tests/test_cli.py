@@ -344,3 +344,58 @@ def test_cli_preview_pptx_generates_pngs_via_office_backend_mock(tmp_path: Path,
     assert payload["preview_count"] == 10
     assert payload["backend_used"] == "office"
     assert payload["preview_artifact_review"]["status"] in {"ok", "review"}
+
+
+def test_cli_preview_pptx_falls_back_to_pdf_rasterization_when_office_exports_single_png(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    from ppt_creator import preview as preview_module
+
+    pptx_path = tmp_path / "source_deck_pdf_fallback.pptx"
+    output_dir = tmp_path / "pptx_preview_pdf_fallback_output"
+    report_path = tmp_path / "pptx_preview_pdf_fallback_report.json"
+
+    spec = PresentationInput.from_path("examples/ai_sales.json")
+    PresentationRenderer(asset_root="examples").render(spec, pptx_path)
+
+    def _fake_run(command, capture_output, text, check):
+        outdir = Path(command[command.index("--outdir") + 1]) if "--outdir" in command else tmp_path
+        outdir.mkdir(parents=True, exist_ok=True)
+        if command[0] == "/usr/bin/soffice" and "png" in command:
+            Image.new("RGB", (1280, 720), (245, 245, 245)).save(outdir / "single.png")
+        elif command[0] == "/usr/bin/soffice" and "pdf" in command:
+            (outdir / "source_deck_pdf_fallback.pdf").write_bytes(b"%PDF-1.4 mock")
+        elif command[0] == "/usr/bin/gs":
+            slide_count = len(PptxPresentation(str(pptx_path)).slides)
+            pattern = next(argument.split("=", 1)[1] for argument in command if argument.startswith("-sOutputFile="))
+            for index in range(1, slide_count + 1):
+                target = Path(pattern.replace("%02d", f"{index:02d}"))
+                Image.new("RGB", (1280, 720), (245, 245, 245)).save(target)
+
+        class _Completed:
+            returncode = 0
+            stdout = ""
+            stderr = ""
+
+        return _Completed()
+
+    monkeypatch.setattr(preview_module, "find_office_runtime", lambda: "/usr/bin/soffice")
+    monkeypatch.setattr(preview_module, "find_ghostscript_runtime", lambda: "/usr/bin/gs")
+    monkeypatch.setattr(preview_module.subprocess, "run", _fake_run)
+
+    result = main(
+        [
+            "preview-pptx",
+            str(pptx_path),
+            str(output_dir),
+            "--report-json",
+            str(report_path),
+        ]
+    )
+
+    assert result == 0
+    payload = json.loads(report_path.read_text(encoding="utf-8"))
+    assert payload["preview_count"] == 10
+    assert payload["backend_used"] == "office"
+    assert payload["office_conversion_strategy"] == "pdf_via_ghostscript"

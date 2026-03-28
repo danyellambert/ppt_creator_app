@@ -100,6 +100,7 @@ def test_api_validate_render_and_template_endpoints(tmp_path: Path) -> None:
         assert status == 200
         assert template_payload["template"]["presentation"]["theme"] == "consulting_clean"
 
+        preview_module.find_office_runtime = lambda: None
         preview_dir = tmp_path / "api_previews"
         status, preview_payload = _request_json(
             f"{base_url}/preview",
@@ -185,6 +186,62 @@ def test_api_validate_render_and_template_endpoints(tmp_path: Path) -> None:
         assert pptx_preview_payload["result"]["mode"] == "preview-pptx"
         assert pptx_preview_payload["result"]["preview_count"] == len(spec_payload["slides"])
         assert pptx_preview_payload["result"]["backend_used"] == "office"
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
+def test_api_preview_pptx_falls_back_to_pdf_rasterization_when_needed(tmp_path: Path) -> None:
+    from ppt_creator import preview as preview_module
+
+    server = build_api_server("127.0.0.1", 0, asset_root="examples")
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    try:
+        base_url = f"http://127.0.0.1:{server.server_address[1]}"
+        spec_payload = PresentationInput.from_path("examples/ai_sales.json").model_dump(mode="json")
+        pptx_path = tmp_path / "api_preview_pdf_fallback_source.pptx"
+        PresentationRenderer(asset_root="examples").render(PresentationInput.model_validate(spec_payload), pptx_path)
+
+        def _fake_run(command, capture_output, text, check):
+            outdir = Path(command[command.index("--outdir") + 1]) if "--outdir" in command else tmp_path
+            outdir.mkdir(parents=True, exist_ok=True)
+            if command[0] == "/usr/bin/soffice" and "png" in command:
+                Image.new("RGB", (1280, 720), (245, 245, 245)).save(outdir / "single.png")
+            elif command[0] == "/usr/bin/soffice" and "pdf" in command:
+                (outdir / "api_preview_pdf_fallback_source.pdf").write_bytes(b"%PDF-1.4 mock")
+            elif command[0] == "/usr/bin/gs":
+                slide_count = len(PptxPresentation(str(pptx_path)).slides)
+                pattern = next(argument.split("=", 1)[1] for argument in command if argument.startswith("-sOutputFile="))
+                for index in range(1, slide_count + 1):
+                    target = Path(pattern.replace("%02d", f"{index:02d}"))
+                    Image.new("RGB", (1280, 720), (245, 245, 245)).save(target)
+
+            class _Completed:
+                returncode = 0
+                stdout = ""
+                stderr = ""
+
+            return _Completed()
+
+        preview_module.find_office_runtime = lambda: "/usr/bin/soffice"
+        preview_module.find_ghostscript_runtime = lambda: "/usr/bin/gs"
+        preview_module.subprocess.run = _fake_run
+
+        pptx_preview_dir = tmp_path / "api_preview_pdf_fallback_output"
+        status, pptx_preview_payload = _request_json(
+            f"{base_url}/preview-pptx",
+            {
+                "input_pptx": str(pptx_path),
+                "output_dir": str(pptx_preview_dir),
+            },
+            method="POST",
+        )
+        assert status == 200
+        assert pptx_preview_payload["result"]["preview_count"] == len(spec_payload["slides"])
+        assert pptx_preview_payload["result"]["office_conversion_strategy"] == "pdf_via_ghostscript"
     finally:
         server.shutdown()
         server.server_close()

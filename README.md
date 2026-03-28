@@ -618,6 +618,13 @@ python -m ppt_creator.cli preview-pptx outputs/ai_sales.pptx outputs/ai_sales_re
 
 Esse fluxo ajuda a aproximar ainda mais a inspeção visual do artefato final gerado.
 
+Quando o LibreOffice exporta apenas um PNG único na conversão direta do `.pptx`, o projeto agora tenta automaticamente um caminho mais robusto:
+
+- `.pptx` -> `.pdf` via LibreOffice
+- `.pdf` -> um PNG por página via Ghostscript (`gs`)
+
+Isso melhora bastante a confiabilidade do preview real em ambientes onde a exportação direta para PNG não sai slide a slide.
+
 ## Modo API / serviço
 
 Também existe um modo HTTP simples para integrar o `ppt_creator` em outros fluxos:
