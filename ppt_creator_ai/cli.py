@@ -7,7 +7,7 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from ppt_creator.preview import render_previews
+from ppt_creator.preview import render_previews, render_previews_from_pptx
 from ppt_creator.qa import review_presentation
 from ppt_creator.renderer import PresentationRenderer
 from ppt_creator.schema import PresentationInput
@@ -72,6 +72,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--preview-write-diff-images",
         action="store_true",
         help="Write diff images when preview regression is enabled",
+    )
+    generate_parser.add_argument(
+        "--preview-from-rendered-pptx",
+        action="store_true",
+        help="When rendering a PPTX in the same run, derive previews from the final rendered .pptx instead of the intermediate JSON/spec path",
     )
     generate_parser.add_argument(
         "--auto-regenerate",
@@ -146,6 +151,7 @@ def generate_from_briefing(
     preview_backend: str = "auto",
     preview_baseline_dir: str | Path | None = None,
     preview_write_diff_images: bool = False,
+    preview_from_rendered_pptx: bool = False,
     auto_regenerate: bool = False,
     regenerate_passes: int = 1,
     auto_refine: bool = False,
@@ -294,21 +300,36 @@ def generate_from_briefing(
         print_info(f"Rendered PPTX from generated deck: {rendered_output}")
     if preview_dir:
         preview_output_dir = Path(preview_dir)
-        preview_result = render_previews(
-            spec,
-            preview_output_dir,
-            theme_name=spec.presentation.theme,
-            asset_root=resolved_asset_root,
-            basename=output_path.stem,
-            backend=preview_backend,
-            baseline_dir=preview_baseline_dir,
-            write_diff_images=preview_write_diff_images,
-        )
+        if preview_from_rendered_pptx:
+            if not rendered_pptx_path:
+                raise ValueError("--preview-from-rendered-pptx requires --render-pptx in the same command")
+            preview_result = render_previews_from_pptx(
+                rendered_pptx_path,
+                preview_output_dir,
+                theme_name=spec.presentation.theme,
+                basename=output_path.stem,
+                baseline_dir=preview_baseline_dir,
+                write_diff_images=preview_write_diff_images,
+            )
+        else:
+            preview_result = render_previews(
+                spec,
+                preview_output_dir,
+                theme_name=spec.presentation.theme,
+                asset_root=resolved_asset_root,
+                basename=output_path.stem,
+                backend=preview_backend,
+                baseline_dir=preview_baseline_dir,
+                write_diff_images=preview_write_diff_images,
+            )
         preview_path = str(preview_output_dir)
         print_info(f"Generated previews from generated deck: {preview_output_dir}")
         if preview_report_json:
             write_json(preview_report_json, preview_result)
     print(f"[OK] Generated deck JSON: {output_path} ({len(payload['slides'])} slides)")
+    preview_quality_review = preview_result.get("quality_review") if preview_result else None
+    preview_artifact_review = preview_result.get("preview_artifact_review") if preview_result else None
+    preview_visual_regression = preview_result.get("visual_regression") if preview_result else None
     return {
         "mode": "briefing-generate",
         "provider": provider.name,
@@ -322,6 +343,7 @@ def generate_from_briefing(
         "render_output_pptx": rendered_pptx_path,
         "preview_output_dir": preview_path,
         "preview_report_json": str(preview_report_json) if preview_report_json else None,
+        "preview_from_rendered_pptx": preview_from_rendered_pptx,
         "auto_regenerate_enabled": auto_regenerate,
         "auto_regenerate_applied": regenerate_applied,
         "regenerate_passes_requested": regenerate_passes if auto_regenerate else 0,
@@ -337,9 +359,9 @@ def generate_from_briefing(
         "generated_deck_review_status": deck_review["status"],
         "generated_deck_issue_count": deck_review["issue_count"],
         "slide_critique_count": len(slide_critiques),
-        "preview_quality_review_status": preview_result["quality_review"]["status"] if preview_result else None,
-        "preview_artifact_review_status": preview_result["preview_artifact_review"]["status"] if preview_result else None,
-        "preview_regression_status": preview_result["visual_regression"]["status"] if preview_result and preview_result["visual_regression"] else None,
+        "preview_quality_review_status": preview_quality_review["status"] if preview_quality_review else None,
+        "preview_artifact_review_status": preview_artifact_review["status"] if preview_artifact_review else None,
+        "preview_regression_status": preview_visual_regression["status"] if preview_visual_regression else None,
     }
 
 
@@ -376,6 +398,7 @@ def main(argv: list[str] | None = None) -> int:
             preview_backend=args.preview_backend,
             preview_baseline_dir=args.preview_baseline_dir,
             preview_write_diff_images=args.preview_write_diff_images,
+            preview_from_rendered_pptx=args.preview_from_rendered_pptx,
             auto_regenerate=args.auto_regenerate,
             regenerate_passes=args.regenerate_passes,
             auto_refine=args.auto_refine,

@@ -454,6 +454,15 @@ Isso aproxima ainda mais o ciclo de:
 - preview visual
 - render final
 
+Se você quiser que esse preview venha do **`.pptx` final renderizado**, em vez do caminho baseado no JSON/spec, já existe um fluxo explícito para isso no pipeline opcional:
+
+```bash
+python -m ppt_creator_ai.cli generate examples/briefing_sales.json outputs/briefing_sales_deck.json \
+  --render-pptx outputs/briefing_sales_deck.pptx \
+  --preview-dir outputs/briefing_sales_real_previews \
+  --preview-from-rendered-pptx
+```
+
 Você também pode listar os providers disponíveis da camada opcional:
 
 ```bash

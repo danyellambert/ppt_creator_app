@@ -352,6 +352,77 @@ def test_ai_cli_can_generate_previews_for_generated_deck(tmp_path: Path) -> None
     assert generation_payload["preview_output_dir"] == str(preview_dir)
 
 
+def test_ai_cli_can_generate_previews_from_rendered_pptx(tmp_path: Path, monkeypatch) -> None:
+    from ppt_creator_ai import cli as ai_cli_module
+
+    output_json = tmp_path / "generated_deck.json"
+    output_pptx = tmp_path / "generated_deck.pptx"
+    preview_dir = tmp_path / "generated_real_previews"
+    report_path = tmp_path / "generated_real_preview_report.json"
+
+    captured: dict[str, object] = {}
+
+    def _fake_preview_from_pptx(input_pptx, output_dir, **kwargs):
+        captured["input_pptx"] = str(input_pptx)
+        captured["output_dir"] = str(output_dir)
+        Path(output_dir).mkdir(parents=True, exist_ok=True)
+        return {
+            "mode": "preview-pptx",
+            "preview_count": 8,
+            "previews": [],
+            "thumbnail_sheet": str(Path(output_dir) / "thumbs.png"),
+            "quality_review": None,
+            "preview_artifact_review": {"status": "ok"},
+            "visual_regression": None,
+            "backend_requested": "office",
+            "backend_used": "office",
+            "office_conversion_strategy": "pdf_via_ghostscript",
+        }
+
+    monkeypatch.setattr(ai_cli_module, "render_previews_from_pptx", _fake_preview_from_pptx)
+
+    result = main(
+        [
+            "generate",
+            "examples/briefing_sales.json",
+            str(output_json),
+            "--render-pptx",
+            str(output_pptx),
+            "--preview-dir",
+            str(preview_dir),
+            "--preview-from-rendered-pptx",
+            "--preview-report-json",
+            str(report_path),
+        ]
+    )
+
+    assert result == 0
+    assert captured["input_pptx"] == str(output_pptx)
+    assert captured["output_dir"] == str(preview_dir)
+    payload = json.loads(report_path.read_text(encoding="utf-8"))
+    assert payload["mode"] == "preview-pptx"
+
+
+def test_ai_cli_rejects_preview_from_rendered_pptx_without_render_flag(tmp_path: Path, capsys) -> None:
+    output_json = tmp_path / "generated_deck.json"
+    preview_dir = tmp_path / "generated_real_previews"
+
+    result = main(
+        [
+            "generate",
+            "examples/briefing_sales.json",
+            str(output_json),
+            "--preview-dir",
+            str(preview_dir),
+            "--preview-from-rendered-pptx",
+        ]
+    )
+    captured = capsys.readouterr()
+
+    assert result == 2
+    assert "requires --render-pptx" in captured.err
+
+
 def test_ai_cli_can_use_local_provider_when_mocked(tmp_path: Path, monkeypatch) -> None:
     output = tmp_path / "generated_local_deck.json"
     provider = get_provider("pptagent_local")
