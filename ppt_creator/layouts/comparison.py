@@ -20,30 +20,26 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
     gap = 0.42
     top = 2.45
     height = 3.25
-    column_flexes = renderer.normalize_content_flexes(
-        [
-            renderer.estimate_content_weight(
-                title=column.title,
-                body=column.body,
-                bullets=column.bullets,
-                footer=column.footer,
-                tag=column.tag,
-            )
-            for column in slide_spec.comparison_columns
-        ],
-        min_flex=0.95,
-        max_flex=1.2,
-    )
-    panel_bounds = renderer.build_panel_row_bounds(
+    panel_bounds = renderer.build_constrained_panel_row_bounds(
         left=g.content_left,
         top=top,
         width=g.content_width,
         height=height,
         gap=gap,
-        min_width=3.6,
         regions=[
-            {"kind": f"comparison_{index + 1}", "min_width": 3.6, "flex": flex}
-            for index, flex in enumerate(column_flexes)
+            {
+                "kind": f"comparison_{index + 1}",
+                "min_width": 3.6,
+                "target_share": renderer.estimate_content_weight(
+                    title=column.title,
+                    body=column.body,
+                    bullets=column.bullets,
+                    footer=column.footer,
+                    tag=column.tag,
+                ),
+                "max_width": 4.9,
+            }
+            for index, column in enumerate(slide_spec.comparison_columns)
         ],
     )
 
@@ -96,7 +92,7 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
         if column.footer:
             regions.append({"kind": "footer", "height": 0.22})
 
-        for region, (content_left, region_top, content_width, region_height) in renderer.build_panel_content_stack_bounds(
+        for region, (content_left, region_top, content_width, region_height) in renderer.build_constrained_panel_content_stack_bounds(
             left=left,
             top=panel_top,
             width=panel_width,
@@ -104,8 +100,6 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
             regions=regions,
             gap=0.06,
             padding=0.28,
-            min_flex=0.9,
-            max_flex=1.35,
         ):
             kind = region["kind"]
             if kind == "tag":

@@ -379,6 +379,35 @@ def test_build_constrained_panel_content_stack_bounds_uses_target_share_and_padd
     assert regions[0][1][3] <= 0.8
 
 
+def test_build_constrained_panel_grid_content_bounds_returns_matrix_with_inner_bounds() -> None:
+    renderer = PresentationRenderer(asset_root="examples")
+
+    grid = renderer.build_constrained_panel_grid_content_bounds(
+        left=1.0,
+        top=2.0,
+        width=5.2,
+        height=3.0,
+        column_gap=0.1,
+        row_gap=0.2,
+        column_regions=[
+            {"kind": "left", "min_width": 1.4, "target_share": 1.0, "max_width": 1.8},
+            {"kind": "right", "min_width": 1.8, "target_share": 2.0},
+        ],
+        row_regions=[
+            {"kind": "top", "min_height": 0.8, "target_share": 1.0, "max_height": 1.0},
+            {"kind": "bottom", "min_height": 1.0, "target_share": 2.0},
+        ],
+        padding=0.15,
+    )
+
+    assert len(grid) == 2
+    assert len(grid[0]) == 2
+    first_panel, first_content = grid[0][0]
+    assert first_content[0] == pytest.approx(first_panel[0] + 0.15)
+    assert first_content[1] == pytest.approx(first_panel[1] + 0.15)
+    assert first_panel[2] <= 1.8
+
+
 def test_estimate_content_weight_increases_with_more_content() -> None:
     renderer = PresentationRenderer(asset_root="examples")
 

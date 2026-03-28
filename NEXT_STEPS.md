@@ -202,6 +202,7 @@ Mesmo com a Fase 1 concluída, ainda há uma camada importante de refinamento vi
   - [x] expandir auto-fit para todos os layouts e blocos compostos
 - [ ] balancear melhor colunas, cards e painéis quando o conteúdo variar
   - [x] primeira camada de balanceamento adaptativo por peso de conteúdo em `metrics`, `cards`, `table`, `comparison`, `two_column`, `faq` e `summary`
+  - [x] avanço adicional com panel-grids/rows constrained em `metrics`, `comparison`, `faq` e `summary`
   - [ ] expandir balanceamento para todos os layouts e heurísticas mais fortes
 - [ ] formalizar baseline vertical e anchors consistentes por tipo de slide
 - [ ] revisar visualmente, slide a slide, os layouts `title`, `metrics`, `comparison`, `table`, `faq`, `summary` e `closing`
@@ -520,6 +521,7 @@ Se a meta for perseguir o nível “deck quase pronto sem retoque manual”, a o
   - [ ] consolidar primitives reutilizáveis de mais alto nível
   - [x] primeira consolidação prática com constrained columns/rows e uso real em capas, seções, charts e timelines
   - [x] primeira expansão com helpers semânticos adicionais para panel-grid ponderado e panel-content stacks reutilizáveis
+  - [x] nova expansão prática com constrained panel grids/rows em layouts compostos adicionais (`metrics`, `comparison`, `faq`, `summary`)
 - [ ] constraints semânticas em vez de posições excessivamente rígidas
 - [ ] auto-fit real de texto por caixa
   - [x] primeira camada aplicada em caixas homogêneas críticas

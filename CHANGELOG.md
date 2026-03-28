@@ -7,6 +7,7 @@ The format is inspired by Keep a Changelog, and the project aims to follow Seman
 ## [Unreleased]
 
 ### Added
+- constrained panel-grid rollout extended into `metrics`, `comparison`, `faq`, and `summary`, improving fixed/flexible region control in more executive layouts
 - constrained semantic layout primitives for fixed/flexible columns and rows, including `target_share`, `max_width`, and `max_height` support in the renderer core
 - stronger semantic balancing rollout in `title`, `section`, `chart`, and `timeline`, reducing rigid splits and letting narrative/chart/sidebar regions keep more stable proportions
 - reusable workflow presets for operational/commercial scenarios (`sales_qbr`, `board_strategy`, `product_operating_review`, `consulting_steerco`) with linked starter templates, audience profiles, and asset collections

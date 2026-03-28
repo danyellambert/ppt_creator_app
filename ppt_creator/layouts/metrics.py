@@ -32,31 +32,26 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
     value_size = t.metric_value_size if variant == "standard" else t.metric_value_size - 4
     label_size = t.metric_label_size + 1 if variant == "standard" else t.metric_label_size
     detail_size = t.small_size + 1 if variant == "standard" else t.small_size
-    metric_flexes = renderer.normalize_content_flexes(
-        [
-            renderer.estimate_content_weight(
-                title=metric.label,
-                body=metric.detail,
-                footer=metric.trend,
-            )
-            for metric in metrics
-        ],
-        min_flex=0.95,
-        max_flex=1.25,
-    )
-
-    metric_cards = renderer.build_weighted_panel_row_content_bounds(
+    metric_cards = renderer.build_constrained_panel_row_content_bounds(
         left=left,
         top=top,
         width=total_width,
         height=panel_height,
         gap=gap,
-        weights=metric_flexes,
-        min_width=1.8,
         padding=0.24,
-        kind_prefix="metric",
-        min_flex=0.95,
-        max_flex=1.25,
+        regions=[
+            {
+                "kind": f"metric_{idx + 1}",
+                "min_width": 1.85,
+                "target_share": renderer.estimate_content_weight(
+                    title=metric.label,
+                    body=metric.detail,
+                    footer=metric.trend,
+                ),
+                "max_width": 4.2 if len(metrics) <= 3 else 3.35,
+            }
+            for idx, metric in enumerate(metrics)
+        ],
     )
 
     for idx, (metric, (panel_bounds, content_bounds)) in enumerate(zip(metrics, metric_cards, strict=True)):
@@ -96,13 +91,11 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
         if metric.trend:
             regions.append({"kind": "trend", "height": 0.30})
 
-        for region, (region_top, region_height) in renderer.build_content_stack(
+        for region, (region_top, region_height) in renderer.build_constrained_content_stack(
             top=content_top + 0.06,
             height=max(0.4, content_height - 0.06),
             regions=regions,
             gap=0.08,
-            min_flex=0.9,
-            max_flex=1.35,
         ):
             box = renderer.textbox(slide, content_left, region_top, content_width, region_height)
             if region["kind"] == "value":

@@ -1025,6 +1025,102 @@ class PresentationRenderer:
             )
         ]
 
+    def build_constrained_grid_bounds(
+        self,
+        *,
+        left: float,
+        top: float,
+        width: float,
+        height: float,
+        column_regions: list[dict[str, float | str]],
+        row_regions: list[dict[str, float | str]],
+        column_gap: float,
+        row_gap: float,
+    ) -> list[list[tuple[float, float, float, float]]]:
+        columns = self.build_constrained_columns(
+            left=left,
+            width=width,
+            gap=column_gap,
+            regions=column_regions,
+        )
+        rows = self.build_constrained_rows(
+            top=top,
+            height=height,
+            gap=row_gap,
+            regions=row_regions,
+        )
+
+        return [
+            [
+                (column_left, row_top, column_width, row_height)
+                for column_left, column_width in columns
+            ]
+            for row_top, row_height in rows
+        ]
+
+    def build_constrained_panel_grid(
+        self,
+        *,
+        left: float,
+        top: float,
+        width: float,
+        height: float,
+        column_gap: float,
+        row_gap: float,
+        column_regions: list[dict[str, float | str]],
+        row_regions: list[dict[str, float | str]],
+    ) -> list[list[tuple[float, float, float, float]]]:
+        return self.build_constrained_grid_bounds(
+            left=left,
+            top=top,
+            width=width,
+            height=height,
+            column_regions=column_regions,
+            row_regions=row_regions,
+            column_gap=column_gap,
+            row_gap=row_gap,
+        )
+
+    def build_constrained_panel_grid_content_bounds(
+        self,
+        *,
+        left: float,
+        top: float,
+        width: float,
+        height: float,
+        column_gap: float,
+        row_gap: float,
+        column_regions: list[dict[str, float | str]],
+        row_regions: list[dict[str, float | str]],
+        padding: float | None = None,
+    ) -> list[list[tuple[tuple[float, float, float, float], tuple[float, float, float, float]]]]:
+        grid = self.build_constrained_panel_grid(
+            left=left,
+            top=top,
+            width=width,
+            height=height,
+            column_gap=column_gap,
+            row_gap=row_gap,
+            column_regions=column_regions,
+            row_regions=row_regions,
+        )
+        return [
+            [
+                (
+                    bounds,
+                    self.panel_inner_bounds(
+                        left=bounds[0],
+                        top=bounds[1],
+                        width=bounds[2],
+                        height=bounds[3],
+                        padding=padding,
+                    ),
+                )
+                for bounds in row
+            ]
+            for row in grid
+        ]
+
     def build_grid_bounds(
         self,
         *,

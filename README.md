@@ -992,6 +992,8 @@ Mais recentemente entrou também uma camada de **constraints semânticas explíc
 
 Isso já começou a ser usado para estabilizar melhor capas, slides de seção, charts com bloco narrativo e timelines com painéis mais previsíveis.
 
+Essa mesma linha agora também avançou mais em layouts compostos como `metrics`, `comparison`, `faq` e `summary`, onde painéis, grids e regiões internas passaram a usar combinações mais explícitas de colunas/rows constrained, max bounds e distribuição guiada por peso de conteúdo.
+
 Isso ainda não é um layout engine completo, mas já é o primeiro passo para sair de coordenadas excessivamente rígidas e caminhar para composição mais resiliente.
 
 Também já existe uma primeira infraestrutura para um backend de preview mais fiel ao `.pptx` quando um runtime de Office estiver disponível localmente, mantendo fallback limpo para o preview sintético.

@@ -21,20 +21,21 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
     )
 
     if has_body and has_bullets:
-        split_flexes = renderer.normalize_content_flexes(
-            [
-                renderer.estimate_content_weight(title=slide_spec.title, body=slide_spec.body),
-                renderer.estimate_content_weight(bullets=slide_spec.bullets),
-            ],
-            min_flex=0.9,
-            max_flex=1.4,
-        )
-        split_regions = renderer.build_columns(
+        split_regions = renderer.build_constrained_columns(
             left=g.content_left,
             width=g.content_width,
             regions=[
-                {"kind": "narrative", "min_width": 6.2, "flex": split_flexes[0]},
-                {"kind": "panel", "min_width": 3.4, "flex": split_flexes[1]},
+                {
+                    "kind": "narrative",
+                    "min_width": 5.9,
+                    "target_share": renderer.estimate_content_weight(title=slide_spec.title, body=slide_spec.body),
+                },
+                {
+                    "kind": "panel",
+                    "min_width": 3.4,
+                    "max_width": 4.15,
+                    "target_share": renderer.estimate_content_weight(bullets=slide_spec.bullets),
+                },
             ],
             gap=0.35,
         )
@@ -61,7 +62,7 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
             renderer.theme.components.accent_bar_height,
             color=colors.accent,
         )
-        panel_regions = renderer.build_panel_content_stack_bounds(
+        panel_regions = renderer.build_constrained_panel_content_stack_bounds(
             left=panel_left,
             top=panel_top,
             width=panel_width,
@@ -71,14 +72,11 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
                 {
                     "kind": "bullets",
                     "min_height": 2.18,
-                    "flex": 1.0,
-                    "content_weight": renderer.estimate_content_weight(bullets=slide_spec.bullets),
+                    "target_share": renderer.estimate_content_weight(bullets=slide_spec.bullets),
                 },
             ],
             gap=0.08,
             padding=0.26,
-            min_flex=0.9,
-            max_flex=1.35,
         )
         heading_left, heading_top, heading_width, heading_height = panel_regions[0][1]
         heading_box = renderer.textbox(slide, heading_left, heading_top, heading_width, heading_height)
@@ -120,16 +118,28 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
         renderer.theme.components.accent_bar_height,
         color=colors.accent,
     )
-    heading_box = renderer.textbox(slide, g.content_left + 0.28, 2.52, g.content_width - 0.56, 0.28)
-    renderer.write_paragraph(
-        heading_box.text_frame,
-        "Key takeaways",
-        size=t.eyebrow_size,
-        color=colors.muted,
-        bold=True,
+    content_regions = renderer.build_constrained_panel_content_stack_bounds(
+        left=g.content_left,
+        top=2.2,
+        width=g.content_width,
+        height=3.0,
+        regions=[
+            {"kind": "heading", "height": 0.28},
+            {
+                "kind": "bullets",
+                "min_height": 1.9,
+                "target_share": renderer.estimate_content_weight(bullets=slide_spec.bullets),
+            },
+        ],
+        gap=0.1,
+        padding=0.28,
     )
+    heading_left, heading_top, heading_width, heading_height = content_regions[0][1]
+    heading_box = renderer.textbox(slide, heading_left, heading_top, heading_width, heading_height)
+    renderer.write_paragraph(heading_box.text_frame, "Key takeaways", size=t.eyebrow_size, color=colors.muted, bold=True)
     renderer.fit_text_frame(heading_box.text_frame, max_size=t.eyebrow_size, bold=True)
-    bullets_box = renderer.textbox(slide, g.content_left + 0.28, 2.9, g.content_width - 0.56, 1.9)
+    bullets_left, bullets_top, bullets_width, bullets_height = content_regions[1][1]
+    bullets_box = renderer.textbox(slide, bullets_left, bullets_top, bullets_width, bullets_height)
     tf = bullets_box.text_frame
     for bullet in slide_spec.bullets:
         renderer.write_paragraph(tf, f"• {bullet}", size=t.body_size - 1, color=colors.text, space_after=8)

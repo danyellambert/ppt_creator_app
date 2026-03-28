@@ -241,11 +241,15 @@ def test_new_layout_types_render_without_crashing(tmp_path: Path) -> None:
                     "comparison_columns": [
                         {
                             "title": "Before",
+                            "body": "A longer current-state narrative helps validate constrained column balancing in comparison slides.",
                             "bullets": ["Manual prep", "Uneven quality"],
+                            "footer": "Current-state footer",
                         },
                         {
                             "title": "After",
+                            "body": "A longer target-state narrative keeps the stress case realistic for comparison layouts.",
                             "bullets": ["Structured workflow", "Better consistency"],
+                            "footer": "Target-state footer",
                         },
                     ],
                 },
@@ -286,6 +290,7 @@ def test_new_layout_types_render_without_crashing(tmp_path: Path) -> None:
                 {
                     "type": "summary",
                     "title": "Summary",
+                    "body": "This summary body is intentionally longer so the narrative/takeaway split has to remain stable under the constrained balancing rules.",
                     "bullets": ["Stay focused", "Sequence the rollout"],
                 },
             ],

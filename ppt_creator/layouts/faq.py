@@ -42,21 +42,31 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
         )
         for column_index in range(columns)
     ]
-    grid_bounds = renderer.build_weighted_panel_grid(
+    grid_bounds = renderer.build_constrained_panel_grid(
         left=g.content_left,
         top=top_start,
         width=g.content_width,
         height=total_height,
         column_gap=panel_gap,
         row_gap=0.24,
-        column_weights=column_weights,
-        row_weights=[max(1.0, flex) for flex in row_flexes],
-        column_min_width=3.2,
-        row_min_height=1.15,
-        min_flex=0.9,
-        max_flex=1.35,
-        column_kind_prefix="faq_column",
-        row_kind_prefix="faq_row",
+        column_regions=[
+            {
+                "kind": f"faq_column_{column_index + 1}",
+                "min_width": 3.2,
+                "target_share": column_weights[column_index],
+                "max_width": 5.05 if columns > 1 else g.content_width,
+            }
+            for column_index in range(columns)
+        ],
+        row_regions=[
+            {
+                "kind": f"faq_row_{row_index + 1}",
+                "min_height": 1.15,
+                "target_share": max(1.0, row_flexes[row_index]),
+                "max_height": 1.9 if row_count > 1 else total_height,
+            }
+            for row_index in range(row_count)
+        ],
     )
 
     for idx, item in enumerate(items):
@@ -82,7 +92,7 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
             color=colors.accent if idx % 2 else colors.navy,
         )
 
-        for region, (content_left, region_top, content_width, region_height) in renderer.build_panel_content_stack_bounds(
+        for region, (content_left, region_top, content_width, region_height) in renderer.build_constrained_panel_content_stack_bounds(
             left=left,
             top=top,
             width=panel_width,
@@ -92,14 +102,11 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
                 {
                     "kind": "body",
                     "min_height": 0.68,
-                    "flex": 1.0,
-                    "content_weight": renderer.estimate_content_weight(body=item.body),
+                    "target_share": renderer.estimate_content_weight(body=item.body),
                 },
             ],
             gap=0.06,
             padding=0.22,
-            min_flex=0.9,
-            max_flex=1.35,
         ):
             if region["kind"] == "title":
                 title_box = renderer.textbox(slide, content_left, region_top, content_width, region_height)
