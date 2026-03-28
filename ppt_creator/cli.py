@@ -14,6 +14,7 @@ from ppt_creator.preview import (
     render_previews,
     render_previews_for_rendered_artifact,
     render_previews_from_pptx,
+    review_pptx_artifact,
 )
 from ppt_creator.profiles import get_audience_profile, list_audience_profiles
 from ppt_creator.qa import augment_review_with_preview_artifacts, review_presentation
@@ -141,6 +142,28 @@ def build_parser() -> argparse.ArgumentParser:
         help="Write per-slide diff images when running baseline comparison",
     )
     preview_pptx_parser.add_argument("--report-json", help="Optional path to write a JSON PPTX preview report")
+
+    review_pptx_parser = subparsers.add_parser(
+        "review-pptx",
+        help="Run QA review directly against an existing .pptx by generating real previews",
+    )
+    review_pptx_parser.add_argument("input_pptx", help="Path to the input .pptx file")
+    review_pptx_parser.add_argument("output_dir", help="Directory where review preview artifacts will be written")
+    review_pptx_parser.add_argument("--theme", help="Optional theme used only for report/contact-sheet styling")
+    review_pptx_parser.add_argument("--basename", help="Optional base name for generated preview files")
+    review_pptx_parser.add_argument("--baseline-dir", help="Optional directory of golden preview PNGs for regression comparison")
+    review_pptx_parser.add_argument(
+        "--diff-threshold",
+        type=float,
+        default=0.01,
+        help="Threshold used to flag review regressions against baseline images",
+    )
+    review_pptx_parser.add_argument(
+        "--write-diff-images",
+        action="store_true",
+        help="Write per-slide diff images when running review against a baseline",
+    )
+    review_pptx_parser.add_argument("--report-json", help="Optional path to write a JSON PPTX review report")
 
     compare_pptx_parser = subparsers.add_parser(
         "compare-pptx",
@@ -735,6 +758,35 @@ def compare_pptx_one(
     return result
 
 
+def review_pptx_one(
+    input_pptx: str | Path,
+    output_dir: str | Path,
+    *,
+    theme_name: str | None = None,
+    basename: str | None = None,
+    baseline_dir: str | None = None,
+    diff_threshold: float = 0.01,
+    write_diff_images: bool = False,
+) -> dict[str, object]:
+    input_path = Path(input_pptx)
+    output_path = Path(output_dir)
+    print_info(f"Reviewing PPTX input: {input_path}")
+    print_info(f"Review artifact directory: {output_path}")
+    result = review_pptx_artifact(
+        input_path,
+        output_path,
+        theme_name=theme_name,
+        basename=basename,
+        baseline_dir=baseline_dir,
+        diff_threshold=diff_threshold,
+        write_diff_images=write_diff_images,
+    )
+    print(
+        f"[OK] PPTX review completed: {result['issue_count']} issue(s), average score {result['average_score']}"
+    )
+    return result
+
+
 def collect_batch_inputs(input_dir: str | Path, pattern: str) -> tuple[Path, list[Path]]:
     root = Path(input_dir)
     if not root.exists():
@@ -841,6 +893,20 @@ def main(argv: list[str] | None = None) -> int:
 
         if args.command == "preview-pptx":
             report = preview_pptx_one(
+                args.input_pptx,
+                args.output_dir,
+                theme_name=args.theme,
+                basename=args.basename,
+                baseline_dir=args.baseline_dir,
+                diff_threshold=args.diff_threshold,
+                write_diff_images=args.write_diff_images,
+            )
+            if args.report_json:
+                write_report(args.report_json, report)
+            return 0
+
+        if args.command == "review-pptx":
+            report = review_pptx_one(
                 args.input_pptx,
                 args.output_dir,
                 theme_name=args.theme,

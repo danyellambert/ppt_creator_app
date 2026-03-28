@@ -4,7 +4,7 @@ PYTEST := $(PYTHON) -m pytest
 RUFF := $(PYTHON) -m ruff
 QUALITY_PATHS := ppt_creator ppt_creator_ai tests
 
-.PHONY: install install-dev test lint format validate-example render-example render-all-examples generate-briefing-example docker-render-example ci
+.PHONY: install install-dev test lint format validate-example render-example render-all-examples review-example review-pptx-example playground generate-briefing-example docker-render-example ci
 
 install:
 	$(PIP) install -e .
@@ -26,6 +26,15 @@ validate-example:
 
 render-example:
 	$(PYTHON) -m ppt_creator.cli render examples/ai_sales.json outputs/ai_sales_makefile.pptx
+
+review-example:
+	$(PYTHON) -m ppt_creator.cli review examples/ai_sales.json --preview-dir outputs/ai_sales_review_makefile --report-json outputs/ai_sales_review_makefile.json
+
+review-pptx-example:
+	$(PYTHON) -m ppt_creator.cli review-pptx outputs/ai_sales.pptx outputs/ai_sales_review_pptx_makefile --report-json outputs/ai_sales_review_pptx_makefile.json
+
+playground:
+	$(PYTHON) -m ppt_creator.api --host 127.0.0.1 --port 8787 --asset-root examples
 
 render-all-examples:
 	$(PYTHON) -m ppt_creator.cli render examples/ai_sales.json outputs/ai_sales_makefile.pptx

@@ -10,9 +10,14 @@ from ppt_creator.api import (
     validate_spec_payload,
 )
 from ppt_creator.assets import get_asset_collection, list_asset_collections
-from ppt_creator.preview import PreviewRenderer, compare_pptx_artifacts, render_previews
+from ppt_creator.preview import (
+    PreviewRenderer,
+    compare_pptx_artifacts,
+    render_previews,
+    review_pptx_artifact,
+)
 from ppt_creator.profiles import get_audience_profile, list_audience_profiles
-from ppt_creator.qa import review_presentation
+from ppt_creator.qa import review_presentation, review_preview_artifacts
 from ppt_creator.renderer import PresentationRenderer, render_presentation
 from ppt_creator.schema import (
     CardItem,
@@ -78,6 +83,8 @@ __all__ = [
     "PreviewRenderer",
     "preview_spec_payload",
     "render_previews",
+    "review_pptx_artifact",
+    "review_preview_artifacts",
     "review_presentation",
     "review_spec_payload",
     "render_spec_payload",

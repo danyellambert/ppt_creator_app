@@ -345,6 +345,7 @@ Como a qualidade percebida do deck depende muito da inspeção visual, existe um
   - [x] integração inicial desse caminho ao fluxo principal de render, preferindo o artefato final quando possível
   - [x] camada opcional de geração/preview agora também prefere automaticamente o `.pptx` final renderizado em mais cenários
   - [x] evoluir para usar isso como caminho preferencial em mais cenários de QA/regressão
+  - [x] primeiro fluxo explícito de review QA direto sobre `.pptx` renderizado
 - [ ] adicionar regressão visual baseada em previews reais/golden files
   - [x] primeira camada de comparação contra golden previews com diffs opcionais
   - [x] caminhos opcionais com `render-pptx` + baseline agora passam a favorecer preview real quando disponível
@@ -565,6 +566,7 @@ Se a meta for perseguir o nível “deck quase pronto sem retoque manual”, a o
 - [ ] editor visual leve
 - [ ] playground local para gerar/editar/re-renderizar decks
 - [x] playground local para gerar/editar/re-renderizar decks
+- [x] playground local mais robusto com bootstrap de template/perfil e controles operacionais básicos
 - [x] perfis de público (board, consulting, sales, product)
 - [ ] integração com workflows comerciais e operacionais
 

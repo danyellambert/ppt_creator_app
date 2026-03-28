@@ -409,3 +409,53 @@ def test_api_compare_pptx_endpoint_generates_visual_comparison(tmp_path: Path) -
         server.shutdown()
         server.server_close()
         thread.join(timeout=5)
+
+
+def test_api_review_pptx_endpoint_generates_real_artifact_review(tmp_path: Path) -> None:
+    from ppt_creator import preview as preview_module
+
+    server = build_api_server("127.0.0.1", 0, asset_root="examples")
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    try:
+        base_url = f"http://127.0.0.1:{server.server_address[1]}"
+        spec = PresentationInput.from_path("examples/ai_sales.json")
+        pptx_path = tmp_path / "api_review_source.pptx"
+        PresentationRenderer(asset_root="examples").render(spec, pptx_path)
+
+        def _fake_run(command, capture_output, text, check):
+            outdir = Path(command[command.index("--outdir") + 1])
+            source_pptx = Path(command[-1])
+            slide_count = len(PptxPresentation(str(source_pptx)).slides)
+            outdir.mkdir(parents=True, exist_ok=True)
+            for index in range(1, slide_count + 1):
+                Image.new("RGB", (1280, 720), (245, 245, 245)).save(outdir / f"api-review-{index:02d}.png")
+
+            class _Completed:
+                returncode = 0
+                stdout = ""
+                stderr = ""
+
+            return _Completed()
+
+        preview_module.find_office_runtime = lambda: "/usr/bin/soffice"
+        preview_module.subprocess.run = _fake_run
+
+        review_dir = tmp_path / "api_review_pptx_output"
+        status, review_payload = _request_json(
+            f"{base_url}/review-pptx",
+            {
+                "input_pptx": str(pptx_path),
+                "output_dir": str(review_dir),
+            },
+            method="POST",
+        )
+        assert status == 200
+        assert review_payload["result"]["mode"] == "review-pptx"
+        assert review_payload["result"]["preview_result"]["mode"] == "preview-pptx"
+        assert "preview_artifact_review" in review_payload["result"]
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)

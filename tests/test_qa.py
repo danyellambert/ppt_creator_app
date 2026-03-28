@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-from ppt_creator.qa import augment_review_with_preview_artifacts, review_presentation
+from ppt_creator.qa import (
+    augment_review_with_preview_artifacts,
+    review_presentation,
+    review_preview_artifacts,
+)
 from ppt_creator.schema import PresentationInput
 
 
@@ -141,3 +145,49 @@ def test_augment_review_with_preview_artifacts_adds_final_preview_clipping_and_c
     assert augmented["clipping_risk_count"] > review["clipping_risk_count"]
     assert augmented["collision_risk_count"] > review["collision_risk_count"]
     assert any("final preview" in issue for issue in augmented["issues"])
+
+
+def test_review_preview_artifacts_builds_review_summary_from_rendered_preview_only() -> None:
+    review = review_preview_artifacts(
+        {
+            "input_pptx": "outputs/sample.pptx",
+            "preview_count": 2,
+            "preview_artifact_review": {
+                "slides": [
+                    {
+                        "slide_number": 1,
+                        "edge_contact": True,
+                        "safe_margin_warning": False,
+                        "body_edge_contact": True,
+                        "safe_area_intrusion": False,
+                        "footer_intrusion_warning": False,
+                        "edge_density_warning": True,
+                        "corner_density_warning": False,
+                        "body_max_edge_ratio": 0.08,
+                        "max_corner_ratio": 0.01,
+                    },
+                    {
+                        "slide_number": 2,
+                        "edge_contact": False,
+                        "safe_margin_warning": True,
+                        "body_edge_contact": False,
+                        "safe_area_intrusion": False,
+                        "footer_intrusion_warning": True,
+                        "edge_density_warning": False,
+                        "corner_density_warning": True,
+                        "body_max_edge_ratio": 0.02,
+                        "max_corner_ratio": 0.07,
+                    },
+                ]
+            },
+            "visual_regression": {
+                "diff_count": 1,
+                "slides": [{"slide_number": 2, "regression": True}],
+            },
+        }
+    )
+
+    assert review["issue_count"] >= 4
+    assert review["collision_risk_count"] >= 3
+    assert review["clipping_risk_count"] >= 2
+    assert review["regression_diff_count"] == 1

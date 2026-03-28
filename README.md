@@ -694,6 +694,15 @@ Quando o LibreOffice exporta apenas um PNG único na conversão direta do `.pptx
 
 Isso melhora bastante a confiabilidade do preview real em ambientes onde a exportação direta para PNG não sai slide a slide.
 
+Agora também existe um fluxo explícito de **review QA diretamente sobre um `.pptx` já renderizado**:
+
+```bash
+python -m ppt_creator.cli review-pptx outputs/ai_sales.pptx outputs/ai_sales_review_pptx \
+  --report-json outputs/ai_sales_review_pptx_report.json
+```
+
+Esse caminho ajuda quando você quer validar o artefato final em si, não apenas o spec JSON original.
+
 Também já existe um fluxo explícito para **comparar visualmente duas versões `.pptx`** usando previews reais do artefato final:
 
 ```bash
@@ -730,7 +739,7 @@ Também já existe um playground/editor local bem inicial servindo HTML em:
 
 - `GET /playground`
 
-Ele permite colar/editar JSON e acionar validate/review/preview/render diretamente contra a API local.
+Ele permite colar/editar JSON, carregar starter templates por domínio/perfil, escolher backend de preview e acionar validate/review/preview/render diretamente contra a API local.
 
 Exemplo de validação por API:
 
@@ -826,6 +835,9 @@ make lint
 make test
 make validate-example
 make render-example
+make review-example
+make review-pptx-example
+make playground
 make render-all-examples
 ```
 

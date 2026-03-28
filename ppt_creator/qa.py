@@ -623,6 +623,162 @@ def augment_review_with_preview_artifacts(
     return _rebuild_review_result(merged)
 
 
+def review_preview_artifacts(
+    preview_result: dict[str, object],
+    *,
+    input_pptx: str | None = None,
+) -> dict[str, object]:
+    artifact_review = (preview_result or {}).get("preview_artifact_review") or {}
+    visual_regression = (preview_result or {}).get("visual_regression")
+    slides: list[dict[str, object]] = []
+
+    for artifact_slide in artifact_review.get("slides") or []:
+        slide_number = int(artifact_slide.get("slide_number") or 0)
+        issues: list[dict[str, str]] = []
+        likely_overflow_regions: list[str] = []
+        likely_collision_regions: list[str] = []
+        overflow_risk_count = 0
+        clipping_risk_count = 0
+        collision_risk_count = 0
+        balance_warning_count = 0
+
+        def add_issue(
+            *,
+            severity: str,
+            message: str,
+            overflow_region: str | None = None,
+            collision_region: str | None = None,
+            clipping: int = 0,
+            collision: int = 0,
+        ) -> None:
+            issues.append(_issue(severity, message))
+            if overflow_region:
+                likely_overflow_regions.append(overflow_region)
+            if collision_region:
+                likely_collision_regions.append(collision_region)
+            nonlocal overflow_risk_count, clipping_risk_count, collision_risk_count
+            overflow_risk_count += 1 if overflow_region else 0
+            clipping_risk_count += clipping
+            collision_risk_count += collision
+
+        if artifact_slide.get("edge_contact"):
+            add_issue(
+                severity="high",
+                message="final preview indicates content touching the slide edge",
+                overflow_region="preview_edge",
+                collision_region="preview_edge",
+                clipping=1,
+                collision=1,
+            )
+        elif artifact_slide.get("safe_margin_warning"):
+            add_issue(
+                severity="low",
+                message="final preview indicates content approaching the outer slide margin",
+                overflow_region="preview_margin",
+                clipping=1,
+            )
+        if artifact_slide.get("body_edge_contact"):
+            add_issue(
+                severity="high",
+                message="final preview indicates body content touching a boundary before the footer",
+                overflow_region="preview_body_edge",
+                collision_region="preview_body_edge",
+                clipping=1,
+                collision=1,
+            )
+        if artifact_slide.get("safe_area_intrusion"):
+            add_issue(
+                severity="high",
+                message="final preview indicates unsafe margin intrusion",
+                overflow_region="preview_safe_area",
+                collision_region="preview_safe_area",
+                clipping=1,
+                collision=1,
+            )
+        if artifact_slide.get("footer_intrusion_warning"):
+            add_issue(
+                severity="medium",
+                message="final preview indicates crowding near the footer boundary",
+                overflow_region="preview_footer",
+                collision_region="preview_footer",
+                clipping=1,
+                collision=1,
+            )
+        if artifact_slide.get("edge_density_warning"):
+            add_issue(
+                severity="medium",
+                message="final preview indicates aggressive edge packing",
+                collision_region="preview_edge_density",
+                collision=1,
+            )
+        if artifact_slide.get("corner_density_warning"):
+            add_issue(
+                severity="medium",
+                message="final preview indicates dense corner packing that may hide clipping or collisions",
+                collision_region="preview_corner_density",
+                collision=1,
+            )
+
+        slides.append(
+            _recompute_slide_review(
+                {
+                    "slide_number": slide_number,
+                    "slide_type": "rendered_artifact",
+                    "title": f"Slide {slide_number:02d}",
+                    "score": 100,
+                    "status": "ok",
+                    "content_weight": 0.0,
+                    "overflow_risk_count": overflow_risk_count,
+                    "clipping_risk_count": clipping_risk_count,
+                    "collision_risk_count": collision_risk_count,
+                    "balance_warning_count": balance_warning_count,
+                    "layout_pressure_score": round(
+                        float(artifact_slide.get("body_max_edge_ratio") or 0.0)
+                        + float(artifact_slide.get("max_corner_ratio") or 0.0),
+                        3,
+                    ),
+                    "risk_level": "low",
+                    "likely_overflow_regions": likely_overflow_regions,
+                    "likely_collision_regions": likely_collision_regions,
+                    "layout_pressure_signals": [],
+                    "severity_counts": {"high": 0, "medium": 0, "low": 0},
+                    "issues": issues,
+                }
+            )
+        )
+
+    if visual_regression is not None:
+        regression_lookup = {
+            int(slide_report["slide_number"]): slide_report
+            for slide_report in visual_regression.get("slides") or []
+            if slide_report.get("regression")
+        }
+        for slide in slides:
+            regression = regression_lookup.get(int(slide["slide_number"]))
+            if not regression:
+                continue
+            slide["issues"].append(_issue("medium", "final preview differs from baseline and needs visual review"))
+            slide["collision_risk_count"] += 1
+            slide["likely_collision_regions"].append("visual_regression")
+            _recompute_slide_review(slide)
+
+    review = _rebuild_review_result(
+        {
+            "mode": "review-preview-artifacts",
+            "presentation_title": input_pptx or preview_result.get("input_pptx") or "Rendered artifact review",
+            "theme": preview_result.get("theme") or None,
+            "slide_count": int(preview_result.get("preview_count") or len(slides)),
+            "slides": slides,
+            "missing_assets": [],
+        }
+    )
+    review["preview_artifact_review"] = artifact_review
+    review["visual_regression"] = visual_regression
+    review["regression_diff_count"] = int((visual_regression or {}).get("diff_count") or 0)
+    review["input_pptx"] = input_pptx or preview_result.get("input_pptx")
+    return review
+
+
 def _review_slide(
     slide: Slide,
     *,

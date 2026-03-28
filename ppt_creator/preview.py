@@ -9,7 +9,7 @@ from tempfile import TemporaryDirectory
 from PIL import Image, ImageChops, ImageDraw, ImageFont, ImageOps, ImageStat
 from pptx import Presentation
 
-from ppt_creator.qa import review_presentation
+from ppt_creator.qa import review_presentation, review_preview_artifacts
 from ppt_creator.renderer import PresentationRenderer
 from ppt_creator.schema import PresentationInput, PresentationMeta, Slide, SlideType
 from ppt_creator.theme import get_theme
@@ -1322,6 +1322,35 @@ def render_previews_from_pptx(
         backend="office",
     )
     return renderer.render_pptx_previews(input_pptx, output_dir, basename=basename)
+
+
+def review_pptx_artifact(
+    input_pptx: str | Path,
+    output_dir: str | Path,
+    *,
+    theme_name: str | None = None,
+    basename: str | None = None,
+    baseline_dir: str | Path | None = None,
+    diff_threshold: float = 0.01,
+    write_diff_images: bool = False,
+) -> dict[str, object]:
+    preview_result = render_previews_from_pptx(
+        input_pptx,
+        output_dir,
+        theme_name=theme_name,
+        basename=basename,
+        baseline_dir=baseline_dir,
+        diff_threshold=diff_threshold,
+        write_diff_images=write_diff_images,
+    )
+    review = review_preview_artifacts(preview_result, input_pptx=str(Path(input_pptx).resolve()))
+    return {
+        "mode": "review-pptx",
+        "input_pptx": str(Path(input_pptx).resolve()),
+        "output_dir": str(Path(output_dir).resolve()),
+        "preview_result": preview_result,
+        **{key: value for key, value in review.items() if key != "mode"},
+    }
 
 
 def compare_preview_directories(

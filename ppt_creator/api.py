@@ -15,6 +15,7 @@ from ppt_creator.preview import (
     render_previews,
     render_previews_for_rendered_artifact,
     render_previews_from_pptx,
+    review_pptx_artifact,
 )
 from ppt_creator.profiles import get_audience_profile, list_audience_profiles
 from ppt_creator.qa import augment_review_with_preview_artifacts, review_presentation
@@ -59,8 +60,33 @@ def _build_playground_html() -> str:
       <input id='previewDir' value='outputs/playground_previews' />
     </div>
   </div>
+  <div class='row'>
+    <div>
+      <label>Template domain</label>
+      <select id='templateDomain'></select>
+    </div>
+    <div>
+      <label>Audience profile</label>
+      <select id='audienceProfile'></select>
+    </div>
+  </div>
+  <div class='row'>
+    <div>
+      <label>Preview backend</label>
+      <select id='previewBackend'>
+        <option value='auto'>auto</option>
+        <option value='synthetic'>synthetic</option>
+        <option value='office'>office</option>
+      </select>
+    </div>
+    <div>
+      <label>Baseline directory</label>
+      <input id='baselineDir' value='' placeholder='optional baseline preview dir' />
+    </div>
+  </div>
   <textarea id='spec'>{initial_json}</textarea>
   <div style='margin: 16px 0;'>
+    <button onclick='loadTemplate()'>Load starter</button>
     <button onclick='runAction("/validate")'>Validate</button>
     <button onclick='runAction("/review")'>Review</button>
     <button onclick='runAction("/preview")'>Preview</button>
@@ -68,20 +94,64 @@ def _build_playground_html() -> str:
   </div>
   <pre id='result'>Ready.</pre>
   <script>
+    async function initControls() {{
+      const templates = await fetch('/templates').then(r => r.json());
+      const profiles = await fetch('/profiles').then(r => r.json());
+      const domainSelect = document.getElementById('templateDomain');
+      const profileSelect = document.getElementById('audienceProfile');
+      for (const domain of templates.domains) {{
+        const option = document.createElement('option');
+        option.value = domain;
+        option.textContent = domain;
+        domainSelect.appendChild(option);
+      }}
+      const none = document.createElement('option');
+      none.value = '';
+      none.textContent = '(none)';
+      profileSelect.appendChild(none);
+      for (const profile of profiles.profiles) {{
+        const option = document.createElement('option');
+        option.value = profile.display_name.toLowerCase();
+        option.textContent = profile.display_name;
+        profileSelect.appendChild(option);
+      }}
+    }}
+
+    async function loadTemplate() {{
+      const domain = document.getElementById('templateDomain').value;
+      const audienceProfile = document.getElementById('audienceProfile').value;
+      const response = await fetch('/template', {{
+        method: 'POST',
+        headers: {{ 'Content-Type': 'application/json' }},
+        body: JSON.stringify({{ domain, audience_profile: audienceProfile || undefined }}),
+      }});
+      const data = await response.json();
+      document.getElementById('spec').value = JSON.stringify(data.template, null, 2);
+      document.getElementById('result').textContent = 'Starter template loaded.';
+    }}
+
     async function runAction(path) {{
       const spec = JSON.parse(document.getElementById('spec').value);
       const outputPath = document.getElementById('outputPath').value;
       const previewDir = document.getElementById('previewDir').value;
+      const previewBackend = document.getElementById('previewBackend').value;
+      const baselineDir = document.getElementById('baselineDir').value;
       const payload = {{ spec }};
       if (path === '/render') {{
         payload.output_path = outputPath;
         payload.preview_output_dir = previewDir;
+        payload.preview_backend = previewBackend;
+        payload.preview_baseline_dir = baselineDir || undefined;
       }}
       if (path === '/preview') {{
         payload.output_dir = previewDir;
+        payload.preview_backend = previewBackend;
+        payload.baseline_dir = baselineDir || undefined;
       }}
       if (path === '/review') {{
         payload.preview_output_dir = previewDir;
+        payload.preview_backend = previewBackend;
+        payload.preview_baseline_dir = baselineDir || undefined;
       }}
       const response = await fetch(path, {{
         method: 'POST',
@@ -91,6 +161,7 @@ def _build_playground_html() -> str:
       const data = await response.json();
       document.getElementById('result').textContent = JSON.stringify(data, null, 2);
     }}
+    initControls();
   </script>
 </body>
 </html>"""
@@ -359,6 +430,27 @@ def preview_pptx_payload(
     )
 
 
+def review_pptx_payload(
+    input_pptx: str | Path,
+    *,
+    output_dir: str | Path,
+    theme_name: str | None = None,
+    basename: str | None = None,
+    baseline_dir: str | Path | None = None,
+    diff_threshold: float = 0.01,
+    write_diff_images: bool = False,
+) -> dict[str, object]:
+    return review_pptx_artifact(
+        input_pptx,
+        output_dir,
+        theme_name=theme_name,
+        basename=basename,
+        baseline_dir=baseline_dir,
+        diff_threshold=diff_threshold,
+        write_diff_images=write_diff_images,
+    )
+
+
 def compare_pptx_payload(
     before_pptx: str | Path,
     after_pptx: str | Path,
@@ -556,6 +648,23 @@ class PptCreatorAPIHandler(BaseHTTPRequestHandler):
                 if "output_dir" not in payload:
                     raise APIRequestError("'output_dir' is required for /preview-pptx")
                 result = preview_pptx_payload(
+                    str(payload["input_pptx"]),
+                    output_dir=str(payload["output_dir"]),
+                    theme_name=str(payload["theme_name"]) if payload.get("theme_name") else None,
+                    basename=str(payload["basename"]) if payload.get("basename") else None,
+                    baseline_dir=payload.get("baseline_dir"),
+                    diff_threshold=float(payload.get("diff_threshold", 0.01)),
+                    write_diff_images=bool(payload.get("write_diff_images", False)),
+                )
+                self._json_response(HTTPStatus.OK, {"result": result})
+                return
+
+            if self.path == "/review-pptx":
+                if "input_pptx" not in payload:
+                    raise APIRequestError("'input_pptx' is required for /review-pptx")
+                if "output_dir" not in payload:
+                    raise APIRequestError("'output_dir' is required for /review-pptx")
+                result = review_pptx_payload(
                     str(payload["input_pptx"]),
                     output_dir=str(payload["output_dir"]),
                     theme_name=str(payload["theme_name"]) if payload.get("theme_name") else None,
