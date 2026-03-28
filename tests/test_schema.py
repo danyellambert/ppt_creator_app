@@ -203,6 +203,44 @@ def test_summary_slide_requires_body_or_bullets() -> None:
         PresentationInput.model_validate(payload)
 
 
+def test_image_focal_coordinates_are_accepted() -> None:
+    payload = {
+        "presentation": {"title": "Deck", "theme": "executive_premium_minimal"},
+        "slides": [
+            {
+                "type": "image_text",
+                "title": "Image",
+                "body": "Body",
+                "image_path": "image.png",
+                "image_focal_x": 0.2,
+                "image_focal_y": 0.8,
+            }
+        ],
+    }
+
+    spec = PresentationInput.model_validate(payload)
+    assert spec.slides[0].image_focal_x == 0.2
+    assert spec.slides[0].image_focal_y == 0.8
+
+
+def test_image_focal_coordinates_must_stay_in_unit_interval() -> None:
+    payload = {
+        "presentation": {"title": "Deck", "theme": "executive_premium_minimal"},
+        "slides": [
+            {
+                "type": "image_text",
+                "title": "Image",
+                "body": "Body",
+                "image_path": "image.png",
+                "image_focal_x": 1.5,
+            }
+        ],
+    }
+
+    with pytest.raises(Exception):
+        PresentationInput.model_validate(payload)
+
+
 def test_table_slide_requires_columns_and_rows() -> None:
     payload = {
         "presentation": {"title": "Deck", "theme": "executive_premium_minimal"},

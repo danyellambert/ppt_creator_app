@@ -226,6 +226,8 @@ class PresentationRenderer:
         image_height_px: int,
         box_width: float,
         box_height: float,
+        focal_x: float | None = None,
+        focal_y: float | None = None,
     ) -> tuple[float, float, float, float]:
         if image_width_px <= 0 or image_height_px <= 0 or box_width <= 0 or box_height <= 0:
             return 0.0, 0.0, 0.0, 0.0
@@ -237,12 +239,16 @@ class PresentationRenderer:
 
         if image_aspect > box_aspect:
             keep_fraction = box_aspect / image_aspect
-            crop = max(0.0, (1.0 - keep_fraction) / 2.0)
-            return crop, 0.0, crop, 0.0
+            center = 0.5 if focal_x is None else focal_x
+            crop_left = min(max(0.0, center - (keep_fraction / 2.0)), 1.0 - keep_fraction)
+            crop_right = max(0.0, 1.0 - keep_fraction - crop_left)
+            return crop_left, 0.0, crop_right, 0.0
 
         keep_fraction = image_aspect / box_aspect
-        crop = max(0.0, (1.0 - keep_fraction) / 2.0)
-        return 0.0, crop, 0.0, crop
+        center = 0.5 if focal_y is None else focal_y
+        crop_top = min(max(0.0, center - (keep_fraction / 2.0)), 1.0 - keep_fraction)
+        crop_bottom = max(0.0, 1.0 - keep_fraction - crop_top)
+        return 0.0, crop_top, 0.0, crop_bottom
 
     def add_image_cover(
         self,
@@ -253,6 +259,8 @@ class PresentationRenderer:
         top: float,
         width: float,
         height: float,
+        focal_x: float | None = None,
+        focal_y: float | None = None,
     ):
         resolved_path = Path(image_path)
         picture = slide.shapes.add_picture(
@@ -268,6 +276,8 @@ class PresentationRenderer:
                 image_height_px=image.height,
                 box_width=width,
                 box_height=height,
+                focal_x=focal_x,
+                focal_y=focal_y,
             )
         picture.crop_left = crop_left
         picture.crop_top = crop_top

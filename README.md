@@ -202,6 +202,21 @@ Exemplo de variante:
 }
 ```
 
+Você também pode orientar melhor o crop da imagem em slides com mídia usando um focal point simples:
+
+```json
+{
+  "type": "image_text",
+  "title": "Operating model",
+  "body": "Structured deployment model.",
+  "image_path": "assets/operating_model.jpg",
+  "image_focal_x": 0.2,
+  "image_focal_y": 0.5
+}
+```
+
+Esses campos ajudam o render e o preview a manterem áreas mais relevantes da imagem quando o encaixe precisa fazer crop em modo cover-fit.
+
 Exemplo de `timeline`:
 
 ```json

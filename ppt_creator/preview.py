@@ -1119,7 +1119,10 @@ class PreviewRenderer:
                 loaded,
                 (box[2] - box[0], box[3] - box[1]),
                 method=resampling,
-                centering=(0.5, 0.5),
+                centering=(
+                    slide_spec.image_focal_x if slide_spec.image_focal_x is not None else 0.5,
+                    slide_spec.image_focal_y if slide_spec.image_focal_y is not None else 0.5,
+                ),
             )
             image.paste(fitted, (box[0], box[1]))
         else:

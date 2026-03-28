@@ -34,6 +34,7 @@ The format is inspired by Keep a Changelog, and the project aims to follow Seman
 - AI briefing analysis now includes more granular image suggestions per slide/type, not only deck-level suggestions
 - AI briefing CLI can now derive previews from the final rendered `.pptx`, not only from the intermediate JSON/spec path
 - preview artifact QA now includes stronger body-region signals for safe-area intrusion, footer-boundary crowding, and unsafe corner density
+- image slides now support focal-point-aware cover cropping via `image_focal_x` / `image_focal_y` in both rendered PPTX output and preview generation
 - optional office-aware preview backend selection with automatic fallback to synthetic previews
 - initial layout primitive helpers for panel inner bounds and stacked vertical regions
 - initial application of layout primitives to comparison, faq, cards, and two-column slides

@@ -531,6 +531,7 @@ Se a meta for perseguir o nível “deck quase pronto sem retoque manual”, a o
 
 - [ ] crop mais inteligente
   - [x] primeira camada de cover-fit/crop aplicada a caixas fixas de imagem (`image_text` + preview correspondente)
+  - [x] primeira camada de focal point explícito (`image_focal_x` / `image_focal_y`) no render e no preview de slides com imagem
   - [ ] expandir a estratégia para mais layouts e regras de focal point/contexto
 - [ ] placeholders mais premium e contextuais
 - [ ] sugestões de imagem por tipo de slide, não só por briefing geral

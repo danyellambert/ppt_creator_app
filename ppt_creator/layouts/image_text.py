@@ -39,6 +39,8 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
             top=image_top,
             width=image_width,
             height=image_height,
+            focal_x=slide_spec.image_focal_x,
+            focal_y=slide_spec.image_focal_y,
         )
     else:
         panel = renderer.add_panel(slide, image_left, image_top, image_width, image_height, fill_color=colors.surface, line_color=colors.line)

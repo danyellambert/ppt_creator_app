@@ -268,6 +268,8 @@ class Slide(BaseModel):
     section_label: str | None = None
     image_path: str | None = None
     image_caption: str | None = None
+    image_focal_x: float | None = None
+    image_focal_y: float | None = None
     speaker_notes: str | None = None
     layout_variant: str | None = None
 
@@ -298,6 +300,15 @@ class Slide(BaseModel):
 
         normalized = value.strip().lower().replace("-", "_").replace(" ", "_")
         return normalized or None
+
+    @field_validator("image_focal_x", "image_focal_y")
+    @classmethod
+    def validate_image_focal_coordinates(cls, value: float | None, info) -> float | None:
+        if value is None:
+            return None
+        if not 0.0 <= value <= 1.0:
+            raise ValueError(f"{info.field_name} must be between 0.0 and 1.0")
+        return value
 
     @field_validator("bullets")
     @classmethod

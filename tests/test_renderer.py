@@ -311,6 +311,37 @@ def test_compute_cover_crop_crops_tall_images_vertically() -> None:
     assert crop_right == 0
 
 
+def test_compute_cover_crop_respects_horizontal_focal_point() -> None:
+    renderer = PresentationRenderer(asset_root="examples")
+
+    crop_left, _, crop_right, _ = renderer.compute_cover_crop(
+        image_width_px=400,
+        image_height_px=200,
+        box_width=2.0,
+        box_height=2.0,
+        focal_x=0.15,
+    )
+
+    assert crop_left == pytest.approx(0.0)
+    assert crop_right > 0.0
+
+
+def test_compute_cover_crop_respects_vertical_focal_point() -> None:
+    renderer = PresentationRenderer(asset_root="examples")
+
+    _, crop_top, _, crop_bottom = renderer.compute_cover_crop(
+        image_width_px=200,
+        image_height_px=400,
+        box_width=2.0,
+        box_height=1.0,
+        focal_y=0.85,
+    )
+
+    assert crop_bottom < crop_top
+    assert crop_bottom >= 0.0
+    assert crop_top > 0.0
+
+
 def test_add_image_cover_applies_crop_for_mismatched_aspect_ratio(tmp_path: Path) -> None:
     image_path = tmp_path / "wide.png"
     Image.new("RGB", (400, 200), (120, 140, 180)).save(image_path)
@@ -355,3 +386,32 @@ def test_preview_artifact_review_flags_body_content_near_footer_boundary(tmp_pat
 
     assert review["footer_intrusion_count"] == 1
     assert review["slides"][0]["footer_intrusion_warning"] is True
+
+
+def test_preview_image_text_respects_focal_point_when_cover_cropping(tmp_path: Path) -> None:
+    asset_path = tmp_path / "focus.png"
+    image = Image.new("RGB", (400, 200), (0, 0, 255))
+    draw = ImageDraw.Draw(image)
+    draw.rectangle((0, 0, 199, 199), fill=(255, 0, 0))
+    image.save(asset_path)
+
+    spec = PresentationInput.model_validate(
+        {
+            "presentation": {"title": "Deck", "theme": "executive_premium_minimal"},
+            "slides": [
+                {
+                    "type": "image_text",
+                    "title": "Focused image",
+                    "body": "Body",
+                    "image_path": str(asset_path),
+                    "image_focal_x": 0.15,
+                }
+            ],
+        }
+    )
+
+    renderer = PreviewRenderer(asset_root=tmp_path)
+    rendered = renderer.render_slide(spec.presentation, spec.slides[0], 1, 1)
+
+    sampled = rendered.getpixel((974, 370))
+    assert sampled[0] > sampled[2]
