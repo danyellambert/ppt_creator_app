@@ -412,6 +412,7 @@ Qualquer camada de IA deve ser opcional.
   - [x] integração inicial de preview visual no pipeline opcional de briefing
   - [x] integração inicial de preview derivado do `.pptx` renderizado no pipeline opcional de briefing
   - [x] primeira regeneração automática baseada em feedback heurístico do review
+  - [x] primeira incorporação de feedback vindo também do preview visual ao loop heurístico opcional
   - [ ] evoluir para revisão opcional/regeração iterativa automática mais forte
 
 ### Resultado esperado
@@ -537,7 +538,7 @@ Se a meta for perseguir o nível “deck quase pronto sem retoque manual”, a o
 - [ ] placeholders mais premium e contextuais
 - [ ] sugestões de imagem por tipo de slide, não só por briefing geral
   - [x] primeira camada de sugestões mais granulares por slide/tipo na análise heurística de briefing
-  - [ ] evoluir para sugestões mais contextuais com focal point/asset style
+  - [x] evoluir para sugestões mais contextuais com focal point/asset style
 - [ ] biblioteca básica de assets e estilos visuais
 
 ### Prioridade 5 — LLM opcional de conteúdo e revisão
@@ -545,6 +546,7 @@ Se a meta for perseguir o nível “deck quase pronto sem retoque manual”, a o
 - [x] provider layer para múltiplas LLMs
 - [x] provider local GGUF via `llama.cpp` para experimentar com `PPTAgent`
 - [ ] geração de outline e narrativa a partir de briefing livre
+- [x] geração de outline e narrativa a partir de briefing livre
 - [ ] reescrita executiva de conteúdo fraco
 - [ ] revisão iterativa do deck após renderização e QA
 

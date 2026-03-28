@@ -4,6 +4,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from pydantic import ValidationError
 
@@ -13,6 +14,7 @@ from ppt_creator.renderer import PresentationRenderer
 from ppt_creator.schema import PresentationInput
 from ppt_creator_ai.briefing import (
     BriefingInput,
+    build_generation_feedback_from_preview,
     build_generation_feedback_from_review,
     build_slide_critiques_from_review,
 )
@@ -136,6 +138,109 @@ def _provider_generate(
     return provider.generate(briefing, theme_name=theme_name)
 
 
+def _merge_feedback_messages(*message_groups: list[str]) -> list[str]:
+    merged: list[str] = []
+    for group in message_groups:
+        for message in group:
+            normalized = message.strip()
+            if normalized and normalized not in merged:
+                merged.append(normalized)
+    return merged
+
+
+def _preview_feedback_score(preview_result: dict[str, object] | None) -> float | None:
+    if not preview_result:
+        return None
+
+    artifact_review = preview_result.get("preview_artifact_review") or {}
+    visual_regression = preview_result.get("visual_regression") or {}
+    quality_review = preview_result.get("quality_review") or {}
+    return (
+        float(artifact_review.get("edge_contact_count") or 0) * 3.0
+        + float(artifact_review.get("safe_area_intrusion_count") or 0) * 3.0
+        + float(artifact_review.get("body_edge_contact_count") or 0) * 2.5
+        + float(artifact_review.get("footer_intrusion_count") or 0) * 2.0
+        + float(artifact_review.get("corner_density_warning_count") or 0) * 1.5
+        + float(artifact_review.get("edge_density_warning_count") or 0) * 1.0
+        + float(visual_regression.get("diff_count") or 0) * 4.0
+        + float(quality_review.get("warning_count") or quality_review.get("issue_count") or 0) * 0.5
+    )
+
+
+def _build_preview_feedback_for_spec(
+    spec: PresentationInput,
+    *,
+    preview_enabled: bool,
+    prefer_rendered_pptx: bool,
+    resolved_asset_root: Path,
+    preview_backend: str,
+    preview_baseline_dir: str | Path | None,
+    preview_write_diff_images: bool,
+    basename: str,
+) -> tuple[dict[str, object] | None, list[str], str | None]:
+    if not preview_enabled:
+        return None, [], None
+
+    with TemporaryDirectory(prefix="ppt_creator_ai_preview_feedback_") as tmpdir:
+        temp_root = Path(tmpdir)
+        temp_preview_dir = temp_root / "previews"
+
+        if prefer_rendered_pptx:
+            temp_pptx = temp_root / f"{basename}.pptx"
+            PresentationRenderer(theme_name=spec.presentation.theme, asset_root=resolved_asset_root).render(spec, temp_pptx)
+            if preview_backend == "synthetic":
+                preview_result = render_previews(
+                    spec,
+                    temp_preview_dir,
+                    theme_name=spec.presentation.theme,
+                    asset_root=resolved_asset_root,
+                    basename=basename,
+                    backend="synthetic",
+                    baseline_dir=preview_baseline_dir,
+                    write_diff_images=preview_write_diff_images,
+                )
+                preview_source = "spec"
+            else:
+                try:
+                    preview_result = render_previews_from_pptx(
+                        temp_pptx,
+                        temp_preview_dir,
+                        theme_name=spec.presentation.theme,
+                        basename=basename,
+                        baseline_dir=preview_baseline_dir,
+                        write_diff_images=preview_write_diff_images,
+                    )
+                    preview_source = "rendered_pptx"
+                except Exception:
+                    if preview_backend == "office":
+                        raise
+                    preview_result = render_previews(
+                        spec,
+                        temp_preview_dir,
+                        theme_name=spec.presentation.theme,
+                        asset_root=resolved_asset_root,
+                        basename=basename,
+                        backend="synthetic",
+                        baseline_dir=preview_baseline_dir,
+                        write_diff_images=preview_write_diff_images,
+                    )
+                    preview_source = "spec"
+        else:
+            preview_result = render_previews(
+                spec,
+                temp_preview_dir,
+                theme_name=spec.presentation.theme,
+                asset_root=resolved_asset_root,
+                basename=basename,
+                backend=preview_backend,
+                baseline_dir=preview_baseline_dir,
+                write_diff_images=preview_write_diff_images,
+            )
+            preview_source = "spec"
+
+    return preview_result, build_generation_feedback_from_preview(preview_result), preview_source
+
+
 def generate_from_briefing(
     input_briefing: str | Path,
     output_json: str | Path,
@@ -158,6 +263,8 @@ def generate_from_briefing(
     refine_passes: int = 1,
 ) -> dict[str, object]:
     input_path = Path(input_briefing)
+    output_json_path = Path(output_json)
+    preview_feedback_basename = output_json_path.stem
     print_info(f"Loading briefing: {input_path}")
     briefing = BriefingInput.from_path(input_path)
     provider = get_provider(provider_name)
@@ -170,6 +277,7 @@ def generate_from_briefing(
     analysis = result.analysis
     initial_deck_review = review_presentation(spec, asset_root=resolved_asset_root, theme_name=spec.presentation.theme)
     deck_review = initial_deck_review
+    preview_feedback_enabled = bool(preview_dir)
     regeneration_history: list[dict[str, object]] = []
     regenerate_applied = False
 
@@ -177,10 +285,24 @@ def generate_from_briefing(
         current_result = result
         current_spec = spec
         current_review = initial_deck_review
+        current_preview_result, current_preview_feedback, current_preview_source = _build_preview_feedback_for_spec(
+            current_spec,
+            preview_enabled=preview_feedback_enabled,
+            prefer_rendered_pptx=preview_from_rendered_pptx,
+            resolved_asset_root=resolved_asset_root,
+            preview_backend=preview_backend,
+            preview_baseline_dir=preview_baseline_dir,
+            preview_write_diff_images=preview_write_diff_images,
+            basename=preview_feedback_basename,
+        )
+        current_preview_score = _preview_feedback_score(current_preview_result)
         for pass_index in range(max(1, regenerate_passes)):
-            if current_review["issue_count"] == 0:
+            if current_review["issue_count"] == 0 and (current_preview_score is None or current_preview_score == 0):
                 break
-            feedback_messages = build_generation_feedback_from_review(current_review)
+            feedback_messages = _merge_feedback_messages(
+                build_generation_feedback_from_review(current_review),
+                current_preview_feedback,
+            )
             if not feedback_messages:
                 break
             candidate_result = _provider_generate(
@@ -195,6 +317,17 @@ def generate_from_briefing(
                 asset_root=resolved_asset_root,
                 theme_name=candidate_spec.presentation.theme,
             )
+            candidate_preview_result, candidate_preview_feedback, candidate_preview_source = _build_preview_feedback_for_spec(
+                candidate_spec,
+                preview_enabled=preview_feedback_enabled,
+                prefer_rendered_pptx=preview_from_rendered_pptx,
+                resolved_asset_root=resolved_asset_root,
+                preview_backend=preview_backend,
+                preview_baseline_dir=preview_baseline_dir,
+                preview_write_diff_images=preview_write_diff_images,
+                basename=preview_feedback_basename,
+            )
+            candidate_preview_score = _preview_feedback_score(candidate_preview_result)
             payload_changed = candidate_spec.model_dump(mode="json") != current_spec.model_dump(mode="json")
             regeneration_history.append(
                 {
@@ -204,15 +337,29 @@ def generate_from_briefing(
                     "after_issue_count": candidate_review["issue_count"],
                     "before_average_score": current_review["average_score"],
                     "after_average_score": candidate_review["average_score"],
+                    "preview_feedback_messages": current_preview_feedback,
+                    "preview_feedback_source": current_preview_source,
+                    "before_preview_score": current_preview_score,
+                    "after_preview_score": candidate_preview_score,
                 }
             )
             improved = (
                 candidate_review["issue_count"] < current_review["issue_count"]
                 or candidate_review["average_score"] > current_review["average_score"]
                 or (
+                    current_preview_score is not None
+                    and candidate_preview_score is not None
+                    and candidate_preview_score < current_preview_score
+                )
+                or (
                     payload_changed
                     and candidate_review["issue_count"] <= current_review["issue_count"]
                     and candidate_review["average_score"] >= current_review["average_score"]
+                    and (
+                        current_preview_score is None
+                        or candidate_preview_score is None
+                        or candidate_preview_score <= current_preview_score
+                    )
                 )
             )
             if not improved:
@@ -220,6 +367,10 @@ def generate_from_briefing(
             current_result = candidate_result
             current_spec = candidate_spec
             current_review = candidate_review
+            current_preview_result = candidate_preview_result
+            current_preview_feedback = candidate_preview_feedback
+            current_preview_source = candidate_preview_source
+            current_preview_score = candidate_preview_score
             regenerate_applied = True
 
         result = current_result
@@ -233,8 +384,19 @@ def generate_from_briefing(
     if auto_refine:
         current_spec = spec
         current_review = deck_review
+        current_preview_result, _, _ = _build_preview_feedback_for_spec(
+            current_spec,
+            preview_enabled=preview_feedback_enabled,
+            prefer_rendered_pptx=preview_from_rendered_pptx,
+            resolved_asset_root=resolved_asset_root,
+            preview_backend=preview_backend,
+            preview_baseline_dir=preview_baseline_dir,
+            preview_write_diff_images=preview_write_diff_images,
+            basename=preview_feedback_basename,
+        )
+        current_preview_score = _preview_feedback_score(current_preview_result)
         for pass_index in range(max(1, refine_passes)):
-            if current_review["issue_count"] == 0:
+            if current_review["issue_count"] == 0 and (current_preview_score is None or current_preview_score == 0):
                 break
             candidate_spec = refine_presentation_input(current_spec, review=current_review)
             candidate_review = review_presentation(
@@ -242,6 +404,17 @@ def generate_from_briefing(
                 asset_root=resolved_asset_root,
                 theme_name=candidate_spec.presentation.theme,
             )
+            candidate_preview_result, _, _ = _build_preview_feedback_for_spec(
+                candidate_spec,
+                preview_enabled=preview_feedback_enabled,
+                prefer_rendered_pptx=preview_from_rendered_pptx,
+                resolved_asset_root=resolved_asset_root,
+                preview_backend=preview_backend,
+                preview_baseline_dir=preview_baseline_dir,
+                preview_write_diff_images=preview_write_diff_images,
+                basename=preview_feedback_basename,
+            )
+            candidate_preview_score = _preview_feedback_score(candidate_preview_result)
             refinement_history.append(
                 {
                     "pass": pass_index + 1,
@@ -249,6 +422,8 @@ def generate_from_briefing(
                     "after_issue_count": candidate_review["issue_count"],
                     "before_average_score": current_review["average_score"],
                     "after_average_score": candidate_review["average_score"],
+                    "before_preview_score": current_preview_score,
+                    "after_preview_score": candidate_preview_score,
                 }
             )
             payload_changed = candidate_spec.model_dump(mode="json") != current_spec.model_dump(mode="json")
@@ -256,15 +431,26 @@ def generate_from_briefing(
                 candidate_review["issue_count"] < current_review["issue_count"]
                 or candidate_review["average_score"] > current_review["average_score"]
                 or (
+                    current_preview_score is not None
+                    and candidate_preview_score is not None
+                    and candidate_preview_score < current_preview_score
+                )
+                or (
                     payload_changed
                     and candidate_review["issue_count"] <= current_review["issue_count"]
                     and candidate_review["average_score"] >= current_review["average_score"]
+                    and (
+                        current_preview_score is None
+                        or candidate_preview_score is None
+                        or candidate_preview_score <= current_preview_score
+                    )
                 )
             )
             if not improved:
                 break
             current_spec = candidate_spec
             current_review = candidate_review
+            current_preview_score = candidate_preview_score
             refine_applied = True
         spec = current_spec
         deck_review = current_review

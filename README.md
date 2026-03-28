@@ -461,6 +461,8 @@ Esse fluxo tenta:
 - transformar os principais riscos em mensagens de feedback
 - pedir uma nova geração ao provider com esse feedback
 
+Quando você também pede `--preview-dir`, essa regeneração heurística começa a incorporar sinais vindos do preview visual, como crowding perto do footer, intrusão em safe areas e empacotamento agressivo nas bordas.
+
 E agora você também pode acoplar **preview visual** diretamente nesse pipeline opcional:
 
 ```bash
@@ -812,6 +814,15 @@ Como o componente não está acoplado ao runtime de LLM, ele pode ser usado como
 
 Exemplo de input opcional em `examples/briefing_sales.json`.
 
+Também já existe um primeiro suporte a **briefing mais livre em texto**, mesmo sem todos os campos estruturados. Exemplo mínimo:
+
+```json
+{
+  "title": "AI copilots for sales teams",
+  "briefing_text": "Sales leaders are overloaded with repetitive preparation work. We should start with one workflow, measure time saved and quality lift, and only then expand scope."
+}
+```
+
 Essa camada tenta:
 
 - gerar um deck inicial a partir de briefing
@@ -820,6 +831,7 @@ Essa camada tenta:
 - resumir texto mais longo em bullets executivos
 - sugerir direções de imagem / placeholder automaticamente
 - sugerir direções de imagem também por tipo de slide, não só no nível geral do briefing
+- sugerir também estilo visual do asset e hint inicial de focal point por slide
 - revisar densidade do deck gerado para sinalizar slides potencialmente carregados
 
 Ela **não depende de LLM** nesta fase: é um gerador heurístico, útil como ponto de partida para pipelines futuros.

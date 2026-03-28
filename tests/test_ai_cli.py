@@ -24,6 +24,30 @@ def test_ai_cli_generates_deck_json_from_briefing(tmp_path: Path) -> None:
     assert len(spec.slides) >= 6
 
 
+def test_ai_cli_generates_deck_json_from_freeform_briefing_text(tmp_path: Path) -> None:
+    input_path = tmp_path / "freeform_briefing.json"
+    output = tmp_path / "generated_freeform_deck.json"
+    input_path.write_text(
+        json.dumps(
+            {
+                "title": "AI copilots for sales teams",
+                "briefing_text": (
+                    "Sales leaders are overloaded with repetitive preparation work and inconsistent storytelling. "
+                    "We should start with one workflow for leadership meeting prep, measure time saved and quality lift, and only then expand scope."
+                ),
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = main(["generate", str(input_path), str(output)])
+
+    assert result == 0
+    spec = PresentationInput.from_path(output)
+    assert len(spec.slides) >= 4
+    assert any(slide.type.value == "summary" for slide in spec.slides)
+
+
 def test_ai_cli_lists_available_providers(tmp_path: Path, capsys) -> None:
     report = tmp_path / "providers.json"
     result = main(["providers", "--report-json", str(report)])
@@ -239,6 +263,108 @@ def test_ai_cli_can_auto_regenerate_generated_deck(tmp_path: Path, monkeypatch) 
     assert report_payload["auto_regenerate_applied"] is True
     assert report_payload["generated_deck_issue_count"] < report_payload["initial_generated_deck_issue_count"]
     assert output_payload["slides"][1]["body"] == "Tighter intro for an executive audience."
+
+
+def test_ai_cli_auto_regenerate_can_use_preview_feedback(tmp_path: Path, monkeypatch) -> None:
+    from ppt_creator_ai import cli as ai_cli_module
+
+    output = tmp_path / "generated_preview_feedback_deck.json"
+    report = tmp_path / "generated_preview_feedback_report.json"
+    preview_dir = tmp_path / "generated_preview_feedback_previews"
+    provider = get_provider("heuristic")
+
+    seen_feedback_messages: list[str] = []
+    long_bullet = (
+        "This bullet is intentionally too long and too detailed for a clean executive slide so the regeneration pass should tighten it significantly."
+    )
+    noisy_payload = {
+        "presentation": {
+            "title": "AI copilots for sales teams",
+            "theme": "executive_premium_minimal",
+        },
+        "slides": [
+            {"type": "title", "title": "AI copilots for sales teams"},
+            {
+                "type": "agenda",
+                "title": "Agenda",
+                "body": "This introduction paragraph is intentionally verbose and dense so the provider regeneration loop has a clear reason to regenerate the deck.",
+                "bullets": [long_bullet, long_bullet, long_bullet, long_bullet, long_bullet, long_bullet],
+            },
+            {"type": "closing", "title": "Closing", "quote": "Done."},
+        ],
+    }
+    improved_payload = {
+        "presentation": {
+            "title": "AI copilots for sales teams",
+            "theme": "executive_premium_minimal",
+        },
+        "slides": [
+            {"type": "title", "title": "AI copilots for sales teams"},
+            {
+                "type": "agenda",
+                "title": "Agenda",
+                "body": "Tighter intro for an executive audience.",
+                "bullets": ["Context", "Pilot scope", "Decision", "Metrics"],
+            },
+            {"type": "closing", "title": "Closing", "quote": "Done."},
+        ],
+    }
+
+    def _generate(briefing, theme_name=None, feedback_messages=None):
+        if feedback_messages:
+            seen_feedback_messages.extend(feedback_messages)
+        payload = improved_payload if feedback_messages else noisy_payload
+        return BriefingGenerationResult(
+            provider_name="heuristic",
+            payload=payload,
+            analysis={
+                "image_suggestions": ["sales leadership dashboard"],
+                "density_review": {"status": "review", "warning_count": 2, "warnings": ["dense"], "slides": []},
+            },
+        )
+
+    monkeypatch.setattr(provider, "generate", _generate)
+    monkeypatch.setattr(
+        ai_cli_module,
+        "render_previews",
+        lambda *args, **kwargs: {
+            "mode": "preview",
+            "preview_count": 3,
+            "previews": [],
+            "thumbnail_sheet": str(preview_dir / "thumbs.png"),
+            "quality_review": {"status": "review", "warning_count": 1},
+            "preview_artifact_review": {
+                "status": "review",
+                "edge_contact_count": 0,
+                "edge_density_warning_count": 1,
+                "body_edge_contact_count": 1,
+                "safe_area_intrusion_count": 1,
+                "footer_intrusion_count": 1,
+                "corner_density_warning_count": 1,
+            },
+            "visual_regression": None,
+            "backend_requested": "synthetic",
+            "backend_used": "synthetic",
+        },
+    )
+
+    result = main(
+        [
+            "generate",
+            "examples/briefing_sales.json",
+            str(output),
+            "--auto-regenerate",
+            "--preview-dir",
+            str(preview_dir),
+            "--report-json",
+            str(report),
+        ]
+    )
+
+    assert result == 0
+    assert any("safe" in message.lower() or "footer" in message.lower() or "corner" in message.lower() for message in seen_feedback_messages)
+    report_payload = json.loads(report.read_text(encoding="utf-8"))
+    assert report_payload["auto_regenerate_applied"] is True
 
 
 def test_ai_cli_combines_regeneration_and_refine_from_latest_review(tmp_path: Path, monkeypatch) -> None:

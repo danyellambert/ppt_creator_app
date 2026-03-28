@@ -37,6 +37,21 @@ def _clean_string_list(values: list[str], *, field_name: str) -> list[str]:
     return cleaned
 
 
+def _shorten_words(value: str | None, *, max_words: int) -> str | None:
+    if not value:
+        return value
+    words = value.split()
+    if len(words) <= max_words:
+        return value.strip()
+    return " ".join(words[:max_words]).rstrip(" ,;:.!?") + "..."
+
+
+def _split_sentences(text: str | None) -> list[str]:
+    if not text:
+        return []
+    return [segment.strip() for segment in re.split(r"[\n\.\?!;]+", text) if segment.strip()]
+
+
 def summarize_text_to_executive_bullets(
     text: str | None,
     *,
@@ -147,6 +162,7 @@ class BriefingInput(BaseModel):
     audience: str | None = None
     objective: str | None = None
     context: str | None = None
+    briefing_text: str | None = None
     client_name: str | None = None
     author: str | None = None
     date: str | None = None
@@ -173,6 +189,7 @@ class BriefingInput(BaseModel):
         "audience",
         "objective",
         "context",
+        "briefing_text",
         "client_name",
         "author",
         "date",
@@ -204,6 +221,7 @@ class BriefingInput(BaseModel):
             [
                 self.objective,
                 self.context,
+                self.briefing_text,
                 self.key_messages,
                 self.metrics,
                 self.milestones,
@@ -260,6 +278,120 @@ def suggest_image_queries_from_briefing(
     return suggestions[:max_suggestions]
 
 
+def derive_briefing_freeform_signals(briefing: BriefingInput) -> dict[str, object]:
+    freeform_text = briefing.briefing_text
+    if not freeform_text:
+        return {
+            "objective": briefing.objective,
+            "context": briefing.context,
+            "outline": briefing.outline,
+            "key_messages": briefing.key_messages,
+            "recommendations": briefing.recommendations,
+        }
+
+    sentences = _split_sentences(freeform_text)
+    paragraphs = [segment.strip() for segment in freeform_text.splitlines() if segment.strip()]
+    summary_bullets = summarize_text_to_executive_bullets(freeform_text, max_bullets=6, max_words=14)
+
+    def _contains_any(value: str, keywords: tuple[str, ...]) -> bool:
+        normalized = value.lower()
+        return any(keyword in normalized for keyword in keywords)
+
+    recommendation_sentences = [
+        sentence
+        for sentence in sentences
+        if _contains_any(sentence, ("should", "recommend", "need to", "must", "focus", "prioritize", "start with"))
+    ]
+
+    derived_outline: list[str] = list(briefing.outline)
+    if not derived_outline:
+        derived_outline.append("Situation overview")
+        if _contains_any(freeform_text, ("metric", "kpi", "growth", "revenue", "%", "pipeline", "performance")):
+            derived_outline.append("Performance signals")
+        if _contains_any(freeform_text, ("roadmap", "timeline", "milestone", "phase", "rollout", "month")):
+            derived_outline.append("Execution timeline")
+        if _contains_any(freeform_text, ("option", "alternative", "choice", "compare", "versus")):
+            derived_outline.append("Option framing")
+        if _contains_any(freeform_text, ("question", "risk", "concern", "objection", "faq")):
+            derived_outline.append("Executive FAQ")
+        derived_outline.append("Recommendation")
+
+    return {
+        "objective": briefing.objective or (sentences[0] if sentences else None),
+        "context": briefing.context or _shorten_words(paragraphs[0] if paragraphs else freeform_text, max_words=45),
+        "outline": derived_outline,
+        "key_messages": briefing.key_messages or summary_bullets[:4],
+        "recommendations": briefing.recommendations or recommendation_sentences[:3] or summary_bullets[-2:],
+    }
+
+
+def _slide_image_context_hints(*, slide_type: str, title_context: str) -> dict[str, object]:
+    hints: dict[str, dict[str, object]] = {
+        "title": {
+            "asset_style": "editorial executive hero background",
+            "composition_notes": "Use a premium landscape image with strong negative space for cover typography.",
+            "focal_point": {"x": 0.52, "y": 0.34},
+        },
+        "bullets": {
+            "asset_style": "leadership workshop documentary photo",
+            "composition_notes": "Prefer a contextual business scene with one cleaner side for narrative overlay.",
+            "focal_point": {"x": 0.56, "y": 0.42},
+        },
+        "metrics": {
+            "asset_style": "clean analytics dashboard or control-room visual",
+            "composition_notes": "Prefer structured analytical imagery with the core signal cluster near the center.",
+            "focal_point": {"x": 0.5, "y": 0.44},
+        },
+        "timeline": {
+            "asset_style": "roadmap planning wall or milestone workshop",
+            "composition_notes": "Prefer a wide planning visual with the main roadmap artifact centered slightly above mid-frame.",
+            "focal_point": {"x": 0.5, "y": 0.4},
+        },
+        "comparison": {
+            "asset_style": "decision workshop whiteboard with side-by-side framing",
+            "composition_notes": "Prefer imagery that implies contrast and keeps both sides visually balanced.",
+            "focal_point": {"x": 0.5, "y": 0.42},
+        },
+        "faq": {
+            "asset_style": "boardroom Q&A discussion scene",
+            "composition_notes": "Prefer a calm meeting image with evenly distributed visual weight and limited clutter.",
+            "focal_point": {"x": 0.5, "y": 0.38},
+        },
+        "summary": {
+            "asset_style": "executive alignment or final decision moment",
+            "composition_notes": "Prefer a premium closing visual with centered subject matter and preserved whitespace.",
+            "focal_point": {"x": 0.52, "y": 0.36},
+        },
+    }
+
+    resolved = dict(
+        hints.get(
+            slide_type,
+            {
+                "asset_style": "clean executive contextual photo",
+                "composition_notes": "Prefer premium, uncluttered imagery with enough negative space for slide text.",
+                "focal_point": {"x": 0.5, "y": 0.4},
+            },
+        )
+    )
+
+    if "sales" in title_context or "revenue" in title_context:
+        if slide_type == "metrics":
+            resolved["asset_style"] = "sales dashboard or pipeline forecast visual"
+        elif slide_type in {"bullets", "summary"}:
+            resolved["asset_style"] = "sales leadership meeting or forecast review"
+    elif "product" in title_context:
+        if slide_type == "timeline":
+            resolved["asset_style"] = "product roadmap workshop visual"
+        elif slide_type in {"bullets", "summary"}:
+            resolved["asset_style"] = "product strategy offsite or prioritization workshop"
+    elif "strategy" in title_context:
+        if slide_type in {"title", "summary"}:
+            resolved["asset_style"] = "executive strategy offsite hero visual"
+
+    return resolved
+
+
 def suggest_slide_image_queries_from_briefing(
     briefing: BriefingInput,
     *,
@@ -280,104 +412,122 @@ def suggest_slide_image_queries_from_briefing(
     title_context = briefing.title.lower()
     audience_context = briefing.audience or "executive leadership team"
 
+    def _suggestion(
+        *,
+        slide_key: str,
+        slide_type: str,
+        title: str,
+        queries: list[str],
+    ) -> dict[str, object]:
+        hints = _slide_image_context_hints(slide_type=slide_type, title_context=title_context)
+        return {
+            "slide_key": slide_key,
+            "slide_type": slide_type,
+            "title": title,
+            "queries": queries,
+            "asset_style": hints["asset_style"],
+            "composition_notes": hints["composition_notes"],
+            "focal_point": hints["focal_point"],
+        }
+
     suggestions.append(
-        {
-            "slide_key": "title",
-            "slide_type": "title",
-            "title": briefing.title,
-            "queries": _queries(
+        _suggestion(
+            slide_key="title",
+            slide_type="title",
+            title=briefing.title,
+            queries=_queries(
                 f"{briefing.title} executive presentation cover image",
                 f"{audience_context} strategy meeting hero background",
             ),
-        }
+        )
     )
 
     if briefing.objective or briefing.context or briefing.key_messages:
         suggestions.append(
-            {
-                "slide_key": "situation_overview",
-                "slide_type": "bullets",
-                "title": "Situation overview",
-                "queries": _queries(
+            _suggestion(
+                slide_key="situation_overview",
+                slide_type="bullets",
+                title="Situation overview",
+                queries=_queries(
                     f"{briefing.title} business context workshop",
                     f"{audience_context} planning session",
                     "executive team discussion around business priorities",
                 ),
-            }
+            )
         )
 
     if briefing.metrics:
         metric_labels = ", ".join(metric.label for metric in briefing.metrics[:2])
         suggestions.append(
-            {
-                "slide_key": "headline_metrics",
-                "slide_type": "metrics",
-                "title": "Headline metrics",
-                "queries": _queries(
+            _suggestion(
+                slide_key="headline_metrics",
+                slide_type="metrics",
+                title="Headline metrics",
+                queries=_queries(
                     f"executive KPI dashboard for {briefing.title}",
                     f"business performance dashboard showing {metric_labels}" if metric_labels else None,
                     "leadership dashboard with clean charts and metric cards",
                 ),
-            }
+            )
         )
 
     if briefing.milestones:
         milestone_titles = ", ".join(item.title for item in briefing.milestones[:3])
         suggestions.append(
-            {
-                "slide_key": "execution_timeline",
-                "slide_type": "timeline",
-                "title": "Execution timeline",
-                "queries": _queries(
+            _suggestion(
+                slide_key="execution_timeline",
+                slide_type="timeline",
+                title="Execution timeline",
+                queries=_queries(
                     f"program roadmap timeline for {briefing.title}",
                     f"milestone planning workshop covering {milestone_titles}" if milestone_titles else None,
                     "strategy roadmap with milestone planning board",
                 ),
-            }
+            )
         )
 
     if len(briefing.options) == 2:
         left, right = briefing.options
         suggestions.append(
-            {
-                "slide_key": "option_framing",
-                "slide_type": "comparison",
-                "title": "Option framing",
-                "queries": _queries(
+            _suggestion(
+                slide_key="option_framing",
+                slide_type="comparison",
+                title="Option framing",
+                queries=_queries(
                     f"executive decision workshop comparing {left.title} and {right.title}",
                     "comparison whiteboard for strategic options",
                     f"leadership team evaluating {briefing.title} scenarios",
                 ),
-            }
+            )
         )
 
     if len(briefing.faqs) >= 2:
         first_question = briefing.faqs[0].question
         suggestions.append(
-            {
-                "slide_key": "executive_faq",
-                "slide_type": "faq",
-                "title": "Executive FAQ",
-                "queries": _queries(
+            _suggestion(
+                slide_key="executive_faq",
+                slide_type="faq",
+                title="Executive FAQ",
+                queries=_queries(
                     f"executive Q&A session about {briefing.title}",
                     f"leadership meeting addressing question: {first_question}",
                     "boardroom discussion handling objections and decisions",
                 ),
-            }
+            )
         )
 
     if briefing.recommendations or briefing.key_messages:
         suggestions.append(
-            {
-                "slide_key": "executive_summary",
-                "slide_type": "summary",
-                "title": "Executive summary",
-                "queries": _queries(
+            _suggestion(
+                slide_key="executive_summary",
+                slide_type="summary",
+                title="Executive summary",
+                queries=_queries(
                     f"executive summary visual for {briefing.title}",
                     "leadership alignment and decision summary",
                     "final recommendation slide background for executive meeting",
                 ),
-            }
+            )
         )
 
     if "sales" in title_context or "revenue" in title_context:
@@ -409,8 +559,9 @@ def suggest_slide_image_queries_from_briefing(
 
 
 def _infer_agenda(briefing: BriefingInput) -> list[str]:
-    if briefing.outline:
-        return briefing.outline[:6]
+    derived = derive_briefing_freeform_signals(briefing)
+    if derived["outline"]:
+        return list(derived["outline"])[:6]
 
     agenda: list[str] = []
     if briefing.objective or briefing.context or briefing.key_messages:
@@ -536,6 +687,38 @@ def build_generation_feedback_from_review(
     return messages
 
 
+def build_generation_feedback_from_preview(
+    preview_result: dict[str, object],
+    *,
+    max_messages: int = 6,
+) -> list[str]:
+    messages: list[str] = []
+
+    def add(message: str) -> None:
+        normalized = message.strip()
+        if normalized and normalized not in messages and len(messages) < max_messages:
+            messages.append(normalized)
+
+    artifact_review = preview_result.get("preview_artifact_review") or {}
+    if artifact_review.get("status") not in {None, "ok"}:
+        if int(artifact_review.get("safe_area_intrusion_count") or 0) > 0:
+            add("Keep main content within safer margins and avoid intruding into edge-adjacent regions.")
+        if int(artifact_review.get("body_edge_contact_count") or 0) > 0:
+            add("Pull body content farther from slide boundaries before the footer region.")
+        if int(artifact_review.get("footer_intrusion_count") or 0) > 0:
+            add("Reduce lower-slide crowding so content stays farther from the footer line.")
+        if int(artifact_review.get("corner_density_warning_count") or 0) > 0:
+            add("Avoid packing important content into slide corners; preserve more whitespace there.")
+        if int(artifact_review.get("edge_density_warning_count") or 0) > 0:
+            add("Reduce aggressive edge packing and simplify composition near the slide perimeter.")
+
+    visual_regression = preview_result.get("visual_regression") or {}
+    if int(visual_regression.get("diff_count") or 0) > 0:
+        add("Stabilize the visual composition so regenerated slides drift less from baseline previews.")
+
+    return messages
+
+
 def build_slide_critiques_from_review(
     spec: PresentationInput,
     review: dict[str, object],
@@ -607,14 +790,15 @@ def build_briefing_analysis(
         theme_name=theme_name,
         feedback_messages=feedback_messages,
     )
+    derived_signals = derive_briefing_freeform_signals(briefing)
     summary_source = " ".join(
         filter(
             None,
             [
-                briefing.objective,
-                briefing.context,
-                *briefing.key_messages[:3],
-                *briefing.recommendations[:3],
+                str(derived_signals.get("objective") or "") or None,
+                str(derived_signals.get("context") or "") or None,
+                *(derived_signals.get("key_messages") or [])[:3],
+                *(derived_signals.get("recommendations") or [])[:3],
             ],
         )
     )
@@ -624,7 +808,7 @@ def build_briefing_analysis(
         "theme": spec.presentation.theme,
         "generated_slide_count": len(spec.slides),
         "feedback_messages": feedback_messages or [],
-        "executive_summary_bullets": briefing.recommendations[:3]
+        "executive_summary_bullets": (derived_signals.get("recommendations") or [])[:3]
         or summarize_text_to_executive_bullets(summary_source, max_bullets=3),
         "image_suggestions": suggest_image_queries_from_briefing(briefing),
         "slide_image_suggestions": suggest_slide_image_queries_from_briefing(briefing),
@@ -640,8 +824,18 @@ def generate_presentation_payload_from_briefing(
 ) -> dict[str, object]:
     effective_theme = theme_name or briefing.theme
     compact_mode = bool(feedback_messages)
+    derived_signals = derive_briefing_freeform_signals(briefing)
     derived_context_bullets = summarize_text_to_executive_bullets(
-        " ".join(filter(None, [briefing.objective, briefing.context])),
+        " ".join(
+            filter(
+                None,
+                [
+                    str(derived_signals.get("objective") or "") or None,
+                    str(derived_signals.get("context") or "") or None,
+                    briefing.briefing_text,
+                ],
+            )
+        ),
         max_bullets=3 if compact_mode else 4,
     )
     slides: list[dict[str, object]] = [
@@ -651,7 +845,7 @@ def generate_presentation_payload_from_briefing(
             "subtitle": briefing.subtitle,
             "eyebrow": briefing.audience or "Briefing-generated deck",
             "layout_variant": "hero_cover",
-            "body": briefing.objective,
+            "body": derived_signals.get("objective"),
         }
     ]
 
@@ -666,15 +860,17 @@ def generate_presentation_payload_from_briefing(
             }
         )
 
-    context_bullets = (briefing.key_messages[: (4 if compact_mode else 6)] or derived_context_bullets[: (4 if compact_mode else 6)])
-    if briefing.objective or briefing.context or context_bullets:
+    key_messages = list(derived_signals.get("key_messages") or [])
+    recommendations = list(derived_signals.get("recommendations") or [])
+    context_bullets = (key_messages[: (4 if compact_mode else 6)] or derived_context_bullets[: (4 if compact_mode else 6)])
+    if derived_signals.get("objective") or derived_signals.get("context") or context_bullets:
         slides.append(
             {
                 "type": "bullets",
                 "title": "Situation overview",
                 "subtitle": briefing.subtitle,
                 "eyebrow": "Context",
-                "body": briefing.objective or briefing.context,
+                "body": derived_signals.get("objective") or derived_signals.get("context"),
                 "bullets": context_bullets,
             }
         )
@@ -728,13 +924,13 @@ def generate_presentation_payload_from_briefing(
             }
         )
 
-    summary_bullets = (briefing.recommendations or briefing.key_messages or derived_context_bullets)[: (4 if compact_mode else 6)]
-    if summary_bullets or briefing.context:
+    summary_bullets = (recommendations or key_messages or derived_context_bullets)[: (4 if compact_mode else 6)]
+    if summary_bullets or derived_signals.get("context"):
         slides.append(
             {
                 "type": "summary",
                 "title": "Executive summary",
-                "body": briefing.context,
+                "body": derived_signals.get("context"),
                 "bullets": summary_bullets,
             }
         )

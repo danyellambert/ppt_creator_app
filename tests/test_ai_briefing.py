@@ -4,6 +4,7 @@ from ppt_creator.schema import PresentationInput
 from ppt_creator_ai.briefing import (
     BriefingInput,
     build_briefing_analysis,
+    derive_briefing_freeform_signals,
     generate_presentation_input_from_briefing,
     generate_presentation_payload_from_briefing,
     suggest_slide_image_queries_from_briefing,
@@ -64,6 +65,62 @@ def test_slide_image_suggestions_are_granular_by_slide_type() -> None:
     assert "metrics" in slide_types
     assert "timeline" in slide_types
     assert any(item["queries"] for item in suggestions)
+
+
+def test_slide_image_suggestions_include_asset_style_and_focal_point_hints() -> None:
+    briefing = BriefingInput.from_path("examples/briefing_sales.json")
+
+    suggestions = suggest_slide_image_queries_from_briefing(briefing)
+
+    assert suggestions
+    for item in suggestions:
+        assert item["asset_style"]
+        assert item["composition_notes"]
+        assert 0.0 <= item["focal_point"]["x"] <= 1.0
+        assert 0.0 <= item["focal_point"]["y"] <= 1.0
+
+    title_hint = next(item for item in suggestions if item["slide_type"] == "title")
+    assert title_hint["focal_point"]["y"] < 0.5
+
+
+def test_briefing_freeform_text_derives_content_signals() -> None:
+    briefing = BriefingInput.model_validate(
+        {
+            "title": "AI copilots for sales teams",
+            "briefing_text": (
+                "Sales leaders are overloaded with repetitive preparation work and inconsistent storytelling. "
+                "We should start with one workflow for leadership meeting prep, measure time saved and quality lift, and only then expand scope. "
+                "The rollout should stay narrow in the first month and follow a milestone-based plan."
+            ),
+        }
+    )
+
+    derived = derive_briefing_freeform_signals(briefing)
+
+    assert derived["objective"]
+    assert derived["context"]
+    assert derived["key_messages"]
+    assert derived["recommendations"]
+    assert derived["outline"]
+
+
+def test_briefing_freeform_text_can_generate_valid_presentation() -> None:
+    briefing = BriefingInput.model_validate(
+        {
+            "title": "AI copilots for sales teams",
+            "briefing_text": (
+                "Sales leaders are overloaded with repetitive preparation work and inconsistent storytelling. "
+                "We should start with one workflow for leadership meeting prep, measure time saved and quality lift, and only then expand scope."
+            ),
+        }
+    )
+
+    spec = generate_presentation_input_from_briefing(briefing)
+
+    assert isinstance(spec, PresentationInput)
+    assert len(spec.slides) >= 4
+    assert any(slide.type.value == "agenda" for slide in spec.slides)
+    assert any(slide.type.value == "summary" for slide in spec.slides)
 
 
 def test_provider_registry_exposes_heuristic_provider() -> None:

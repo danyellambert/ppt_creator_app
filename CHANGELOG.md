@@ -36,6 +36,9 @@ The format is inspired by Keep a Changelog, and the project aims to follow Seman
 - preview artifact QA now includes stronger body-region signals for safe-area intrusion, footer-boundary crowding, and unsafe corner density
 - image slides now support focal-point-aware cover cropping via `image_focal_x` / `image_focal_y` in both rendered PPTX output and preview generation
 - the main render flow can now generate previews alongside the final `.pptx`, preferring previews derived from the rendered artifact when Office-backed preview is available
+- AI briefing slide-level image suggestions now include contextual asset-style and focal-point hints for downstream image selection/cropping
+- AI briefing regeneration/refine loops can now also consider preview-derived visual feedback when preview generation is enabled
+- the optional briefing layer can now derive outline/context/key messages from a freer `briefing_text`, not only fully structured fields
 - optional office-aware preview backend selection with automatic fallback to synthetic previews
 - initial layout primitive helpers for panel inner bounds and stacked vertical regions
 - initial application of layout primitives to comparison, faq, cards, and two-column slides
