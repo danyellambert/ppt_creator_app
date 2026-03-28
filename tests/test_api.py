@@ -299,3 +299,57 @@ def test_api_preview_pptx_falls_back_to_pdf_rasterization_when_needed(tmp_path: 
         server.shutdown()
         server.server_close()
         thread.join(timeout=5)
+
+
+def test_api_compare_pptx_endpoint_generates_visual_comparison(tmp_path: Path) -> None:
+    from ppt_creator import preview as preview_module
+
+    server = build_api_server("127.0.0.1", 0, asset_root="examples")
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    try:
+        base_url = f"http://127.0.0.1:{server.server_address[1]}"
+        spec = PresentationInput.from_path("examples/ai_sales.json")
+        before_pptx = tmp_path / "api_compare_before.pptx"
+        after_pptx = tmp_path / "api_compare_after.pptx"
+        PresentationRenderer(asset_root="examples").render(spec, before_pptx)
+        PresentationRenderer(asset_root="examples").render(spec, after_pptx)
+
+        def _fake_run(command, capture_output, text, check):
+            outdir = Path(command[command.index("--outdir") + 1]) if "--outdir" in command else tmp_path
+            source_pptx = Path(command[-1])
+            slide_count = len(PptxPresentation(str(source_pptx)).slides)
+            outdir.mkdir(parents=True, exist_ok=True)
+            for index in range(1, slide_count + 1):
+                Image.new("RGB", (1280, 720), (245, 245, 245)).save(outdir / f"api-compare-{index:02d}.png")
+
+            class _Completed:
+                returncode = 0
+                stdout = ""
+                stderr = ""
+
+            return _Completed()
+
+        preview_module.find_office_runtime = lambda: "/usr/bin/soffice"
+        preview_module.subprocess.run = _fake_run
+
+        comparison_dir = tmp_path / "api_compare_output"
+        status, comparison_payload = _request_json(
+            f"{base_url}/compare-pptx",
+            {
+                "before_pptx": str(before_pptx),
+                "after_pptx": str(after_pptx),
+                "output_dir": str(comparison_dir),
+                "write_diff_images": True,
+            },
+            method="POST",
+        )
+        assert status == 200
+        assert comparison_payload["result"]["mode"] == "compare-pptx"
+        assert comparison_payload["result"]["comparison"]["status"] == "ok"
+        assert comparison_payload["result"]["comparison"]["diff_count"] == 0
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)

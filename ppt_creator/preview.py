@@ -1324,6 +1324,117 @@ def render_previews_from_pptx(
     return renderer.render_pptx_previews(input_pptx, output_dir, basename=basename)
 
 
+def compare_preview_directories(
+    current_dir: str | Path,
+    baseline_dir: str | Path,
+    output_dir: str | Path,
+    *,
+    theme_name: str | None = None,
+    basename: str | None = None,
+    diff_threshold: float = 0.01,
+    write_diff_images: bool = False,
+) -> dict[str, object]:
+    current_root = Path(current_dir).resolve()
+    baseline_root = Path(baseline_dir).resolve()
+    destination = Path(output_dir).resolve()
+
+    if not current_root.exists() or not current_root.is_dir():
+        raise FileNotFoundError(f"Current preview directory not found: {current_root}")
+    if not baseline_root.exists() or not baseline_root.is_dir():
+        raise FileNotFoundError(f"Baseline preview directory not found: {baseline_root}")
+
+    current_images = [str(path) for path in _list_preview_images(current_root)]
+    baseline_images = _list_preview_images(baseline_root)
+    if not current_images:
+        raise FileNotFoundError(f"No preview PNGs found in current directory: {current_root}")
+    if not baseline_images:
+        raise FileNotFoundError(f"No preview PNGs found in baseline directory: {baseline_root}")
+
+    destination.mkdir(parents=True, exist_ok=True)
+    base = basename or f"{_safe_basename(current_root.name)}-vs-{_safe_basename(baseline_root.name)}"
+    renderer = PreviewRenderer(
+        theme_name=theme_name,
+        baseline_dir=baseline_root,
+        diff_threshold=diff_threshold,
+        write_diff_images=write_diff_images,
+        backend="synthetic",
+    )
+    comparison = renderer.build_visual_regression_report(current_images, destination, base)
+    return {
+        "mode": "compare-previews",
+        "current_dir": str(current_root),
+        "baseline_dir": str(baseline_root),
+        "output_dir": str(destination),
+        "current_preview_count": len(current_images),
+        "baseline_preview_count": len(baseline_images),
+        "comparison": comparison,
+    }
+
+
+def compare_pptx_artifacts(
+    before_pptx: str | Path,
+    after_pptx: str | Path,
+    output_dir: str | Path,
+    *,
+    theme_name: str | None = None,
+    basename: str | None = None,
+    diff_threshold: float = 0.01,
+    write_diff_images: bool = False,
+) -> dict[str, object]:
+    before_path = Path(before_pptx).resolve()
+    after_path = Path(after_pptx).resolve()
+    if not before_path.exists():
+        raise FileNotFoundError(f"Before PPTX not found: {before_path}")
+    if not after_path.exists():
+        raise FileNotFoundError(f"After PPTX not found: {after_path}")
+    if before_path.suffix.lower() != ".pptx":
+        raise ValueError(f"Before PPTX path must end with .pptx: {before_path}")
+    if after_path.suffix.lower() != ".pptx":
+        raise ValueError(f"After PPTX path must end with .pptx: {after_path}")
+
+    with TemporaryDirectory(prefix="ppt_creator_compare_pptx_") as tmpdir:
+        temp_root = Path(tmpdir)
+        before_preview_dir = temp_root / "before"
+        after_preview_dir = temp_root / "after"
+        before_result = render_previews_from_pptx(
+            before_path,
+            before_preview_dir,
+            theme_name=theme_name,
+            basename="before",
+            diff_threshold=diff_threshold,
+            write_diff_images=False,
+        )
+        after_result = render_previews_from_pptx(
+            after_path,
+            after_preview_dir,
+            theme_name=theme_name,
+            basename="after",
+            diff_threshold=diff_threshold,
+            write_diff_images=False,
+        )
+        comparison = compare_preview_directories(
+            after_preview_dir,
+            before_preview_dir,
+            output_dir,
+            theme_name=theme_name,
+            basename=basename or f"{_safe_basename(after_path.stem)}-vs-{_safe_basename(before_path.stem)}",
+            diff_threshold=diff_threshold,
+            write_diff_images=write_diff_images,
+        )
+
+    return {
+        "mode": "compare-pptx",
+        "before_pptx": str(before_path),
+        "after_pptx": str(after_path),
+        "output_dir": str(Path(output_dir).resolve()),
+        "before_preview_count": before_result["preview_count"],
+        "after_preview_count": after_result["preview_count"],
+        "before_office_conversion_strategy": before_result.get("office_conversion_strategy"),
+        "after_office_conversion_strategy": after_result.get("office_conversion_strategy"),
+        "comparison": comparison["comparison"],
+    }
+
+
 def render_previews_for_rendered_artifact(
     spec: PresentationInput,
     output_dir: str | Path,

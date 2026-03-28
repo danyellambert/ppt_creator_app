@@ -450,3 +450,52 @@ def test_cli_preview_pptx_falls_back_to_pdf_rasterization_when_office_exports_si
     assert payload["preview_count"] == 10
     assert payload["backend_used"] == "office"
     assert payload["office_conversion_strategy"] == "pdf_via_ghostscript"
+
+
+def test_cli_compare_pptx_generates_visual_comparison_report(tmp_path: Path, monkeypatch) -> None:
+    from ppt_creator import preview as preview_module
+
+    before_pptx = tmp_path / "before_deck.pptx"
+    after_pptx = tmp_path / "after_deck.pptx"
+    output_dir = tmp_path / "compare_pptx_output"
+    report_path = tmp_path / "compare_pptx_report.json"
+
+    spec = PresentationInput.from_path("examples/ai_sales.json")
+    PresentationRenderer(asset_root="examples").render(spec, before_pptx)
+    PresentationRenderer(asset_root="examples").render(spec, after_pptx)
+
+    def _fake_run(command, capture_output, text, check):
+        outdir = Path(command[command.index("--outdir") + 1]) if "--outdir" in command else tmp_path
+        source_pptx = Path(command[-1])
+        slide_count = len(PptxPresentation(str(source_pptx)).slides)
+        outdir.mkdir(parents=True, exist_ok=True)
+        for index in range(1, slide_count + 1):
+            Image.new("RGB", (1280, 720), (245, 245, 245)).save(outdir / f"compare-mock-{index:02d}.png")
+
+        class _Completed:
+            returncode = 0
+            stdout = ""
+            stderr = ""
+
+        return _Completed()
+
+    monkeypatch.setattr(preview_module, "find_office_runtime", lambda: "/usr/bin/soffice")
+    monkeypatch.setattr(preview_module.subprocess, "run", _fake_run)
+
+    result = main(
+        [
+            "compare-pptx",
+            str(before_pptx),
+            str(after_pptx),
+            str(output_dir),
+            "--write-diff-images",
+            "--report-json",
+            str(report_path),
+        ]
+    )
+
+    assert result == 0
+    payload = json.loads(report_path.read_text(encoding="utf-8"))
+    assert payload["mode"] == "compare-pptx"
+    assert payload["comparison"]["status"] == "ok"
+    assert payload["comparison"]["diff_count"] == 0

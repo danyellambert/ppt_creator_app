@@ -9,6 +9,7 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from ppt_creator.preview import (
+    compare_pptx_artifacts,
     render_previews,
     render_previews_for_rendered_artifact,
     render_previews_from_pptx,
@@ -243,6 +244,27 @@ def preview_pptx_payload(
     )
 
 
+def compare_pptx_payload(
+    before_pptx: str | Path,
+    after_pptx: str | Path,
+    *,
+    output_dir: str | Path,
+    theme_name: str | None = None,
+    basename: str | None = None,
+    diff_threshold: float = 0.01,
+    write_diff_images: bool = False,
+) -> dict[str, object]:
+    return compare_pptx_artifacts(
+        before_pptx,
+        after_pptx,
+        output_dir,
+        theme_name=theme_name,
+        basename=basename,
+        diff_threshold=diff_threshold,
+        write_diff_images=write_diff_images,
+    )
+
+
 def build_api_server(
     host: str = "127.0.0.1",
     port: int = 8787,
@@ -397,6 +419,25 @@ class PptCreatorAPIHandler(BaseHTTPRequestHandler):
                     theme_name=str(payload["theme_name"]) if payload.get("theme_name") else None,
                     basename=str(payload["basename"]) if payload.get("basename") else None,
                     baseline_dir=payload.get("baseline_dir"),
+                    diff_threshold=float(payload.get("diff_threshold", 0.01)),
+                    write_diff_images=bool(payload.get("write_diff_images", False)),
+                )
+                self._json_response(HTTPStatus.OK, {"result": result})
+                return
+
+            if self.path == "/compare-pptx":
+                if "before_pptx" not in payload:
+                    raise APIRequestError("'before_pptx' is required for /compare-pptx")
+                if "after_pptx" not in payload:
+                    raise APIRequestError("'after_pptx' is required for /compare-pptx")
+                if "output_dir" not in payload:
+                    raise APIRequestError("'output_dir' is required for /compare-pptx")
+                result = compare_pptx_payload(
+                    str(payload["before_pptx"]),
+                    str(payload["after_pptx"]),
+                    output_dir=str(payload["output_dir"]),
+                    theme_name=str(payload["theme_name"]) if payload.get("theme_name") else None,
+                    basename=str(payload["basename"]) if payload.get("basename") else None,
                     diff_threshold=float(payload.get("diff_threshold", 0.01)),
                     write_diff_images=bool(payload.get("write_diff_images", False)),
                 )

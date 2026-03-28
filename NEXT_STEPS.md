@@ -348,6 +348,7 @@ Como a qualidade percebida do deck depende muito da inspeção visual, existe um
 - [ ] adicionar regressão visual baseada em previews reais/golden files
   - [x] primeira camada de comparação contra golden previews com diffs opcionais
   - [x] caminhos opcionais com `render-pptx` + baseline agora passam a favorecer preview real quando disponível
+  - [x] primeiro fluxo dedicado para comparar duas versões `.pptx` via previews reais e diff automático
   - [ ] evoluir para comparação baseada preferencialmente em preview do `.pptx` real
 - [ ] criar detectores mais fortes de colisão, overflow e clipping
   - [x] primeira camada heurística de risco de overflow e desbalanceamento exposta no review/QA
@@ -504,6 +505,7 @@ Se a meta for perseguir o nível “deck quase pronto sem retoque manual”, a o
 - [x] overlays de debug para analisar composição
 - [x] revisão heurística inicial de qualidade
 - [ ] comparação visual automática entre versões
+- [x] comparação visual automática entre versões
 
 ### Prioridade 2 — Refatoração do motor de layout
 

@@ -48,6 +48,8 @@ def test_domain_templates_are_exposed() -> None:
 
 def test_api_helpers_are_exposed() -> None:
     assert ppt_creator.build_api_server is not None
+    assert ppt_creator.compare_pptx_artifacts is not None
+    assert ppt_creator.compare_pptx_payload is not None
     assert ppt_creator.PreviewRenderer is not None
     assert ppt_creator.preview_spec_payload is not None
     assert ppt_creator.render_previews is not None

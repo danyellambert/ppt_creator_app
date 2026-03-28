@@ -8,6 +8,7 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from ppt_creator.preview import (
+    compare_pptx_artifacts,
     render_previews,
     render_previews_for_rendered_artifact,
     render_previews_from_pptx,
@@ -137,6 +138,28 @@ def build_parser() -> argparse.ArgumentParser:
         help="Write per-slide diff images when running baseline comparison",
     )
     preview_pptx_parser.add_argument("--report-json", help="Optional path to write a JSON PPTX preview report")
+
+    compare_pptx_parser = subparsers.add_parser(
+        "compare-pptx",
+        help="Compare two PPTX artifacts visually by generating real previews and diffing them",
+    )
+    compare_pptx_parser.add_argument("before_pptx", help="Reference PPTX path")
+    compare_pptx_parser.add_argument("after_pptx", help="Updated PPTX path")
+    compare_pptx_parser.add_argument("output_dir", help="Directory where comparison artifacts/diff images will be written")
+    compare_pptx_parser.add_argument("--theme", help="Optional theme used only for comparison/report styling")
+    compare_pptx_parser.add_argument("--basename", help="Optional base name for generated comparison artifacts")
+    compare_pptx_parser.add_argument(
+        "--diff-threshold",
+        type=float,
+        default=0.01,
+        help="Threshold used to flag visual differences between the two PPTX artifacts",
+    )
+    compare_pptx_parser.add_argument(
+        "--write-diff-images",
+        action="store_true",
+        help="Write per-slide diff images when comparing the two PPTX artifacts",
+    )
+    compare_pptx_parser.add_argument("--report-json", help="Optional path to write a JSON comparison report")
 
     validate_parser = subparsers.add_parser("validate", help="Validate JSON without rendering")
     validate_parser.add_argument("input_json", help="Path to the structured JSON input")
@@ -602,6 +625,38 @@ def preview_pptx_one(
     return result
 
 
+def compare_pptx_one(
+    before_pptx: str | Path,
+    after_pptx: str | Path,
+    output_dir: str | Path,
+    *,
+    theme_name: str | None = None,
+    basename: str | None = None,
+    diff_threshold: float = 0.01,
+    write_diff_images: bool = False,
+) -> dict[str, object]:
+    before_path = Path(before_pptx)
+    after_path = Path(after_pptx)
+    output_path = Path(output_dir)
+    print_info(f"Comparing PPTX artifacts: {before_path} -> {after_path}")
+    print_info(f"Comparison output directory: {output_path}")
+    result = compare_pptx_artifacts(
+        before_path,
+        after_path,
+        output_path,
+        theme_name=theme_name,
+        basename=basename,
+        diff_threshold=diff_threshold,
+        write_diff_images=write_diff_images,
+    )
+    print(
+        "[OK] Compared PPTX artifacts: "
+        f"{result['comparison']['diff_count']} diff(s), "
+        f"{result['comparison']['missing_baseline_count']} missing baseline(s)"
+    )
+    return result
+
+
 def collect_batch_inputs(input_dir: str | Path, pattern: str) -> tuple[Path, list[Path]]:
     root = Path(input_dir)
     if not root.exists():
@@ -687,6 +742,20 @@ def main(argv: list[str] | None = None) -> int:
                 theme_name=args.theme,
                 basename=args.basename,
                 baseline_dir=args.baseline_dir,
+                diff_threshold=args.diff_threshold,
+                write_diff_images=args.write_diff_images,
+            )
+            if args.report_json:
+                write_report(args.report_json, report)
+            return 0
+
+        if args.command == "compare-pptx":
+            report = compare_pptx_one(
+                args.before_pptx,
+                args.after_pptx,
+                args.output_dir,
+                theme_name=args.theme,
+                basename=args.basename,
                 diff_threshold=args.diff_threshold,
                 write_diff_images=args.write_diff_images,
             )

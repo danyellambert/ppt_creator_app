@@ -665,6 +665,15 @@ Quando o LibreOffice exporta apenas um PNG único na conversão direta do `.pptx
 
 Isso melhora bastante a confiabilidade do preview real em ambientes onde a exportação direta para PNG não sai slide a slide.
 
+Também já existe um fluxo explícito para **comparar visualmente duas versões `.pptx`** usando previews reais do artefato final:
+
+```bash
+python -m ppt_creator.cli compare-pptx outputs/v1.pptx outputs/v2.pptx outputs/compare_v1_v2 \
+  --write-diff-images --report-json outputs/compare_v1_v2_report.json
+```
+
+Isso ajuda a transformar a regressão visual em algo mais operacional quando você quer comparar duas versões renderizadas do deck, não só um baseline manual de PNGs.
+
 ## Modo API / serviço
 
 Também existe um modo HTTP simples para integrar o `ppt_creator` em outros fluxos:
@@ -677,6 +686,7 @@ Endpoints disponíveis:
 
 - `GET /health`
 - `GET /templates`
+- `POST /compare-pptx`
 - `POST /review`
 - `POST /preview`
 - `POST /validate`
