@@ -359,6 +359,10 @@ def review_one(
         print_info(
             f"Clipping risk heuristics flagged {result['clipping_risk_count']} signal(s) across the deck"
         )
+    if result["collision_risk_count"]:
+        print_info(
+            f"Collision/layout-pressure heuristics flagged {result['collision_risk_count']} signal(s) across the deck"
+        )
     if result["balance_warning_count"]:
         print_info(
             f"Balance heuristics flagged {result['balance_warning_count']} signal(s) across the deck"
@@ -749,6 +753,13 @@ def main(argv: list[str] | None = None) -> int:
                 else None,
                 "review_clipping_risk_count": sum(
                     int(result["quality_review"]["clipping_risk_count"])
+                    for result in results
+                    if result["quality_review"] is not None
+                )
+                if args.review
+                else None,
+                "review_collision_risk_count": sum(
+                    int(result["quality_review"]["collision_risk_count"])
                     for result in results
                     if result["quality_review"] is not None
                 )

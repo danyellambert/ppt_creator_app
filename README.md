@@ -355,6 +355,7 @@ Esse relatório agora pode incluir:
 
 - `severity_counts`
 - `overflow_risk_count`
+- `collision_risk_count`
 - `balance_warning_count`
 - análise por slide
 
@@ -910,6 +911,7 @@ Esses sinais ainda são heurísticos, mas ajudam a transformar o review em algo 
 Os relatórios também passam a destacar melhor onde olhar primeiro, com campos como:
 
 - `clipping_risk_count`
+- `collision_risk_count`
 - `top_risk_slides`
 - `likely_overflow_regions` por slide
 

@@ -89,6 +89,7 @@ def test_api_validate_render_and_template_endpoints(tmp_path: Path) -> None:
         assert "severity_counts" in review_payload["result"]
         assert "overflow_risk_count" in review_payload["result"]
         assert "clipping_risk_count" in review_payload["result"]
+        assert "collision_risk_count" in review_payload["result"]
         assert "balance_warning_count" in review_payload["result"]
         assert "top_risk_slides" in review_payload["result"]
 

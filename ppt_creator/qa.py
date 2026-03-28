@@ -35,6 +35,353 @@ def _balance_ratio(weights: list[float]) -> float:
     return high / low if low else high
 
 
+def _estimate_text_mass(
+    *,
+    title: str | None = None,
+    body: str | None = None,
+    bullets: list[str] | None = None,
+    footer: str | None = None,
+    tag: str | None = None,
+) -> float:
+    bullet_items = bullets or []
+    mass = 0.0
+    if title:
+        mass += len(title.split()) * 0.7
+    if body:
+        mass += len(body.split()) * 1.0
+    if footer:
+        mass += len(footer.split()) * 0.45
+    if tag:
+        mass += len(tag.split()) * 0.3
+    for bullet in bullet_items:
+        mass += len(bullet.split()) * 1.1
+    return round(mass, 2)
+
+
+def _region_density(
+    *,
+    width: float,
+    height: float,
+    title: str | None = None,
+    body: str | None = None,
+    bullets: list[str] | None = None,
+    footer: str | None = None,
+    tag: str | None = None,
+) -> float:
+    area = max(0.35, width * height)
+    return round(
+        _estimate_text_mass(title=title, body=body, bullets=bullets, footer=footer, tag=tag) / area,
+        3,
+    )
+
+
+def _build_layout_pressure_signals(renderer: PresentationRenderer, slide: Slide) -> list[dict[str, object]]:
+    g = renderer.theme.grid
+    signals: list[dict[str, object]] = []
+
+    def add_signal(*, region: str, density: float, threshold: float, message: str) -> None:
+        if density < threshold:
+            return
+        signals.append(
+            {
+                "region": region,
+                "density": density,
+                "threshold": threshold,
+                "severity": "high" if density >= threshold * 1.3 else "medium",
+                "message": message,
+            }
+        )
+
+    if slide.type.value == "agenda":
+        bullet_weights = [renderer.estimate_content_weight(body=bullet) for bullet in slide.bullets]
+        stack_regions: list[dict[str, float | str]] = []
+        if slide.body:
+            stack_regions.append(
+                {
+                    "kind": "intro",
+                    "min_height": 0.56,
+                    "flex": 1.0,
+                    "content_weight": renderer.estimate_content_weight(body=slide.body),
+                }
+            )
+        stack_regions.append(
+            {
+                "kind": "agenda_rows",
+                "min_height": 2.6,
+                "flex": 1.0,
+                "content_weight": sum(bullet_weights) or 1.0,
+            }
+        )
+        content_stack = renderer.build_content_stack(
+            top=2.2,
+            height=3.9,
+            regions=stack_regions,
+            gap=0.18,
+            min_flex=0.9,
+            max_flex=1.25,
+        )
+        for region, (_, region_height) in content_stack:
+            if region["kind"] == "intro" and slide.body:
+                density = _region_density(width=g.content_width, height=region_height, body=slide.body)
+                add_signal(
+                    region="agenda:intro",
+                    density=density,
+                    threshold=4.1,
+                    message="agenda intro region is dense enough to risk vertical crowding",
+                )
+            elif region["kind"] == "agenda_rows" and slide.bullets:
+                row_bounds = renderer.build_weighted_rows(
+                    top=0.0,
+                    height=region_height,
+                    gap=0.16,
+                    weights=bullet_weights,
+                    min_height=0.46,
+                    min_flex=0.9,
+                    max_flex=1.2,
+                    kind_prefix="agenda_row",
+                )
+                for index, (bullet, (_, row_height)) in enumerate(zip(slide.bullets, row_bounds, strict=True), start=1):
+                    density = _region_density(
+                        width=g.content_width - 0.95,
+                        height=max(0.28, row_height - 0.18),
+                        body=bullet,
+                    )
+                    add_signal(
+                        region=f"agenda:row_{index}",
+                        density=density,
+                        threshold=3.8,
+                        message=f"agenda row {index} is tightly packed and may collide vertically",
+                    )
+
+    elif slide.type.value == "bullets":
+        variant = renderer.resolve_layout_variant(slide, "insight_panel")
+        if variant == "insight_panel":
+            split_weights = [
+                renderer.estimate_content_weight(title=slide.title, body=slide.body, bullets=slide.bullets),
+                renderer.estimate_content_weight(
+                    title="Executive lens",
+                    body="Keep decision-making crisp, reduce operational drag, and let human sellers spend more time in high-value conversations.",
+                    bullets=["clarity", "consistency", "measurable lift"],
+                ),
+            ]
+            split_columns = renderer.build_weighted_columns(
+                left=g.content_left,
+                width=g.content_width,
+                gap=0.35,
+                weights=split_weights,
+                min_width=3.4,
+                min_flex=0.9,
+                max_flex=1.3,
+                kind_prefix="bullets_split",
+            )
+            _, left_width = split_columns[0]
+        else:
+            left_width = g.content_width
+
+        text_regions: list[dict[str, float | str]] = []
+        if slide.body:
+            if slide.bullets:
+                text_regions.append(
+                    {
+                        "kind": "body",
+                        "min_height": 0.92,
+                        "flex": 1.0,
+                        "content_weight": renderer.estimate_content_weight(body=slide.body),
+                    }
+                )
+            else:
+                text_regions.append({"kind": "body", "height": 3.15})
+        if slide.bullets:
+            text_regions.append(
+                {
+                    "kind": "bullets",
+                    "min_height": 1.45 if slide.body else 3.15,
+                    "flex": 1.0,
+                    "content_weight": renderer.estimate_content_weight(bullets=slide.bullets),
+                }
+            )
+        for region, (_, region_height) in renderer.build_content_stack(
+            top=2.55,
+            height=3.15,
+            regions=text_regions,
+            gap=0.18,
+            min_flex=0.9,
+            max_flex=1.35,
+        ):
+            if region["kind"] == "body" and slide.body:
+                density = _region_density(width=left_width, height=region_height, body=slide.body)
+                add_signal(
+                    region="bullets:body",
+                    density=density,
+                    threshold=4.1,
+                    message="bullets narrative region is dense enough to risk text collisions",
+                )
+            elif region["kind"] == "bullets" and slide.bullets:
+                density = _region_density(width=left_width, height=region_height, bullets=slide.bullets)
+                add_signal(
+                    region="bullets:list",
+                    density=density,
+                    threshold=3.9,
+                    message="bullet list region is dense enough to risk crowding or overlap",
+                )
+
+    elif slide.type.value == "summary":
+        has_body = bool(slide.body)
+        has_bullets = bool(slide.bullets)
+        if has_body and has_bullets:
+            split_flexes = renderer.normalize_content_flexes(
+                [
+                    renderer.estimate_content_weight(title=slide.title, body=slide.body),
+                    renderer.estimate_content_weight(bullets=slide.bullets),
+                ],
+                min_flex=0.9,
+                max_flex=1.4,
+            )
+            split_regions = renderer.build_columns(
+                left=g.content_left,
+                width=g.content_width,
+                regions=[
+                    {"kind": "narrative", "min_width": 6.2, "flex": split_flexes[0]},
+                    {"kind": "panel", "min_width": 3.4, "flex": split_flexes[1]},
+                ],
+                gap=0.35,
+            )
+            _, narrative_width = split_regions[0]
+            panel_left, panel_width = split_regions[1]
+            density = _region_density(width=narrative_width, height=1.55, body=slide.body)
+            add_signal(
+                region="summary:narrative",
+                density=density,
+                threshold=4.2,
+                message="summary narrative region is dense enough to risk crowding",
+            )
+
+            content_left, content_top, content_width, content_height = renderer.panel_inner_bounds(
+                left=panel_left,
+                top=2.1,
+                width=panel_width,
+                height=3.2,
+                padding=0.26,
+            )
+            panel_regions = renderer.stack_vertical_regions(
+                top=content_top,
+                height=content_height,
+                regions=[
+                    {"kind": "heading", "height": 0.28},
+                    {"kind": "bullets", "min_height": 2.18, "flex": 1.0},
+                ],
+                gap=0.08,
+            )
+            bullet_height = panel_regions[1][1][1]
+            density = _region_density(width=content_width, height=bullet_height, bullets=slide.bullets)
+            add_signal(
+                region="summary:takeaways",
+                density=density,
+                threshold=3.8,
+                message="summary takeaways panel is dense enough to risk clipping",
+            )
+        elif has_body:
+            density = _region_density(width=g.content_width, height=1.9, body=slide.body)
+            add_signal(
+                region="summary:body",
+                density=density,
+                threshold=4.4,
+                message="summary body region is dense enough to risk crowding",
+            )
+        elif has_bullets:
+            density = _region_density(width=g.content_width - 0.56, height=1.9, bullets=slide.bullets)
+            add_signal(
+                region="summary:bullets",
+                density=density,
+                threshold=3.9,
+                message="summary bullet panel is dense enough to risk crowding",
+            )
+
+    elif slide.type.value in {"comparison", "two_column"}:
+        columns = slide.comparison_columns or slide.two_column_columns
+        weights = [
+            renderer.estimate_content_weight(
+                title=column.title,
+                body=column.body,
+                bullets=column.bullets,
+                footer=column.footer,
+                tag=column.tag,
+            )
+            for column in columns
+        ]
+        panel_bounds = renderer.build_panel_row_bounds(
+            left=g.content_left,
+            top=2.45,
+            width=g.content_width,
+            height=3.25,
+            gap=0.42,
+            min_width=3.6,
+            regions=[
+                {"kind": f"comparison_{index + 1}", "min_width": 3.6, "flex": flex}
+                for index, flex in enumerate(
+                    renderer.normalize_content_flexes(weights, min_flex=0.95, max_flex=1.2)
+                )
+            ],
+        )
+        for index, (column, (left, panel_top, panel_width, panel_height)) in enumerate(zip(columns, panel_bounds, strict=True), start=1):
+            content_left, content_top, content_width, content_height = renderer.panel_inner_bounds(
+                left=left,
+                top=panel_top,
+                width=panel_width,
+                height=panel_height,
+                padding=0.28,
+            )
+            total_density = _region_density(
+                width=content_width,
+                height=content_height,
+                title=column.title,
+                body=column.body,
+                bullets=column.bullets,
+                footer=column.footer,
+                tag=column.tag,
+            )
+            add_signal(
+                region=f"comparison:column_{index}",
+                density=total_density,
+                threshold=3.7,
+                message=f"column '{column.title}' is dense enough to risk internal collisions",
+            )
+
+    elif slide.type.value == "table" and slide.table_rows and slide.table_columns:
+        column_flexes = renderer.normalize_content_flexes(
+            [
+                renderer.estimate_content_weight(
+                    title=column,
+                    body=" ".join(row[index] for row in slide.table_rows if index < len(row)),
+                )
+                for index, column in enumerate(slide.table_columns)
+            ],
+            min_flex=0.85,
+            max_flex=1.5,
+        )
+        column_bounds = renderer.build_columns(
+            left=g.content_left,
+            width=g.content_width,
+            gap=0.06,
+            min_width=1.0,
+            regions=[
+                {"kind": f"column_{index + 1}", "min_width": 1.0, "flex": flex}
+                for index, flex in enumerate(column_flexes)
+            ],
+        )
+        for row_index, row in enumerate(slide.table_rows, start=1):
+            for col_index, (cell, (_, column_width)) in enumerate(zip(row, column_bounds, strict=True), start=1):
+                density = _region_density(width=max(0.4, column_width - 0.12), height=0.32, body=cell)
+                add_signal(
+                    region=f"table:r{row_index}c{col_index}",
+                    density=density,
+                    threshold=8.0,
+                    message=f"table cell r{row_index}c{col_index} is dense enough to risk clipping",
+                )
+
+    return signals
+
+
 def _slide_content_weight(renderer: PresentationRenderer, slide: Slide) -> float:
     weight = renderer.estimate_content_weight(
         title=slide.title,
@@ -80,7 +427,9 @@ def _risk_score(slide_review: dict[str, object]) -> float:
     severity_counts = slide_review["severity_counts"]
     return (
         float(slide_review["overflow_risk_count"]) * 2.0
+        + float(slide_review["collision_risk_count"]) * 1.7
         + float(slide_review["balance_warning_count"]) * 1.2
+        + float(slide_review["layout_pressure_score"]) * 0.45
         + float(severity_counts["high"]) * 2.5
         + float(severity_counts["medium"]) * 1.4
         + float(severity_counts["low"]) * 0.6
@@ -98,9 +447,11 @@ def _review_slide(
     title = slide.title or slide.type.value
     overflow_risk_count = 0
     clipping_risk_count = 0
+    collision_risk_count = 0
     balance_warning_count = 0
     content_weight = _slide_content_weight(renderer, slide)
     likely_overflow_regions: list[str] = []
+    likely_collision_regions: list[str] = []
 
     if len(title) > 72:
         issues.append(_issue("medium", "title is long and may wrap awkwardly"))
@@ -260,6 +611,16 @@ def _review_slide(
     if asset_missing:
         issues.append(_issue("medium", "image asset is missing and will fall back to placeholder"))
 
+    layout_pressure_signals = _build_layout_pressure_signals(renderer, slide)
+    layout_pressure_score = round(
+        sum(float(signal["density"]) - float(signal["threshold"]) for signal in layout_pressure_signals),
+        2,
+    )
+    for signal in layout_pressure_signals:
+        issues.append(_issue(str(signal["severity"]), str(signal["message"])))
+        collision_risk_count += 1
+        likely_collision_regions.append(str(signal["region"]))
+
     score = _score_from_issues(issues)
     if score >= 90:
         status = "ok"
@@ -269,9 +630,9 @@ def _review_slide(
         status = "attention"
 
     risk_level = "low"
-    if clipping_risk_count >= 2 or _severity_counts(issues)["high"]:
+    if clipping_risk_count >= 2 or collision_risk_count >= 2 or _severity_counts(issues)["high"]:
         risk_level = "high"
-    elif overflow_risk_count or balance_warning_count:
+    elif overflow_risk_count or collision_risk_count or balance_warning_count:
         risk_level = "medium"
 
     return {
@@ -283,9 +644,13 @@ def _review_slide(
         "content_weight": content_weight,
         "overflow_risk_count": overflow_risk_count,
         "clipping_risk_count": clipping_risk_count,
+        "collision_risk_count": collision_risk_count,
         "balance_warning_count": balance_warning_count,
+        "layout_pressure_score": layout_pressure_score,
         "risk_level": risk_level,
         "likely_overflow_regions": sorted(set(likely_overflow_regions)),
+        "likely_collision_regions": sorted(set(likely_collision_regions)),
+        "layout_pressure_signals": layout_pressure_signals,
         "severity_counts": _severity_counts(issues),
         "issues": issues,
     }
@@ -331,6 +696,7 @@ def review_presentation(
     }
     overflow_risk_count = sum(int(slide["overflow_risk_count"]) for slide in slides)
     clipping_risk_count = sum(int(slide["clipping_risk_count"]) for slide in slides)
+    collision_risk_count = sum(int(slide["collision_risk_count"]) for slide in slides)
     balance_warning_count = sum(int(slide["balance_warning_count"]) for slide in slides)
     top_risk_slides = [
         {
@@ -339,7 +705,9 @@ def review_presentation(
             "risk_level": slide["risk_level"],
             "overflow_risk_count": slide["overflow_risk_count"],
             "clipping_risk_count": slide["clipping_risk_count"],
+            "collision_risk_count": slide["collision_risk_count"],
             "balance_warning_count": slide["balance_warning_count"],
+            "layout_pressure_score": slide["layout_pressure_score"],
         }
         for slide in sorted(slides, key=_risk_score, reverse=True)[:5]
         if _risk_score(slide) > 0
@@ -357,6 +725,7 @@ def review_presentation(
         "severity_counts": severity_counts,
         "overflow_risk_count": overflow_risk_count,
         "clipping_risk_count": clipping_risk_count,
+        "collision_risk_count": collision_risk_count,
         "balance_warning_count": balance_warning_count,
         "top_risk_slides": top_risk_slides,
         "issues": all_issues,

@@ -95,6 +95,7 @@ def test_cli_render_dry_run_can_include_quality_review(tmp_path: Path) -> None:
     assert "severity_counts" in payload["quality_review"]
     assert "overflow_risk_count" in payload["quality_review"]
     assert "clipping_risk_count" in payload["quality_review"]
+    assert "collision_risk_count" in payload["quality_review"]
     assert "top_risk_slides" in payload["quality_review"]
 
 
@@ -170,6 +171,7 @@ def test_cli_render_batch_review_report_includes_aggregate_risk_fields(tmp_path:
     assert payload["review_enabled"] is True
     assert "review_overflow_risk_count" in payload
     assert "review_clipping_risk_count" in payload
+    assert "review_collision_risk_count" in payload
     assert "review_balance_warning_count" in payload
 
 
