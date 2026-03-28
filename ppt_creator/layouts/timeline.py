@@ -29,25 +29,25 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
     panel_top = 2.55
     panel_height = 2.9
 
-    panel_bounds = renderer.build_weighted_panel_row_bounds(
+    panel_bounds = renderer.build_panel_row_bounds(
         left=g.content_left,
         top=panel_top,
         width=g.content_width,
         height=panel_height,
         gap=gap,
-        weights=[
-            renderer.estimate_content_weight(
-                title=item.title,
-                body=item.body,
-                footer=item.footer,
-                tag=item.tag,
-            )
-            for item in items
+        regions=[
+            {
+                "kind": f"timeline_{index + 1}",
+                "min_width": 1.85,
+                "target_share": renderer.estimate_content_weight(
+                    title=item.title,
+                    body=item.body,
+                    footer=item.footer,
+                    tag=item.tag,
+                ),
+            }
+            for index, item in enumerate(items)
         ],
-        min_width=1.85,
-        min_flex=0.9,
-        max_flex=1.25,
-        kind_prefix="timeline",
     )
 
     line_start = panel_bounds[0][0] + (panel_bounds[0][2] / 2)

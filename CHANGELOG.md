@@ -7,6 +7,12 @@ The format is inspired by Keep a Changelog, and the project aims to follow Seman
 ## [Unreleased]
 
 ### Added
+- constrained semantic layout primitives for fixed/flexible columns and rows, including `target_share`, `max_width`, and `max_height` support in the renderer core
+- stronger semantic balancing rollout in `title`, `section`, `chart`, and `timeline`, reducing rigid splits and letting narrative/chart/sidebar regions keep more stable proportions
+- reusable workflow presets for operational/commercial scenarios (`sales_qbr`, `board_strategy`, `product_operating_review`, `consulting_steerco`) with linked starter templates, audience profiles, and asset collections
+- CLI workflow tooling via `workflows` and `workflow-template`, plus public API exports for workflow discovery/bootstrap flows
+- API endpoints for workflow bootstrap and artifact serving (`GET /workflows`, `POST /workflow-template`, `GET /artifact`)
+- richer local playground/editor behavior with workflow bootstrap, local state persistence, preview galleries, and direct links to generated artifacts/thumbnail sheets
 - non-interactive llama.cpp execution hardening for the local `pptagent_local` provider, with timeout and optional raw-output capture
 - normalization of PPTAgent-style local payloads into the project's canonical presentation schema so locally generated JSON can be validated and rendered even when the model returns an alternate slide structure
 - horizontal layout primitives for reusable row/column distribution, now applied to metrics, cards, and table layouts

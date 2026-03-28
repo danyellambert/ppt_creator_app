@@ -21,6 +21,7 @@ from ppt_creator.qa import augment_review_with_preview_artifacts, review_present
 from ppt_creator.renderer import PresentationRenderer
 from ppt_creator.schema import PresentationInput
 from ppt_creator.templates import build_domain_template, list_template_domains
+from ppt_creator.workflows import build_workflow_packet, get_workflow_preset, list_workflow_presets
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -194,6 +195,18 @@ def build_parser() -> argparse.ArgumentParser:
     assets_parser = subparsers.add_parser("assets", help="List built-in asset collections")
     assets_parser.add_argument("collection_name", nargs="?", help="Optional specific collection to inspect")
     assets_parser.add_argument("--report-json", help="Optional path to write a JSON asset-library report")
+
+    workflows_parser = subparsers.add_parser("workflows", help="List built-in operational workflow presets")
+    workflows_parser.add_argument("workflow_name", nargs="?", help="Optional specific workflow preset to inspect")
+    workflows_parser.add_argument("--report-json", help="Optional path to write a JSON workflows report")
+
+    workflow_template_parser = subparsers.add_parser(
+        "workflow-template",
+        help="Generate a starter JSON template using an operational workflow preset",
+    )
+    workflow_template_parser.add_argument("workflow_name", choices=list_workflow_presets(), help="Workflow preset to generate")
+    workflow_template_parser.add_argument("output_json", help="Destination .json path")
+    workflow_template_parser.add_argument("--theme", help="Optional theme override for the generated workflow template")
 
     validate_parser = subparsers.add_parser("validate", help="Validate JSON without rendering")
     validate_parser.add_argument("input_json", help="Path to the structured JSON input")
@@ -842,6 +855,36 @@ def list_assets(collection_name: str | None = None) -> dict[str, object]:
     return {"mode": "assets", "collections": [get_asset_collection(name) for name in names]}
 
 
+def list_workflows(workflow_name: str | None = None) -> dict[str, object]:
+    if workflow_name:
+        workflow = get_workflow_preset(workflow_name)
+        packet = build_workflow_packet(workflow_name)
+        print_info(f"Workflow preset: {workflow_name}")
+        return {"mode": "workflows", "workflow": workflow, "packet": packet}
+    names = list_workflow_presets()
+    print_info(f"Available workflow presets: {', '.join(names)}")
+    return {"mode": "workflows", "workflows": [get_workflow_preset(name) for name in names]}
+
+
+def generate_workflow_template(
+    workflow_name: str,
+    output_json: str | Path,
+    *,
+    theme_name: str | None = None,
+) -> dict[str, object]:
+    output_path = validate_json_output_path(output_json)
+    packet = build_workflow_packet(workflow_name, theme_name=theme_name)
+    write_json_payload(output_path, packet["template"])
+    print(f"[OK] Generated workflow template: {output_path} ({len(packet['template']['slides'])} slides)")
+    return {
+        "mode": "workflow-template",
+        "workflow_name": workflow_name,
+        "output_path": str(output_path),
+        "theme": packet["template"]["presentation"]["theme"],
+        "workflow": packet["workflow"],
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -952,6 +995,20 @@ def main(argv: list[str] | None = None) -> int:
             report = list_assets(args.collection_name)
             if args.report_json:
                 write_report(args.report_json, report)
+            return 0
+
+        if args.command == "workflows":
+            report = list_workflows(args.workflow_name)
+            if args.report_json:
+                write_report(args.report_json, report)
+            return 0
+
+        if args.command == "workflow-template":
+            generate_workflow_template(
+                args.workflow_name,
+                args.output_json,
+                theme_name=args.theme,
+            )
             return 0
 
         if args.command == "render-batch":

@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import mimetypes
+import tempfile
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from urllib.parse import parse_qs, urlparse
 
 from pydantic import ValidationError
 
@@ -22,6 +25,7 @@ from ppt_creator.qa import augment_review_with_preview_artifacts, review_present
 from ppt_creator.renderer import PresentationRenderer
 from ppt_creator.schema import PresentationInput
 from ppt_creator.templates import build_domain_template, list_template_domains
+from ppt_creator.workflows import build_workflow_packet, get_workflow_preset, list_workflow_presets
 
 
 class APIRequestError(ValueError):
@@ -42,14 +46,21 @@ def _build_playground_html() -> str:
     body {{ font-family: Arial, sans-serif; margin: 24px; background: #f6f4f0; color: #14263f; }}
     textarea {{ width: 100%; min-height: 380px; font-family: monospace; font-size: 13px; }}
     input {{ width: 100%; padding: 8px; margin: 4px 0 12px; }}
+    select {{ width: 100%; padding: 8px; margin: 4px 0 12px; }}
     button {{ margin-right: 8px; padding: 10px 14px; }}
     pre {{ background: white; border: 1px solid #d9dce2; padding: 16px; overflow: auto; max-height: 360px; }}
-    .row {{ display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }}
+    .row {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }}
+    .toolbar {{ margin: 16px 0; display: flex; flex-wrap: wrap; gap: 8px; }}
+    .status {{ margin-top: 12px; color: #44576d; font-size: 14px; }}
+    .gallery {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; margin-top: 20px; }}
+    .gallery-card {{ background: white; border: 1px solid #d9dce2; border-radius: 12px; padding: 10px; }}
+    .gallery-card img {{ width: 100%; border-radius: 8px; display: block; }}
+    .links a {{ display: inline-block; margin-right: 12px; }}
   </style>
 </head>
 <body>
   <h1>PPT Creator Playground</h1>
-  <p>Edit JSON, then validate, review, preview, or render using the local API.</p>
+  <p>Edit JSON, then validate, review, preview, or render using the local API. You can also bootstrap from workflow presets and inspect generated artifacts directly.</p>
   <div class='row'>
     <div>
       <label>Output PPTX path</label>
@@ -62,15 +73,19 @@ def _build_playground_html() -> str:
   </div>
   <div class='row'>
     <div>
+      <label>Workflow preset</label>
+      <select id='workflowPreset'></select>
+    </div>
+    <div>
       <label>Template domain</label>
       <select id='templateDomain'></select>
     </div>
+  </div>
+  <div class='row'>
     <div>
       <label>Audience profile</label>
       <select id='audienceProfile'></select>
     </div>
-  </div>
-  <div class='row'>
     <div>
       <label>Preview backend</label>
       <select id='previewBackend'>
@@ -85,20 +100,95 @@ def _build_playground_html() -> str:
     </div>
   </div>
   <textarea id='spec'>{initial_json}</textarea>
-  <div style='margin: 16px 0;'>
+  <div class='toolbar'>
+    <button onclick='loadWorkflow()'>Load workflow</button>
     <button onclick='loadTemplate()'>Load starter</button>
     <button onclick='runAction("/validate")'>Validate</button>
     <button onclick='runAction("/review")'>Review</button>
     <button onclick='runAction("/preview")'>Preview</button>
     <button onclick='runAction("/render")'>Render</button>
   </div>
+  <div id='status' class='status'>Ready.</div>
+  <div id='artifactLinks' class='links'></div>
   <pre id='result'>Ready.</pre>
+  <div id='previewGallery' class='gallery'></div>
   <script>
+    const storageKey = 'ppt_creator_playground_state_v3';
+
+    function artifactUrl(path) {{
+      return `/artifact?path=${{encodeURIComponent(path)}}`;
+    }}
+
+    function setStatus(message) {{
+      document.getElementById('status').textContent = message;
+    }}
+
+    function collectState() {{
+      return {{
+        outputPath: document.getElementById('outputPath').value,
+        previewDir: document.getElementById('previewDir').value,
+        workflowPreset: document.getElementById('workflowPreset').value,
+        templateDomain: document.getElementById('templateDomain').value,
+        audienceProfile: document.getElementById('audienceProfile').value,
+        previewBackend: document.getElementById('previewBackend').value,
+        baselineDir: document.getElementById('baselineDir').value,
+        spec: document.getElementById('spec').value,
+      }};
+    }}
+
+    function persistState() {{
+      localStorage.setItem(storageKey, JSON.stringify(collectState()));
+    }}
+
+    function restoreState() {{
+      const raw = localStorage.getItem(storageKey);
+      if (!raw) return;
+      try {{
+        const state = JSON.parse(raw);
+        for (const [key, value] of Object.entries(state)) {{
+          const element = document.getElementById(key);
+          if (element && value !== undefined && value !== null) element.value = value;
+        }}
+      }} catch (_error) {{
+        localStorage.removeItem(storageKey);
+      }}
+    }}
+
+    function renderPreviewGallery(previews) {{
+      const gallery = document.getElementById('previewGallery');
+      gallery.innerHTML = '';
+      for (const [index, preview] of previews.entries()) {{
+        const card = document.createElement('div');
+        card.className = 'gallery-card';
+        card.innerHTML = `<img src="${{artifactUrl(preview)}}" alt="Preview ${{index + 1}}" /><div style="margin-top: 8px; font-size: 12px; color: #44576d;">Slide ${{String(index + 1).padStart(2, '0')}}</div>`;
+        gallery.appendChild(card);
+      }}
+    }}
+
+    function updateArtifactLinks(result) {{
+      const links = [];
+      if (result.output_path) links.push(`<a href="${{artifactUrl(result.output_path)}}">output</a>`);
+      if (result.preview_result && result.preview_result.thumbnail_sheet) links.push(`<a href="${{artifactUrl(result.preview_result.thumbnail_sheet)}}">thumbnail sheet</a>`);
+      document.getElementById('artifactLinks').innerHTML = links.join(' ');
+    }}
+
     async function initControls() {{
       const templates = await fetch('/templates').then(r => r.json());
       const profiles = await fetch('/profiles').then(r => r.json());
+      const workflows = await fetch('/workflows').then(r => r.json());
+      const workflowSelect = document.getElementById('workflowPreset');
       const domainSelect = document.getElementById('templateDomain');
       const profileSelect = document.getElementById('audienceProfile');
+      const workflowNone = document.createElement('option');
+      workflowNone.value = '';
+      workflowNone.textContent = '(none)';
+      workflowSelect.appendChild(workflowNone);
+      for (const workflow of workflows.workflows) {{
+        const option = document.createElement('option');
+        option.value = workflow.name;
+        option.textContent = workflow.display_name;
+        workflowSelect.appendChild(option);
+      }}
       for (const domain of templates.domains) {{
         const option = document.createElement('option');
         option.value = domain;
@@ -115,6 +205,34 @@ def _build_playground_html() -> str:
         option.textContent = profile.display_name;
         profileSelect.appendChild(option);
       }}
+      restoreState();
+      for (const id of ['outputPath', 'previewDir', 'workflowPreset', 'templateDomain', 'audienceProfile', 'previewBackend', 'baselineDir', 'spec']) {{
+        const element = document.getElementById(id);
+        element.addEventListener('change', persistState);
+        element.addEventListener('input', persistState);
+      }}
+    }}
+
+    async function loadWorkflow() {{
+      const workflowName = document.getElementById('workflowPreset').value;
+      if (!workflowName) return;
+      const response = await fetch('/workflow-template', {{
+        method: 'POST',
+        headers: {{ 'Content-Type': 'application/json' }},
+        body: JSON.stringify({{ workflow_name: workflowName }}),
+      }});
+      const data = await response.json();
+      document.getElementById('spec').value = JSON.stringify(data.packet.template, null, 2);
+      document.getElementById('templateDomain').value = data.packet.workflow.domain;
+      document.getElementById('audienceProfile').value = data.packet.workflow.audience_profile;
+      document.getElementById('previewBackend').value = data.packet.workflow.default_preview_backend;
+      document.getElementById('outputPath').value = data.packet.workflow.default_output_pptx;
+      document.getElementById('previewDir').value = data.packet.workflow.default_preview_dir;
+      document.getElementById('result').textContent = JSON.stringify(data, null, 2);
+      setStatus(`Workflow loaded: ${{data.packet.workflow.display_name}}`);
+      updateArtifactLinks({{}});
+      renderPreviewGallery([]);
+      persistState();
     }}
 
     async function loadTemplate() {{
@@ -127,7 +245,11 @@ def _build_playground_html() -> str:
       }});
       const data = await response.json();
       document.getElementById('spec').value = JSON.stringify(data.template, null, 2);
-      document.getElementById('result').textContent = 'Starter template loaded.';
+      document.getElementById('result').textContent = JSON.stringify(data, null, 2);
+      setStatus('Starter template loaded.');
+      updateArtifactLinks({{}});
+      renderPreviewGallery([]);
+      persistState();
     }}
 
     async function runAction(path) {{
@@ -160,6 +282,12 @@ def _build_playground_html() -> str:
       }});
       const data = await response.json();
       document.getElementById('result').textContent = JSON.stringify(data, null, 2);
+      const result = data.result || data;
+      const previewPayload = result.preview_result || result;
+      renderPreviewGallery(previewPayload.previews || []);
+      updateArtifactLinks(result);
+      setStatus(`Finished ${{path.replace('/', '')}} flow.`);
+      persistState();
     }}
     initControls();
   </script>
@@ -169,6 +297,26 @@ def _build_playground_html() -> str:
 
 def _resolve_service_asset_root(asset_root: str | Path | None) -> Path:
     return Path(asset_root or ".").resolve()
+
+
+def _resolve_workspace_artifact_path(requested_path: str | Path) -> Path:
+    workspace_root = Path(".").resolve()
+    temp_root = Path(tempfile.gettempdir()).resolve()
+    candidate = Path(requested_path)
+    resolved = candidate.resolve() if candidate.is_absolute() else (workspace_root / candidate).resolve()
+    try:
+        resolved.relative_to(workspace_root)
+    except ValueError:
+        try:
+            resolved.relative_to(temp_root)
+        except ValueError as exc:
+            raise APIRequestError(
+                "artifact path must stay inside the current workspace or the system temp directory",
+                HTTPStatus.FORBIDDEN,
+            ) from exc
+    if not resolved.exists() or not resolved.is_file():
+        raise APIRequestError(f"artifact not found: {resolved}", HTTPStatus.NOT_FOUND)
+    return resolved
 
 
 def _extract_spec_payload(payload: dict[str, object]) -> dict[str, object]:
@@ -521,6 +669,13 @@ class PptCreatorAPIHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _binary_response(self, status_code: int, content_type: str, body: bytes) -> None:
+        self.send_response(status_code)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
     def _read_json_body(self) -> dict[str, object]:
         content_length = int(self.headers.get("Content-Length", "0"))
         if content_length <= 0:
@@ -546,26 +701,43 @@ class PptCreatorAPIHandler(BaseHTTPRequestHandler):
         self._json_response(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
 
     def do_GET(self) -> None:  # noqa: N802
-        if self.path == "/health":
+        parsed = urlparse(self.path)
+        if parsed.path == "/health":
             self._json_response(HTTPStatus.OK, {"status": "ok"})
             return
-        if self.path == "/playground":
+        if parsed.path == "/playground":
             self._html_response(HTTPStatus.OK, _build_playground_html())
             return
-        if self.path == "/profiles":
+        if parsed.path == "/profiles":
             self._json_response(
                 HTTPStatus.OK,
                 {"profiles": [get_audience_profile(name) for name in list_audience_profiles()]},
             )
             return
-        if self.path == "/assets":
+        if parsed.path == "/assets":
             self._json_response(
                 HTTPStatus.OK,
                 {"collections": [get_asset_collection(name) for name in list_asset_collections()]},
             )
             return
-        if self.path == "/templates":
+        if parsed.path == "/workflows":
+            self._json_response(
+                HTTPStatus.OK,
+                {"workflows": [get_workflow_preset(name) for name in list_workflow_presets()]},
+            )
+            return
+        if parsed.path == "/templates":
             self._json_response(HTTPStatus.OK, {"domains": list_template_domains()})
+            return
+        if parsed.path == "/artifact":
+            query = parse_qs(parsed.query)
+            requested_path = (query.get("path") or [""])[0]
+            if not requested_path:
+                self._json_response(HTTPStatus.BAD_REQUEST, {"error": "artifact path is required"})
+                return
+            artifact_path = _resolve_workspace_artifact_path(requested_path)
+            content_type = mimetypes.guess_type(str(artifact_path))[0] or "application/octet-stream"
+            self._binary_response(HTTPStatus.OK, content_type, artifact_path.read_bytes())
             return
         self._json_response(HTTPStatus.NOT_FOUND, {"error": "Route not found"})
 
@@ -704,6 +876,16 @@ class PptCreatorAPIHandler(BaseHTTPRequestHandler):
                     audience_profile=str(payload["audience_profile"]) if payload.get("audience_profile") else None,
                 )
                 self._json_response(HTTPStatus.OK, {"template": template_payload})
+                return
+
+            if self.path == "/workflow-template":
+                if "workflow_name" not in payload:
+                    raise APIRequestError("'workflow_name' is required for /workflow-template")
+                packet = build_workflow_packet(
+                    str(payload["workflow_name"]),
+                    theme_name=str(payload["theme_name"]) if payload.get("theme_name") else None,
+                )
+                self._json_response(HTTPStatus.OK, {"packet": packet})
                 return
 
             self._json_response(HTTPStatus.NOT_FOUND, {"error": "Route not found"})

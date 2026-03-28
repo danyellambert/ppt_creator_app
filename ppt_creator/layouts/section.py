@@ -8,22 +8,26 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
     t = renderer.theme.typography
     colors = renderer.theme.colors
 
-    section_columns = renderer.build_weighted_columns(
+    section_columns = renderer.build_constrained_columns(
         left=g.content_left,
         width=g.content_width,
         gap=0.42,
-        weights=[
-            renderer.estimate_content_weight(
-                title=slide_spec.title,
-                body=slide_spec.subtitle,
-                tag=slide_spec.section_label or slide_spec.eyebrow or "SECTION",
-            ),
-            renderer.estimate_content_weight(body=f"{index:02d}"),
+        regions=[
+            {
+                "kind": "section_content",
+                "min_width": 7.2,
+                "target_share": renderer.estimate_content_weight(
+                    title=slide_spec.title,
+                    body=slide_spec.subtitle,
+                    tag=slide_spec.section_label or slide_spec.eyebrow or "SECTION",
+                ),
+            },
+            {
+                "kind": "section_marker",
+                "width": 1.65,
+                "min_width": 1.5,
+            },
         ],
-        min_width=1.4,
-        min_flex=0.9,
-        max_flex=1.2,
-        kind_prefix="section",
     )
     content_left, content_width = section_columns[0]
     marker_left, marker_width = section_columns[1]

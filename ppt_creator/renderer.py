@@ -349,6 +349,126 @@ class PresentationRenderer:
             cursor_left += region_width + gap
         return bounds
 
+    def _allocate_constrained_region_sizes(
+        self,
+        *,
+        total_size: float,
+        gap: float,
+        regions: list[dict[str, float | str]],
+        fixed_key: str,
+        min_key: str,
+        max_key: str,
+    ) -> list[float]:
+        if not regions:
+            return []
+
+        gap_total = gap * max(0, len(regions) - 1)
+        available = max(0.0, total_size - gap_total)
+        sizes = [0.0 for _ in regions]
+        remaining = available
+        flexible_indices: list[int] = []
+
+        for index, region in enumerate(regions):
+            fixed_size = region.get(fixed_key)
+            min_size = float(region.get(min_key) or 0.0)
+            max_size = float(region.get(max_key)) if region.get(max_key) is not None else None
+            if fixed_size is not None:
+                resolved = max(min_size, float(fixed_size))
+                if max_size is not None:
+                    resolved = min(resolved, max_size)
+                sizes[index] = resolved
+                remaining -= resolved
+            else:
+                sizes[index] = min_size
+                remaining -= min_size
+                flexible_indices.append(index)
+
+        remaining = max(0.0, remaining)
+        active = flexible_indices.copy()
+        while active and remaining > 1e-6:
+            target_units = []
+            for index in active:
+                target_share = regions[index].get("target_share")
+                if target_share is not None:
+                    target_units.append(max(0.0, float(target_share)))
+                else:
+                    target_units.append(max(0.0, float(regions[index].get("content_weight") or regions[index].get("flex") or 1.0)))
+
+            target_total = sum(target_units) or float(len(active))
+            clamped = False
+            next_active: list[int] = []
+            consumed = 0.0
+
+            for index, unit in zip(active, target_units, strict=True):
+                share = (unit / target_total) if target_total else (1.0 / len(active))
+                proposed_extra = remaining * share
+                max_size = float(regions[index].get(max_key)) if regions[index].get(max_key) is not None else None
+                if max_size is not None and sizes[index] + proposed_extra > max_size:
+                    extra = max(0.0, max_size - sizes[index])
+                    sizes[index] = max_size
+                    consumed += extra
+                    clamped = True
+                else:
+                    next_active.append(index)
+
+            if not clamped:
+                for index, unit in zip(active, target_units, strict=True):
+                    share = (unit / target_total) if target_total else (1.0 / len(active))
+                    sizes[index] += remaining * share
+                remaining = 0.0
+                break
+
+            remaining = max(0.0, remaining - consumed)
+            active = next_active
+
+        return sizes
+
+    def build_constrained_columns(
+        self,
+        *,
+        left: float,
+        width: float,
+        gap: float,
+        regions: list[dict[str, float | str]],
+    ) -> list[tuple[float, float]]:
+        column_widths = self._allocate_constrained_region_sizes(
+            total_size=width,
+            gap=gap,
+            regions=regions,
+            fixed_key="width",
+            min_key="min_width",
+            max_key="max_width",
+        )
+        bounds: list[tuple[float, float]] = []
+        cursor_left = left
+        for column_width in column_widths:
+            bounds.append((cursor_left, column_width))
+            cursor_left += column_width + gap
+        return bounds
+
+    def build_constrained_rows(
+        self,
+        *,
+        top: float,
+        height: float,
+        gap: float,
+        regions: list[dict[str, float | str]],
+    ) -> list[tuple[float, float]]:
+        row_heights = self._allocate_constrained_region_sizes(
+            total_size=height,
+            gap=gap,
+            regions=regions,
+            fixed_key="height",
+            min_key="min_height",
+            max_key="max_height",
+        )
+        bounds: list[tuple[float, float]] = []
+        cursor_top = top
+        for row_height in row_heights:
+            bounds.append((cursor_top, row_height))
+            cursor_top += row_height + gap
+        return bounds
+
     def build_columns(
         self,
         *,
@@ -366,6 +486,8 @@ class PresentationRenderer:
                 {"kind": f"column_{index + 1}", "min_width": min_width, "flex": 1.0}
                 for index in range(count)
             ]
+        if any(region.get("target_share") is not None or region.get("max_width") is not None for region in regions):
+            return self.build_constrained_columns(left=left, width=width, gap=gap, regions=regions)
         return [bounds for _, bounds in self.stack_horizontal_regions(left=left, width=width, regions=regions, gap=gap)]
 
     def build_weighted_columns(
@@ -409,6 +531,8 @@ class PresentationRenderer:
                 {"kind": f"row_{index + 1}", "min_height": min_height, "flex": 1.0}
                 for index in range(count)
             ]
+        if any(region.get("target_share") is not None or region.get("max_height") is not None for region in regions):
+            return self.build_constrained_rows(top=top, height=height, gap=gap, regions=regions)
         return [bounds for _, bounds in self.stack_vertical_regions(top=top, height=height, regions=regions, gap=gap)]
 
     def build_weighted_rows(
@@ -483,6 +607,19 @@ class PresentationRenderer:
         )
         return [(column_left, top, column_width, height) for column_left, column_width in columns]
 
+    def build_constrained_panel_row_bounds(
+        self,
+        *,
+        left: float,
+        top: float,
+        width: float,
+        height: float,
+        gap: float,
+        regions: list[dict[str, float | str]],
+    ) -> list[tuple[float, float, float, float]]:
+        columns = self.build_constrained_columns(left=left, width=width, gap=gap, regions=regions)
+        return [(column_left, top, column_width, height) for column_left, column_width in columns]
+
     def build_panel_row_content_bounds(
         self,
         *,
@@ -546,6 +683,39 @@ class PresentationRenderer:
             min_flex=min_flex,
             max_flex=max_flex,
             kind_prefix=kind_prefix,
+        )
+        return [
+            (
+                bounds,
+                self.panel_inner_bounds(
+                    left=bounds[0],
+                    top=bounds[1],
+                    width=bounds[2],
+                    height=bounds[3],
+                    padding=padding,
+                ),
+            )
+            for bounds in panel_bounds
+        ]
+
+    def build_constrained_panel_row_content_bounds(
+        self,
+        *,
+        left: float,
+        top: float,
+        width: float,
+        height: float,
+        gap: float,
+        regions: list[dict[str, float | str]],
+        padding: float | None = None,
+    ) -> list[tuple[tuple[float, float, float, float], tuple[float, float, float, float]]]:
+        panel_bounds = self.build_constrained_panel_row_bounds(
+            left=left,
+            top=top,
+            width=width,
+            height=height,
+            gap=gap,
+            regions=regions,
         )
         return [
             (
@@ -815,6 +985,45 @@ class PresentationRenderer:
             regions=self.rebalance_flexible_regions(regions, min_flex=min_flex, max_flex=max_flex),
             gap=gap,
         )
+
+    def build_constrained_content_stack(
+        self,
+        *,
+        top: float,
+        height: float,
+        regions: list[dict[str, float | str]],
+        gap: float,
+    ) -> list[tuple[dict[str, float | str], tuple[float, float]]]:
+        rows = self.build_constrained_rows(top=top, height=height, gap=gap, regions=regions)
+        return list(zip(regions, rows, strict=True))
+
+    def build_constrained_panel_content_stack_bounds(
+        self,
+        *,
+        left: float,
+        top: float,
+        width: float,
+        height: float,
+        regions: list[dict[str, float | str]],
+        gap: float,
+        padding: float | None = None,
+    ) -> list[tuple[dict[str, float | str], tuple[float, float, float, float]]]:
+        content_left, content_top, content_width, content_height = self.panel_inner_bounds(
+            left=left,
+            top=top,
+            width=width,
+            height=height,
+            padding=padding,
+        )
+        return [
+            (region, (content_left, region_top, content_width, region_height))
+            for region, (region_top, region_height) in self.build_constrained_content_stack(
+                top=content_top,
+                height=content_height,
+                regions=regions,
+                gap=gap,
+            )
+        ]
 
     def build_grid_bounds(
         self,

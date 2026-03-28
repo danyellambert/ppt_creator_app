@@ -44,10 +44,15 @@ def test_api_health_and_templates_endpoints() -> None:
         assert status == 200
         assert assets_payload["collections"]
 
+        status, workflows_payload = _request_json(f"{base_url}/workflows")
+        assert status == 200
+        assert workflows_payload["workflows"]
+
         req = request.Request(f"{base_url}/playground", method="GET")
         with request.urlopen(req, timeout=5) as response:
             html = response.read().decode("utf-8")
         assert "PPT Creator Playground" in html
+        assert "workflowPreset" in html
     finally:
         server.shutdown()
         server.server_close()
@@ -115,6 +120,15 @@ def test_api_validate_render_and_template_endpoints(tmp_path: Path) -> None:
         assert template_payload["template"]["presentation"]["theme"] == "consulting_clean"
         assert template_payload["template"]["presentation"]["footer_text"] == "Board profile"
 
+        status, workflow_template_payload = _request_json(
+            f"{base_url}/workflow-template",
+            {"workflow_name": "sales_qbr"},
+            method="POST",
+        )
+        assert status == 200
+        assert workflow_template_payload["packet"]["workflow"]["name"] == "sales_qbr"
+        assert workflow_template_payload["packet"]["template"]["presentation"]["footer_text"] == "Sales profile"
+
         preview_module.find_office_runtime = lambda: None
         preview_dir = tmp_path / "api_previews"
         status, preview_payload = _request_json(
@@ -137,6 +151,14 @@ def test_api_validate_render_and_template_endpoints(tmp_path: Path) -> None:
         assert preview_payload["result"]["backend_requested"] == "auto"
         assert preview_payload["result"]["backend_used"] in {"synthetic", "office"}
         assert Path(preview_payload["result"]["thumbnail_sheet"]).exists()
+
+        artifact_request = request.Request(
+            f"{base_url}/artifact?path={request.pathname2url(str(Path(preview_payload['result']['thumbnail_sheet'])))}",
+            method="GET",
+        )
+        with request.urlopen(artifact_request, timeout=5) as response:
+            artifact_bytes = response.read()
+        assert artifact_bytes
 
         baseline_dir = tmp_path / "api_baseline_previews"
         status, baseline_preview_payload = _request_json(

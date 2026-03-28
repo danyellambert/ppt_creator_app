@@ -192,6 +192,7 @@ Mesmo com a Fase 1 concluída, ainda há uma camada importante de refinamento vi
   - [x] primeira stack vertical guiada por conteúdo aplicada em regiões narrativas mistas (`comparison`, `two_column`, `image_text`)
   - [x] expansão inicial dessas stacks/weights para `agenda`, `bullets` e `closing`
   - [x] primeira expansão adicional para `title`, `section`, `chart` e `timeline`
+  - [x] primeira camada explícita de constraints semânticas com `target_share`, `max_width` e `max_height` para regiões fixas/flexíveis
   - [x] expandir stacks semânticas reutilizáveis para mais layouts e regiões internas
 - [ ] criar stacks/rows/columns reutilizáveis para reduzir desalinhamentos entre layouts
 - [ ] adicionar auto-fit tipográfico e controle de overflow por bloco
@@ -517,6 +518,7 @@ Se a meta for perseguir o nível “deck quase pronto sem retoque manual”, a o
   - [x] primeira composição simples de grids aplicada em layouts multi-painel
   - [x] primeiros helpers semânticos de mais alto nível reaproveitados em layouts reais
   - [ ] consolidar primitives reutilizáveis de mais alto nível
+  - [x] primeira consolidação prática com constrained columns/rows e uso real em capas, seções, charts e timelines
   - [x] primeira expansão com helpers semânticos adicionais para panel-grid ponderado e panel-content stacks reutilizáveis
 - [ ] constraints semânticas em vez de posições excessivamente rígidas
 - [ ] auto-fit real de texto por caixa
@@ -569,6 +571,8 @@ Se a meta for perseguir o nível “deck quase pronto sem retoque manual”, a o
 - [x] playground local mais robusto com bootstrap de template/perfil e controles operacionais básicos
 - [x] perfis de público (board, consulting, sales, product)
 - [ ] integração com workflows comerciais e operacionais
+  - [x] primeira biblioteca de workflow presets operacionais/comerciais com bootstrap via CLI/API
+  - [x] playground local agora consegue carregar workflows e expor artefatos/previews de forma mais operacional
 
 ---
 

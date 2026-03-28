@@ -52,13 +52,29 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
     chart_top = 2.2
     chart_height = 4.05
     chart_bounds: tuple[float, float, float, float] | None = None
-    for region, (region_top, region_height) in renderer.build_content_stack(
+    for region, (region_top, region_height) in renderer.build_constrained_content_stack(
         top=chart_top,
         height=chart_height,
-        regions=chart_regions,
+        regions=[
+            {
+                **region,
+                **(
+                    {
+                        "target_share": 1.0,
+                        "max_height": 0.9,
+                    }
+                    if region["kind"] == "body"
+                    else {
+                        "target_share": max(
+                            2.4,
+                            len(slide_spec.chart_categories) * 0.5 + len(slide_spec.chart_series) * 0.85,
+                        )
+                    }
+                ),
+            }
+            for region in chart_regions
+        ],
         gap=0.18,
-        min_flex=0.9,
-        max_flex=1.3,
     ):
         if region["kind"] == "body":
             body_box = renderer.textbox(slide, g.content_left, region_top, g.content_width, region_height)

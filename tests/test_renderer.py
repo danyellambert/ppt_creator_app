@@ -193,6 +193,24 @@ def test_build_weighted_columns_allocates_more_width_to_heavier_content() -> Non
     assert columns[1][1] > columns[0][1]
 
 
+def test_build_constrained_columns_respects_fixed_sidebar_width() -> None:
+    renderer = PresentationRenderer(asset_root="examples")
+
+    columns = renderer.build_constrained_columns(
+        left=1.0,
+        width=10.0,
+        gap=0.2,
+        regions=[
+            {"kind": "main", "min_width": 5.0, "target_share": 3.0},
+            {"kind": "sidebar", "width": 3.0, "min_width": 3.0},
+        ],
+    )
+
+    assert len(columns) == 2
+    assert columns[1][1] == pytest.approx(3.0)
+    assert columns[0][1] == pytest.approx(6.8)
+
+
 def test_build_panel_row_bounds_returns_rectangles() -> None:
     renderer = PresentationRenderer(asset_root="examples")
 
@@ -234,6 +252,23 @@ def test_build_weighted_rows_allocates_more_height_to_heavier_content() -> None:
         min_height=0.6,
     )
 
+    assert rows[1][1] > rows[0][1]
+
+
+def test_build_constrained_rows_respects_max_height_caps() -> None:
+    renderer = PresentationRenderer(asset_root="examples")
+
+    rows = renderer.build_constrained_rows(
+        top=1.0,
+        height=4.0,
+        gap=0.1,
+        regions=[
+            {"kind": "intro", "min_height": 0.6, "target_share": 1.0, "max_height": 1.0},
+            {"kind": "chart", "min_height": 1.5, "target_share": 3.0},
+        ],
+    )
+
+    assert rows[0][1] <= 1.0
     assert rows[1][1] > rows[0][1]
 
 
@@ -320,6 +355,28 @@ def test_build_panel_content_stack_bounds_uses_inner_padding() -> None:
     assert len(regions) == 2
     assert regions[0][1][0] == 1.2
     assert regions[0][1][2] == 3.6
+
+
+def test_build_constrained_panel_content_stack_bounds_uses_target_share_and_padding() -> None:
+    renderer = PresentationRenderer(asset_root="examples")
+
+    regions = renderer.build_constrained_panel_content_stack_bounds(
+        left=1.0,
+        top=2.0,
+        width=4.0,
+        height=2.4,
+        padding=0.2,
+        regions=[
+            {"kind": "intro", "min_height": 0.4, "target_share": 1.0, "max_height": 0.8},
+            {"kind": "body", "min_height": 0.9, "target_share": 3.0},
+        ],
+        gap=0.1,
+    )
+
+    assert len(regions) == 2
+    assert regions[0][1][0] == pytest.approx(1.2)
+    assert regions[0][1][2] == pytest.approx(3.6)
+    assert regions[0][1][3] <= 0.8
 
 
 def test_estimate_content_weight_increases_with_more_content() -> None:

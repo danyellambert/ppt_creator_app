@@ -67,30 +67,27 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
         renderer.add_accent_bar(slide, g.content_left, 0.78, g.content_width, 0.08, color=colors.accent)
 
         eyebrow_text = slide_spec.eyebrow or meta.client_name or meta.subtitle or theme_display_name(renderer.theme.name)
-        hero_columns = renderer.build_weighted_columns(
+        hero_columns = renderer.build_constrained_columns(
             left=g.content_left,
             width=g.content_width,
             gap=0.38,
-            weights=[
-                renderer.estimate_content_weight(
-                    title=slide_spec.title or meta.title,
-                    body=slide_spec.body,
-                    footer=slide_spec.subtitle,
-                    tag=eyebrow_text,
-                ),
-                renderer.estimate_content_weight(
-                    title="Context",
-                    body=" ".join(
-                        part
-                        for part in [meta.client_name, meta.author, meta.date, theme_display_name(renderer.theme.name)]
-                        if part
+            regions=[
+                {
+                    "kind": "hero_main",
+                    "min_width": 6.0,
+                    "target_share": renderer.estimate_content_weight(
+                        title=slide_spec.title or meta.title,
+                        body=slide_spec.body,
+                        footer=slide_spec.subtitle,
+                        tag=eyebrow_text,
                     ),
-                ),
+                },
+                {
+                    "kind": "hero_context",
+                    "width": 3.15 if cover_asset else 3.35,
+                    "min_width": 2.85,
+                },
             ],
-            min_width=2.75,
-            min_flex=0.9,
-            max_flex=1.35,
-            kind_prefix="title_hero",
         )
         main_left, main_width = hero_columns[0]
         panel_left, panel_width = hero_columns[1]
@@ -213,30 +210,27 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
     renderer.add_accent_bar(slide, g.content_left, 0.72, 0.1, 1.15, color=colors.accent)
 
     heading_left = g.content_left + 0.33
-    split_columns = renderer.build_weighted_columns(
+    split_columns = renderer.build_constrained_columns(
         left=heading_left,
         width=g.content_right - heading_left,
         gap=0.42,
-        weights=[
-            renderer.estimate_content_weight(
-                title=slide_spec.title or meta.title,
-                body=slide_spec.body,
-                footer=slide_spec.subtitle,
-                tag=slide_spec.eyebrow or meta.subtitle,
-            ),
-            renderer.estimate_content_weight(
-                title="Deck",
-                body=" ".join(
-                    part
-                    for part in [meta.title, meta.client_name, meta.author, meta.date, theme_display_name(renderer.theme.name)]
-                    if part
+        regions=[
+            {
+                "kind": "split_main",
+                "min_width": 5.6,
+                "target_share": renderer.estimate_content_weight(
+                    title=slide_spec.title or meta.title,
+                    body=slide_spec.body,
+                    footer=slide_spec.subtitle,
+                    tag=slide_spec.eyebrow or meta.subtitle,
                 ),
-            ),
+            },
+            {
+                "kind": "split_panel",
+                "width": 3.35 if cover_asset else 3.6,
+                "min_width": 3.0,
+            },
         ],
-        min_width=2.75,
-        min_flex=0.9,
-        max_flex=1.35,
-        kind_prefix="title_split",
     )
     main_left, main_width = split_columns[0]
     panel_left, panel_width = split_columns[1]

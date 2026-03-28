@@ -428,6 +428,21 @@ python -m ppt_creator.cli profiles
 python -m ppt_creator.cli assets
 ```
 
+Agora também existe uma biblioteca inicial de **workflows operacionais/comerciais** para bootstrap mais rápido de decks recorrentes:
+
+```bash
+python -m ppt_creator.cli workflows
+python -m ppt_creator.cli workflow-template sales_qbr outputs/sales_qbr_template.json
+```
+
+Esses workflows combinam:
+
+- domínio base do starter template
+- perfil de público recomendado
+- coleções de assets sugeridas
+- backend de preview preferido
+- caminhos padrão para `.pptx`, previews e reports
+
 Gerar JSON inicial a partir de um briefing estruturado:
 
 ```bash
@@ -726,12 +741,15 @@ Endpoints disponíveis:
 - `GET /templates`
 - `GET /profiles`
 - `GET /assets`
+- `GET /workflows`
+- `GET /artifact`
 - `POST /compare-pptx`
 - `POST /review`
 - `POST /preview`
 - `POST /validate`
 - `POST /render`
 - `POST /template`
+- `POST /workflow-template`
 
 O endpoint `POST /render` também pode receber `include_review: true` para devolver a revisão heurística junto com o resultado do render/dry-run.
 
@@ -739,7 +757,16 @@ Também já existe um playground/editor local bem inicial servindo HTML em:
 
 - `GET /playground`
 
-Ele permite colar/editar JSON, carregar starter templates por domínio/perfil, escolher backend de preview e acionar validate/review/preview/render diretamente contra a API local.
+Ele agora permite:
+
+- colar/editar JSON diretamente
+- carregar starter templates por domínio/perfil
+- carregar workflows operacionais prontos
+- persistir o estado local do playground no navegador
+- escolher backend/baseline de preview
+- abrir artefatos gerados e thumbnail sheets direto da interface
+- navegar por uma galeria simples dos previews gerados
+- acionar validate/review/preview/render diretamente contra a API local
 
 Exemplo de validação por API:
 
@@ -957,6 +984,14 @@ Essa mesma abordagem começou a se espalhar também para outros layouts executiv
 
 O rollout também já começou a alcançar layouts que ainda estavam mais rígidos, como `title`, `section`, `chart` e `timeline`, especialmente com splits ponderados, stacks internas mais semânticas e cobertura adicional de auto-fit em blocos sensíveis.
 
+Mais recentemente entrou também uma camada de **constraints semânticas explícitas** no motor de layout, com suporte a colunas/rows que misturam:
+
+- regiões fixas (por exemplo sidebars e markers)
+- regiões flexíveis guiadas por `target_share`
+- limites máximos como `max_width` e `max_height`
+
+Isso já começou a ser usado para estabilizar melhor capas, slides de seção, charts com bloco narrativo e timelines com painéis mais previsíveis.
+
 Isso ainda não é um layout engine completo, mas já é o primeiro passo para sair de coordenadas excessivamente rígidas e caminhar para composição mais resiliente.
 
 Também já existe uma primeira infraestrutura para um backend de preview mais fiel ao `.pptx` quando um runtime de Office estiver disponível localmente, mantendo fallback limpo para o preview sintético.
@@ -994,6 +1029,8 @@ Também começou a entrar uma primeira camada de **crop/cover-fit mais inteligen
 Os placeholders de imagem também começaram a ganhar uma apresentação mais premium/estruturada, deixando mais claro quando um slide ainda espera um asset real sem parecer apenas um bloco vazio.
 
 Na camada opcional `ppt_creator_ai`, já existe agora uma **primeira etapa de revisão iterativa via provider** depois do QA heurístico. Em outras palavras: além de regenerar ou refinar heuristicamente, o pipeline já pode pedir a um provider real que **reescreva o deck gerado à luz do review e das críticas por slide**, retornando um novo JSON estruturado.
+
+No lado mais operacional/comercial, o projeto também começou a ganhar uma camada explícita de **workflow presets** para casos recorrentes de uso, como QBR de vendas, board strategy review, product operating review e steerco de consultoria. Isso ajuda a aproximar o `ppt_creator` de fluxos reais de operação, não só de exemplos genéricos.
 
 Também já existe um caminho opcional para pedir ao provider uma **crítica slide a slide combinando briefing + QA** e salvar isso em JSON:
 

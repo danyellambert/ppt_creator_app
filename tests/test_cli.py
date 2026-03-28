@@ -304,6 +304,21 @@ def test_cli_profiles_and_assets_commands_emit_reports(tmp_path: Path) -> None:
     assert assets_payload["collections"]
 
 
+def test_cli_workflows_and_workflow_template_commands_emit_reports(tmp_path: Path) -> None:
+    workflows_report = tmp_path / "workflows.json"
+    workflow_template_output = tmp_path / "sales_qbr_template.json"
+
+    assert main(["workflows", "--report-json", str(workflows_report)]) == 0
+    assert main(["workflow-template", "sales_qbr", str(workflow_template_output)]) == 0
+
+    workflows_payload = json.loads(workflows_report.read_text(encoding="utf-8"))
+    assert workflows_payload["workflows"]
+
+    spec = PresentationInput.from_path(workflow_template_output)
+    assert spec.presentation.footer_text == "Sales profile"
+    assert spec.presentation.title == "Sales operating review"
+
+
 def test_cli_preview_generates_pngs_and_thumbnail_sheet(tmp_path: Path, capsys) -> None:
     output_dir = tmp_path / "preview_output"
     report_path = tmp_path / "preview_report.json"

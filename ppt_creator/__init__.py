@@ -45,6 +45,7 @@ from ppt_creator.theme import (
     get_theme,
     theme_display_name,
 )
+from ppt_creator.workflows import build_workflow_packet, get_workflow_preset, list_workflow_presets
 
 __version__ = "0.1.0"
 
@@ -74,12 +75,15 @@ __all__ = [
     "compare_pptx_artifacts",
     "compare_pptx_payload",
     "build_domain_template",
+    "build_workflow_packet",
     "get_asset_collection",
     "get_audience_profile",
     "get_theme",
+    "get_workflow_preset",
     "list_asset_collections",
     "list_audience_profiles",
     "list_template_domains",
+    "list_workflow_presets",
     "PreviewRenderer",
     "preview_spec_payload",
     "render_previews",
