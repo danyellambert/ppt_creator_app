@@ -107,13 +107,6 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
             color=marker_color,
         )
 
-        content_left, content_top, content_width, content_height = renderer.panel_inner_bounds(
-            left=left,
-            top=panel_top,
-            width=item_width,
-            height=item_height,
-            padding=0.22,
-        )
         regions = [{"kind": "title", "height": 0.34}]
         if item.body:
             regions.append(
@@ -127,11 +120,14 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
         if item.footer:
             regions.append({"kind": "footer", "height": 0.22})
 
-        for region, (region_top, region_height) in renderer.build_content_stack(
-            top=content_top,
-            height=content_height,
+        for region, (content_left, region_top, content_width, region_height) in renderer.build_panel_content_stack_bounds(
+            left=left,
+            top=panel_top,
+            width=item_width,
+            height=item_height,
             regions=regions,
             gap=0.08,
+            padding=0.22,
             min_flex=0.9,
             max_flex=1.25,
         ):

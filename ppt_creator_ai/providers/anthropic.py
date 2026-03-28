@@ -13,7 +13,7 @@ from ppt_creator_ai.briefing import (
     suggest_image_queries_from_briefing,
     summarize_text_to_executive_bullets,
 )
-from ppt_creator_ai.providers.base import BriefingGenerationResult
+from ppt_creator_ai.providers.base import BriefingGenerationResult, DeckCritiqueResult
 from ppt_creator_ai.providers.local_gguf import PPTAgentLocalProvider
 
 
@@ -211,4 +211,50 @@ class AnthropicBriefingProvider:
             provider_name=self.name,
             payload=normalized_payload,
             analysis=analysis,
+        )
+
+    def critique_generated_deck(
+        self,
+        briefing: BriefingInput,
+        current_payload: dict[str, object],
+        review: dict[str, object],
+        slide_critiques: list[dict[str, object]],
+        *,
+        theme_name: str | None = None,
+        feedback_messages: list[str] | None = None,
+    ) -> DeckCritiqueResult:
+        model_name = self.resolve_model_name()
+        fallback_used = False
+        try:
+            raw_output = self.request_generation(
+                self._structured_helper.build_critique_prompt(
+                    briefing,
+                    current_payload,
+                    review,
+                    slide_critiques,
+                    theme_name=theme_name,
+                    feedback_messages=feedback_messages,
+                ),
+                model_name=model_name,
+            )
+            critiques = self._structured_helper.normalize_slide_critiques(
+                self._structured_helper.extract_slide_critiques_payload(raw_output),
+                fallback_slide_critiques=slide_critiques,
+            )
+        except Exception:
+            critiques = slide_critiques
+            fallback_used = True
+
+        return DeckCritiqueResult(
+            provider_name=self.name,
+            critiques=critiques,
+            analysis={
+                "provider": self.name,
+                "model_name": model_name,
+                "base_url": self.resolve_base_url(),
+                "critique_mode": "llm_slide_critique",
+                "feedback_messages": feedback_messages or [],
+                "fallback_used": fallback_used,
+                "critique_count": len(critiques),
+            },
         )

@@ -43,6 +43,8 @@ The format is inspired by Keep a Changelog, and the project aims to follow Seman
 - heuristic QA now includes a first layout-pressure/collision signal layer that uses slide-specific composition bounds more directly
 - the optional AI generation flow now prefers real rendered-PPTX previews automatically in more preview/regression scenarios, while image placeholders and bullets heading autofit were further refined
 - providers in the optional AI layer now support an initial post-QA deck revision loop, while new renderer helpers broaden semantic panel-grid/panel-stack primitives and extend autofit into longer closing quotes
+- the optional AI layer can now also emit provider-backed slide-by-slide critiques combining briefing context with QA/visual feedback, while semantic panel-stack helpers spread into more composite layouts
+- provider-backed post-QA review now also covers sharper executive rewrites for titles, subtitles, and summary messaging, while additional composite layouts reuse shared panel-stack helpers
 - optional office-aware preview backend selection with automatic fallback to synthetic previews
 - initial layout primitive helpers for panel inner bounds and stacked vertical regions
 - initial application of layout primitives to comparison, faq, cards, and two-column slides

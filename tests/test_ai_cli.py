@@ -9,7 +9,7 @@ from ppt_creator.schema import PresentationInput
 from ppt_creator_ai.briefing import BriefingInput
 from ppt_creator_ai.cli import main
 from ppt_creator_ai.providers import get_provider
-from ppt_creator_ai.providers.base import BriefingGenerationResult
+from ppt_creator_ai.providers.base import BriefingGenerationResult, DeckCritiqueResult
 
 
 def test_ai_cli_generates_deck_json_from_briefing(tmp_path: Path) -> None:
@@ -533,6 +533,185 @@ def test_ai_cli_can_run_provider_backed_llm_review_after_qa(tmp_path: Path, monk
     assert report_payload["auto_llm_review_applied"] is True
     assert report_payload["generated_deck_issue_count"] <= report_payload["initial_generated_deck_issue_count"]
     assert output_payload["slides"][1]["body"] == "Sharper intro for the decision meeting."
+
+
+def test_ai_cli_provider_backed_llm_review_can_rewrite_executive_titles_and_summary(tmp_path: Path, monkeypatch) -> None:
+    output = tmp_path / "generated_llm_rewrite_deck.json"
+    report = tmp_path / "generated_llm_rewrite_report.json"
+    provider = get_provider("openai")
+
+    noisy_payload = {
+        "presentation": {"title": "AI copilots for sales teams", "theme": "executive_premium_minimal"},
+        "slides": [
+            {
+                "type": "title",
+                "title": "AI copilots for sales teams and how a broader AI enablement operating model could potentially transform preparation quality over time",
+                "subtitle": "A deliberately long subtitle that should be rewritten into a sharper executive framing during the provider-backed review pass.",
+            },
+            {
+                "type": "summary",
+                "title": "Summary of the overall recommendation and supporting logic",
+                "body": "This body is intentionally too long and indirect, making the summary weaker than it should be for an executive audience that needs a cleaner point of view.",
+                "bullets": [
+                    "A verbose recommendation bullet that should become much tighter.",
+                    "Another overly long supporting bullet for the summary slide.",
+                    "A third supporting bullet with more words than necessary.",
+                    "A fourth bullet that makes the slide feel crowded.",
+                    "A fifth bullet that should trigger QA review.",
+                ],
+            },
+            {"type": "closing", "title": "Closing", "quote": "Done."},
+        ],
+    }
+    improved_payload = {
+        "presentation": {"title": "AI copilots for sales teams", "theme": "executive_premium_minimal"},
+        "slides": [
+            {
+                "type": "title",
+                "title": "AI copilots for sales teams",
+                "subtitle": "Scale preparation quality without scaling friction.",
+            },
+            {
+                "type": "summary",
+                "title": "Executive summary",
+                "body": "Start narrow, measure operational lift, and scale only after the workflow is stable.",
+                "bullets": ["Start with one workflow", "Measure lift", "Scale the winner"],
+            },
+            {"type": "closing", "title": "Closing", "quote": "Done."},
+        ],
+    }
+
+    monkeypatch.setattr(
+        provider,
+        "generate",
+        lambda briefing, theme_name=None, feedback_messages=None: BriefingGenerationResult(
+            provider_name="openai",
+            payload=noisy_payload,
+            analysis={
+                "image_suggestions": ["sales leadership dashboard"],
+                "density_review": {"status": "review", "warning_count": 2, "warnings": ["dense"], "slides": []},
+            },
+        ),
+    )
+    monkeypatch.setattr(
+        provider,
+        "revise_generated_deck",
+        lambda briefing, current_payload, review, slide_critiques, theme_name=None, feedback_messages=None: BriefingGenerationResult(
+            provider_name="openai",
+            payload=improved_payload,
+            analysis={
+                "image_suggestions": ["sales leadership dashboard"],
+                "density_review": {"status": "ok", "warning_count": 0, "warnings": [], "slides": []},
+                "revision_mode": "llm_review",
+            },
+        ),
+    )
+
+    result = main(
+        [
+            "generate",
+            "examples/briefing_sales.json",
+            str(output),
+            "--provider",
+            "openai",
+            "--auto-llm-review",
+            "--report-json",
+            str(report),
+        ]
+    )
+
+    assert result == 0
+    output_payload = json.loads(output.read_text(encoding="utf-8"))
+    report_payload = json.loads(report.read_text(encoding="utf-8"))
+    assert output_payload["slides"][0]["subtitle"] == "Scale preparation quality without scaling friction."
+    assert output_payload["slides"][1]["title"] == "Executive summary"
+    assert len(output_payload["slides"][1]["bullets"]) == 3
+    assert report_payload["auto_llm_review_applied"] is True
+
+
+def test_ai_cli_can_emit_provider_backed_llm_slide_critiques(tmp_path: Path, monkeypatch) -> None:
+    output = tmp_path / "generated_llm_critiques_deck.json"
+    report = tmp_path / "generated_llm_critiques_report.json"
+    critique_json = tmp_path / "generated_llm_critiques.json"
+    provider = get_provider("openai")
+
+    noisy_payload = {
+        "presentation": {"title": "AI copilots for sales teams", "theme": "executive_premium_minimal"},
+        "slides": [
+            {"type": "title", "title": "AI copilots for sales teams"},
+            {
+                "type": "agenda",
+                "title": "Agenda",
+                "body": "This introduction paragraph is intentionally verbose and dense so the critique step has something meaningful to call out.",
+                "bullets": [
+                    "An intentionally long bullet that should be shortened for a real executive audience.",
+                    "Another long bullet that makes the same slide denser than it should be.",
+                    "A third long bullet that reinforces the critique scenario.",
+                    "A fourth long bullet that makes the agenda more crowded.",
+                    "A fifth long bullet that should trigger QA guidance.",
+                ],
+            },
+            {"type": "closing", "title": "Closing", "quote": "Done."},
+        ],
+    }
+
+    monkeypatch.setattr(
+        provider,
+        "generate",
+        lambda briefing, theme_name=None, feedback_messages=None: BriefingGenerationResult(
+            provider_name="openai",
+            payload=noisy_payload,
+            analysis={
+                "image_suggestions": ["sales leadership dashboard"],
+                "density_review": {"status": "review", "warning_count": 2, "warnings": ["dense"], "slides": []},
+            },
+        ),
+    )
+    monkeypatch.setattr(
+        provider,
+        "critique_generated_deck",
+        lambda briefing, current_payload, review, slide_critiques, theme_name=None, feedback_messages=None: DeckCritiqueResult(
+            provider_name="openai",
+            critiques=[
+                {
+                    "slide_number": 2,
+                    "slide_type": "agenda",
+                    "title": "Agenda",
+                    "risk_level": "high",
+                    "issues": ["Too many bullets", "Body is too dense"],
+                    "rewrite_guidance": ["Reduce to four bullets", "Shorten the narrative intro"],
+                    "visual_guidance": ["Create more whitespace above the footer"],
+                    "executive_tone_guidance": ["Use sharper decision-oriented language"],
+                }
+            ],
+            analysis={
+                "provider": "openai",
+                "critique_mode": "llm_slide_critique",
+                "critique_count": 1,
+            },
+        ),
+    )
+
+    result = main(
+        [
+            "generate",
+            "examples/briefing_sales.json",
+            str(output),
+            "--provider",
+            "openai",
+            "--llm-critique-json",
+            str(critique_json),
+            "--report-json",
+            str(report),
+        ]
+    )
+
+    assert result == 0
+    critique_payload = json.loads(critique_json.read_text(encoding="utf-8"))
+    report_payload = json.loads(report.read_text(encoding="utf-8"))
+    assert critique_payload["provider"] == "openai"
+    assert critique_payload["critiques"][0]["slide_number"] == 2
+    assert report_payload["llm_slide_critique_count"] == 1
 
 
 def test_ai_cli_can_generate_previews_for_generated_deck(tmp_path: Path) -> None:

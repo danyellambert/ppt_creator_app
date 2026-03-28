@@ -192,7 +192,7 @@ Mesmo com a Fase 1 concluída, ainda há uma camada importante de refinamento vi
   - [x] primeira stack vertical guiada por conteúdo aplicada em regiões narrativas mistas (`comparison`, `two_column`, `image_text`)
   - [x] expansão inicial dessas stacks/weights para `agenda`, `bullets` e `closing`
   - [x] primeira expansão adicional para `title`, `section`, `chart` e `timeline`
-  - [ ] expandir stacks semânticas reutilizáveis para mais layouts e regiões internas
+  - [x] expandir stacks semânticas reutilizáveis para mais layouts e regiões internas
 - [ ] criar stacks/rows/columns reutilizáveis para reduzir desalinhamentos entre layouts
 - [ ] adicionar auto-fit tipográfico e controle de overflow por bloco
   - [x] primeira camada de auto-fit em títulos, subtitles e caixas homogêneas críticas
@@ -398,10 +398,11 @@ Qualquer camada de IA deve ser opcional.
   - [x] adaptar payloads alternativos do PPTAgent local para o schema canônico do `ppt_creator`
   - [ ] providers adicionais e hardening mais profundo de cada integração
 - [ ] usar LLM para revisão iterativa de narrativa após o primeiro deck ser gerado
-- [ ] usar LLM para reescrever títulos, subtitles e summaries em tom mais executivo
-- [ ] usar LLM para crítica slide a slide combinando briefing + QA visual
+- [x] usar LLM para revisão iterativa de narrativa após o primeiro deck ser gerado
+- [x] usar LLM para reescrever títulos, subtitles e summaries em tom mais executivo
+- [x] usar LLM para crítica slide a slide combinando briefing + QA visual
   - [x] primeira crítica slide a slide heurística derivada do review/QA nos relatórios da camada AI
-  - [ ] evoluir para crítica via LLM combinando briefing + QA visual
+  - [x] evoluir para crítica via LLM combinando briefing + QA visual
 
 ### Arquitetura recomendada
 
@@ -416,7 +417,7 @@ Qualquer camada de IA deve ser opcional.
   - [x] integração inicial de preview derivado do `.pptx` renderizado no pipeline opcional de briefing
   - [x] primeira regeneração automática baseada em feedback heurístico do review
   - [x] primeira incorporação de feedback vindo também do preview visual ao loop heurístico opcional
-  - [ ] evoluir para revisão opcional/regeração iterativa automática mais forte
+  - [x] evoluir para revisão opcional/regeração iterativa automática mais forte
 
 ### Resultado esperado
 
@@ -555,6 +556,7 @@ Se a meta for perseguir o nível “deck quase pronto sem retoque manual”, a o
 - [x] geração de outline e narrativa a partir de briefing livre
 - [ ] reescrita executiva de conteúdo fraco
 - [ ] revisão iterativa do deck após renderização e QA
+- [x] revisão iterativa do deck após renderização e QA
 
 ### Prioridade 6 — Produto / experiência de uso
 

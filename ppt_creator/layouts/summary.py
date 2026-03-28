@@ -61,25 +61,31 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
             renderer.theme.components.accent_bar_height,
             color=colors.accent,
         )
-        content_left, content_top, content_width, content_height = renderer.panel_inner_bounds(
+        panel_regions = renderer.build_panel_content_stack_bounds(
             left=panel_left,
             top=panel_top,
             width=panel_width,
             height=panel_height,
-            padding=0.26,
-        )
-        panel_regions = renderer.stack_vertical_regions(
-            top=content_top,
-            height=content_height,
             regions=[
                 {"kind": "heading", "height": 0.28},
-                {"kind": "bullets", "min_height": 2.18, "flex": 1.0},
+                {
+                    "kind": "bullets",
+                    "min_height": 2.18,
+                    "flex": 1.0,
+                    "content_weight": renderer.estimate_content_weight(bullets=slide_spec.bullets),
+                },
             ],
             gap=0.08,
+            padding=0.26,
+            min_flex=0.9,
+            max_flex=1.35,
         )
-        heading_box = renderer.textbox(slide, content_left, panel_regions[0][1][0], content_width, panel_regions[0][1][1])
+        heading_left, heading_top, heading_width, heading_height = panel_regions[0][1]
+        heading_box = renderer.textbox(slide, heading_left, heading_top, heading_width, heading_height)
         renderer.write_paragraph(heading_box.text_frame, "Key takeaways", size=t.eyebrow_size, color=colors.muted, bold=True)
-        bullets_box = renderer.textbox(slide, content_left, panel_regions[1][1][0], content_width, panel_regions[1][1][1])
+        renderer.fit_text_frame(heading_box.text_frame, max_size=t.eyebrow_size, bold=True)
+        bullets_left, bullets_top, bullets_width, bullets_height = panel_regions[1][1]
+        bullets_box = renderer.textbox(slide, bullets_left, bullets_top, bullets_width, bullets_height)
         tf = bullets_box.text_frame
         for bullet in slide_spec.bullets:
             renderer.write_paragraph(tf, f"• {bullet}", size=t.small_size + 1, color=colors.text, space_after=6)
@@ -122,6 +128,7 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
         color=colors.muted,
         bold=True,
     )
+    renderer.fit_text_frame(heading_box.text_frame, max_size=t.eyebrow_size, bold=True)
     bullets_box = renderer.textbox(slide, g.content_left + 0.28, 2.9, g.content_width - 0.56, 1.9)
     tf = bullets_box.text_frame
     for bullet in slide_spec.bullets:

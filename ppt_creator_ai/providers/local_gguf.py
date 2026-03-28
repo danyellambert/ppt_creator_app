@@ -14,7 +14,7 @@ from ppt_creator_ai.briefing import (
     suggest_image_queries_from_briefing,
     summarize_text_to_executive_bullets,
 )
-from ppt_creator_ai.providers.base import BriefingGenerationResult
+from ppt_creator_ai.providers.base import BriefingGenerationResult, DeckCritiqueResult
 
 
 def _normalize_process_output(value: str | bytes | None) -> str:
@@ -119,6 +119,7 @@ class PPTAgentLocalProvider:
             "Do not wrap the result in markdown. Do not explain your reasoning. "
             "Keep the output compatible with these slide types: title, section, agenda, bullets, cards, metrics, chart, image_text, timeline, comparison, two_column, table, faq, summary, closing. "
             "Preserve the overall storyline, but tighten dense slides, reduce clipping/collision risk, and improve executive readability. "
+            "Rewrite weak titles, subtitles, and summary bullets into sharper executive language when needed. "
             f"Use theme '{effective_theme}'.\n\n"
             "Structured briefing JSON:\n"
             f"{json.dumps(briefing.model_dump(mode='json'), ensure_ascii=False, indent=2)}\n\n"
@@ -132,6 +133,48 @@ class PPTAgentLocalProvider:
         if feedback_messages:
             prompt += "Additional revision guidance:\n- " + "\n- ".join(feedback_messages) + "\n\n"
         prompt += "Return a single revised JSON object now."
+        return prompt
+
+    def build_critique_prompt(
+        self,
+        briefing: BriefingInput,
+        current_payload: dict[str, object],
+        review: dict[str, object],
+        slide_critiques: list[dict[str, object]],
+        *,
+        theme_name: str | None = None,
+        feedback_messages: list[str] | None = None,
+    ) -> str:
+        effective_theme = theme_name or briefing.theme
+        review_summary = {
+            "status": review.get("status"),
+            "issue_count": review.get("issue_count"),
+            "average_score": review.get("average_score"),
+            "overflow_risk_count": review.get("overflow_risk_count"),
+            "clipping_risk_count": review.get("clipping_risk_count"),
+            "collision_risk_count": review.get("collision_risk_count"),
+            "balance_warning_count": review.get("balance_warning_count"),
+            "top_risk_slides": review.get("top_risk_slides"),
+        }
+        prompt = (
+            "You are critiquing an existing presentation JSON after QA review. "
+            "Return only valid JSON with a top-level key 'slide_critiques'. "
+            "Do not wrap the result in markdown. Do not explain your reasoning outside the JSON. "
+            "For each risky slide, provide concise slide-by-slide critique that combines briefing intent, QA review, and visual/layout feedback. "
+            "Each critique object should contain: slide_number, slide_type, title, risk_level, issues, rewrite_guidance, visual_guidance, executive_tone_guidance. "
+            f"Use theme '{effective_theme}' as context.\n\n"
+            "Structured briefing JSON:\n"
+            f"{json.dumps(briefing.model_dump(mode='json'), ensure_ascii=False, indent=2)}\n\n"
+            "Current presentation JSON:\n"
+            f"{json.dumps(current_payload, ensure_ascii=False, indent=2)}\n\n"
+            "QA review summary JSON:\n"
+            f"{json.dumps(review_summary, ensure_ascii=False, indent=2)}\n\n"
+            "Existing heuristic slide critiques JSON:\n"
+            f"{json.dumps(slide_critiques[:8], ensure_ascii=False, indent=2)}\n\n"
+        )
+        if feedback_messages:
+            prompt += "Additional visual/QA guidance:\n- " + "\n- ".join(feedback_messages) + "\n\n"
+        prompt += "Return a single JSON object with the slide critiques now."
         return prompt
 
     def validate_generated_payload(
@@ -525,6 +568,54 @@ class PPTAgentLocalProvider:
                 return candidate
         raise ValueError("Could not extract presentation JSON from model output")
 
+    def extract_slide_critiques_payload(self, text: str) -> list[dict[str, object]]:
+        decoder = json.JSONDecoder()
+        for index, char in enumerate(text):
+            if char != "{":
+                continue
+            try:
+                candidate, _ = decoder.raw_decode(text[index:])
+            except json.JSONDecodeError:
+                continue
+            critiques = candidate.get("slide_critiques") if isinstance(candidate, dict) else None
+            if isinstance(critiques, list):
+                return [item for item in critiques if isinstance(item, dict)]
+        raise ValueError("Could not extract slide critique JSON from model output")
+
+    def normalize_slide_critiques(
+        self,
+        critiques: list[dict[str, object]],
+        *,
+        fallback_slide_critiques: list[dict[str, object]],
+        max_critiques: int = 8,
+    ) -> list[dict[str, object]]:
+        normalized: list[dict[str, object]] = []
+        for item in critiques[:max_critiques]:
+            slide_number = item.get("slide_number")
+            if not isinstance(slide_number, int):
+                continue
+            normalized.append(
+                {
+                    "slide_number": slide_number,
+                    "slide_type": str(item.get("slide_type") or "slide"),
+                    "title": str(item.get("title") or f"Slide {slide_number:02d}"),
+                    "risk_level": str(item.get("risk_level") or "medium"),
+                    "issues": [str(issue) for issue in (item.get("issues") or []) if str(issue).strip()][:4],
+                    "rewrite_guidance": [
+                        str(guidance) for guidance in (item.get("rewrite_guidance") or []) if str(guidance).strip()
+                    ][:4],
+                    "visual_guidance": [
+                        str(guidance) for guidance in (item.get("visual_guidance") or []) if str(guidance).strip()
+                    ][:4],
+                    "executive_tone_guidance": [
+                        str(guidance)
+                        for guidance in (item.get("executive_tone_guidance") or [])
+                        if str(guidance).strip()
+                    ][:4],
+                }
+            )
+        return normalized or fallback_slide_critiques[:max_critiques]
+
     def generate(
         self,
         briefing: BriefingInput,
@@ -611,4 +702,49 @@ class PPTAgentLocalProvider:
             provider_name=self.name,
             payload=normalized_payload,
             analysis=analysis,
+        )
+
+    def critique_generated_deck(
+        self,
+        briefing: BriefingInput,
+        current_payload: dict[str, object],
+        review: dict[str, object],
+        slide_critiques: list[dict[str, object]],
+        *,
+        theme_name: str | None = None,
+        feedback_messages: list[str] | None = None,
+    ) -> DeckCritiqueResult:
+        model_path = self.resolve_model_path()
+        fallback_used = False
+        try:
+            raw_output = self.run_model(
+                model_path,
+                self.build_critique_prompt(
+                    briefing,
+                    current_payload,
+                    review,
+                    slide_critiques,
+                    theme_name=theme_name,
+                    feedback_messages=feedback_messages,
+                ),
+            )
+            critiques = self.normalize_slide_critiques(
+                self.extract_slide_critiques_payload(raw_output),
+                fallback_slide_critiques=slide_critiques,
+            )
+        except Exception:
+            critiques = slide_critiques
+            fallback_used = True
+
+        return DeckCritiqueResult(
+            provider_name=self.name,
+            critiques=critiques,
+            analysis={
+                "provider": self.name,
+                "model_path": str(model_path),
+                "critique_mode": "llm_slide_critique",
+                "feedback_messages": feedback_messages or [],
+                "fallback_used": fallback_used,
+                "critique_count": len(critiques),
+            },
         )

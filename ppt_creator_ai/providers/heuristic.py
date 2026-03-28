@@ -5,7 +5,7 @@ from ppt_creator_ai.briefing import (
     build_briefing_analysis,
     generate_presentation_payload_from_briefing,
 )
-from ppt_creator_ai.providers.base import BriefingGenerationResult
+from ppt_creator_ai.providers.base import BriefingGenerationResult, DeckCritiqueResult
 from ppt_creator_ai.refine import refine_presentation_payload
 
 
@@ -64,4 +64,26 @@ class HeuristicBriefingProvider:
             provider_name=self.name,
             payload=payload,
             analysis=analysis,
+        )
+
+    def critique_generated_deck(
+        self,
+        briefing: BriefingInput,
+        current_payload: dict[str, object],
+        review: dict[str, object],
+        slide_critiques: list[dict[str, object]],
+        *,
+        theme_name: str | None = None,
+        feedback_messages: list[str] | None = None,
+    ) -> DeckCritiqueResult:
+        return DeckCritiqueResult(
+            provider_name=self.name,
+            critiques=slide_critiques,
+            analysis={
+                "provider": self.name,
+                "critique_mode": "heuristic_slide_critique",
+                "feedback_messages": feedback_messages or [],
+                "fallback_used": True,
+                "critique_count": len(slide_critiques),
+            },
         )

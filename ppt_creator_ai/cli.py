@@ -115,6 +115,10 @@ def build_parser() -> argparse.ArgumentParser:
         default=1,
         help="Maximum number of provider-backed post-QA review/revision passes to attempt when --auto-llm-review is enabled",
     )
+    generate_parser.add_argument(
+        "--llm-critique-json",
+        help="Optional path to write slide-by-slide provider-backed critique JSON combining briefing + QA feedback",
+    )
     generate_parser.add_argument("--report-json", help="Optional path to write a JSON generation report")
 
     providers_parser = subparsers.add_parser("providers", help="List available briefing providers")
@@ -240,6 +244,7 @@ def generate_from_briefing(
     refine_passes: int = 1,
     auto_llm_review: bool = False,
     llm_review_passes: int = 1,
+    llm_critique_json: str | Path | None = None,
 ) -> dict[str, object]:
     input_path = Path(input_briefing)
     output_json_path = Path(output_json)
@@ -543,6 +548,39 @@ def generate_from_briefing(
         deck_review = current_review
 
     slide_critiques = build_slide_critiques_from_review(spec, deck_review)
+    llm_slide_critiques: list[dict[str, object]] | None = None
+    llm_critique_output_path: str | None = None
+    if llm_critique_json:
+        critique_preview_result, critique_preview_feedback, critique_preview_source = _build_preview_feedback_for_spec(
+            spec,
+            preview_enabled=preview_feedback_enabled,
+            prefer_rendered_pptx=preview_from_rendered_pptx or preview_backend != "synthetic",
+            resolved_asset_root=resolved_asset_root,
+            preview_backend=preview_backend,
+            preview_baseline_dir=preview_baseline_dir,
+            preview_write_diff_images=preview_write_diff_images,
+            basename=preview_feedback_basename,
+        )
+        critique_result = provider.critique_generated_deck(
+            briefing,
+            spec.model_dump(mode="json"),
+            deck_review,
+            slide_critiques,
+            theme_name=theme_name,
+            feedback_messages=_merge_feedback_messages(
+                build_generation_feedback_from_review(deck_review),
+                critique_preview_feedback,
+            ),
+        )
+        llm_slide_critiques = critique_result.critiques
+        llm_critique_payload = {
+            "provider": critique_result.provider_name,
+            "analysis": critique_result.analysis,
+            "preview_feedback_source": critique_preview_source,
+            "critiques": llm_slide_critiques,
+            "preview_feedback_enabled": bool(critique_preview_result),
+        }
+        llm_critique_output_path = str(write_json(llm_critique_json, llm_critique_payload))
 
     payload = spec.model_dump(mode="json")
     output_path = write_json(output_json, payload)
@@ -562,6 +600,7 @@ def generate_from_briefing(
                 "refinement_history": refinement_history,
                 "llm_review_history": llm_review_history,
                 "slide_critiques": slide_critiques,
+                "llm_slide_critiques": llm_slide_critiques,
             },
         )
         analysis_path = str(analysis_output)
@@ -627,6 +666,8 @@ def generate_from_briefing(
         "auto_llm_review_applied": llm_review_applied,
         "llm_review_passes_requested": llm_review_passes if auto_llm_review else 0,
         "llm_review_passes_completed": len(llm_review_history),
+        "llm_critique_output_json": llm_critique_output_path,
+        "llm_slide_critique_count": len(llm_slide_critiques or []),
         "image_suggestion_count": len(analysis["image_suggestions"]),
         "density_review_status": analysis["density_review"]["status"],
         "initial_generated_deck_review_status": initial_deck_review["status"],
@@ -680,6 +721,7 @@ def main(argv: list[str] | None = None) -> int:
             refine_passes=args.refine_passes,
             auto_llm_review=args.auto_llm_review,
             llm_review_passes=args.llm_review_passes,
+            llm_critique_json=args.llm_critique_json,
         )
         if args.report_json:
             write_json(args.report_json, result)

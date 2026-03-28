@@ -13,6 +13,13 @@ class BriefingGenerationResult:
     analysis: dict[str, object]
 
 
+@dataclass(frozen=True)
+class DeckCritiqueResult:
+    provider_name: str
+    critiques: list[dict[str, object]]
+    analysis: dict[str, object]
+
+
 class BriefingProvider(Protocol):
     name: str
     description: str
@@ -35,3 +42,14 @@ class BriefingProvider(Protocol):
         theme_name: str | None = None,
         feedback_messages: list[str] | None = None,
     ) -> BriefingGenerationResult: ...
+
+    def critique_generated_deck(
+        self,
+        briefing: BriefingInput,
+        current_payload: dict[str, object],
+        review: dict[str, object],
+        slide_critiques: list[dict[str, object]],
+        *,
+        theme_name: str | None = None,
+        feedback_messages: list[str] | None = None,
+    ) -> DeckCritiqueResult: ...
