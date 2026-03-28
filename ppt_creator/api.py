@@ -5,6 +5,7 @@ import json
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from pydantic import ValidationError
 
@@ -24,6 +25,73 @@ class APIRequestError(ValueError):
     def __init__(self, message: str, status_code: int = HTTPStatus.BAD_REQUEST):
         super().__init__(message)
         self.status_code = status_code
+
+
+def _build_playground_html() -> str:
+    default_spec = build_domain_template("sales")
+    initial_json = json.dumps(default_spec, indent=2, ensure_ascii=False)
+    return f"""<!doctype html>
+<html lang='en'>
+<head>
+  <meta charset='utf-8'>
+  <title>PPT Creator Playground</title>
+  <style>
+    body {{ font-family: Arial, sans-serif; margin: 24px; background: #f6f4f0; color: #14263f; }}
+    textarea {{ width: 100%; min-height: 380px; font-family: monospace; font-size: 13px; }}
+    input {{ width: 100%; padding: 8px; margin: 4px 0 12px; }}
+    button {{ margin-right: 8px; padding: 10px 14px; }}
+    pre {{ background: white; border: 1px solid #d9dce2; padding: 16px; overflow: auto; max-height: 360px; }}
+    .row {{ display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }}
+  </style>
+</head>
+<body>
+  <h1>PPT Creator Playground</h1>
+  <p>Edit JSON, then validate, review, preview, or render using the local API.</p>
+  <div class='row'>
+    <div>
+      <label>Output PPTX path</label>
+      <input id='outputPath' value='outputs/playground_output.pptx' />
+    </div>
+    <div>
+      <label>Preview directory</label>
+      <input id='previewDir' value='outputs/playground_previews' />
+    </div>
+  </div>
+  <textarea id='spec'>{initial_json}</textarea>
+  <div style='margin: 16px 0;'>
+    <button onclick='runAction("/validate")'>Validate</button>
+    <button onclick='runAction("/review")'>Review</button>
+    <button onclick='runAction("/preview")'>Preview</button>
+    <button onclick='runAction("/render")'>Render</button>
+  </div>
+  <pre id='result'>Ready.</pre>
+  <script>
+    async function runAction(path) {{
+      const spec = JSON.parse(document.getElementById('spec').value);
+      const outputPath = document.getElementById('outputPath').value;
+      const previewDir = document.getElementById('previewDir').value;
+      const payload = {{ spec }};
+      if (path === '/render') {{
+        payload.output_path = outputPath;
+        payload.preview_output_dir = previewDir;
+      }}
+      if (path === '/preview') {{
+        payload.output_dir = previewDir;
+      }}
+      if (path === '/review') {{
+        payload.preview_output_dir = previewDir;
+      }}
+      const response = await fetch(path, {{
+        method: 'POST',
+        headers: {{ 'Content-Type': 'application/json' }},
+        body: JSON.stringify(payload),
+      }});
+      const data = await response.json();
+      document.getElementById('result').textContent = JSON.stringify(data, null, 2);
+    }}
+  </script>
+</body>
+</html>"""
 
 
 def _resolve_service_asset_root(asset_root: str | Path | None) -> Path:
@@ -179,13 +247,57 @@ def review_spec_payload(
     *,
     theme_name: str | None = None,
     asset_root: str | Path | None = None,
+    preview_output_dir: str | Path | None = None,
+    preview_backend: str = "auto",
+    preview_baseline_dir: str | Path | None = None,
+    preview_write_diff_images: bool = False,
 ) -> dict[str, object]:
     spec = PresentationInput.model_validate(spec_payload)
-    return review_presentation(
+    review_result = review_presentation(
         spec,
         theme_name=theme_name or spec.presentation.theme,
         asset_root=_resolve_service_asset_root(asset_root),
     )
+    preview_result: dict[str, object] | None = None
+    preview_source: str | None = None
+    if preview_output_dir:
+        resolved_asset_root = _resolve_service_asset_root(asset_root)
+        if preview_backend != "synthetic":
+            with TemporaryDirectory(prefix="ppt_creator_api_review_preview_") as tmpdir:
+                temp_pptx = Path(tmpdir) / "review-preview.pptx"
+                PresentationRenderer(
+                    theme_name=theme_name or spec.presentation.theme,
+                    asset_root=resolved_asset_root,
+                ).render(spec, temp_pptx)
+                preview_result, preview_source = render_previews_for_rendered_artifact(
+                    spec,
+                    preview_output_dir,
+                    rendered_pptx=temp_pptx,
+                    theme_name=theme_name or spec.presentation.theme,
+                    asset_root=resolved_asset_root,
+                    basename="review-preview",
+                    backend=preview_backend,
+                    baseline_dir=preview_baseline_dir,
+                    write_diff_images=preview_write_diff_images,
+                )
+        else:
+            preview_result, preview_source = render_previews_for_rendered_artifact(
+                spec,
+                preview_output_dir,
+                rendered_pptx=None,
+                theme_name=theme_name or spec.presentation.theme,
+                asset_root=resolved_asset_root,
+                basename="review-preview",
+                backend=preview_backend,
+                baseline_dir=preview_baseline_dir,
+                write_diff_images=preview_write_diff_images,
+            )
+    return {
+        **review_result,
+        "preview_output_dir": str(preview_output_dir) if preview_output_dir else None,
+        "preview_source": preview_source,
+        "preview_result": preview_result,
+    }
 
 
 def preview_spec_payload(
@@ -306,6 +418,14 @@ class PptCreatorAPIHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _html_response(self, status_code: int, html: str) -> None:
+        body = html.encode("utf-8")
+        self.send_response(status_code)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
     def _read_json_body(self) -> dict[str, object]:
         content_length = int(self.headers.get("Content-Length", "0"))
         if content_length <= 0:
@@ -333,6 +453,9 @@ class PptCreatorAPIHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:  # noqa: N802
         if self.path == "/health":
             self._json_response(HTTPStatus.OK, {"status": "ok"})
+            return
+        if self.path == "/playground":
+            self._html_response(HTTPStatus.OK, _build_playground_html())
             return
         if self.path == "/templates":
             self._json_response(HTTPStatus.OK, {"domains": list_template_domains()})
@@ -382,6 +505,10 @@ class PptCreatorAPIHandler(BaseHTTPRequestHandler):
                     spec_payload,
                     theme_name=str(payload["theme_name"]) if payload.get("theme_name") else None,
                     asset_root=payload.get("asset_root") or default_asset_root,
+                    preview_output_dir=payload.get("preview_output_dir"),
+                    preview_backend=str(payload["preview_backend"]) if payload.get("preview_backend") else "auto",
+                    preview_baseline_dir=payload.get("preview_baseline_dir"),
+                    preview_write_diff_images=bool(payload.get("preview_write_diff_images", False)),
                 )
                 self._json_response(HTTPStatus.OK, {"result": result})
                 return

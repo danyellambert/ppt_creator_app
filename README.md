@@ -379,6 +379,14 @@ Esse comando gera um relatório com:
 - issues por slide
 - alertas de densidade, bullet overload, tabelas carregadas e assets ausentes
 
+Se quiser, o fluxo de review agora também pode gerar previews no mesmo passo e **preferir o `.pptx` renderizado** quando isso fizer sentido para o backend:
+
+```bash
+python -m ppt_creator.cli review examples/ai_sales.json \
+  --preview-dir outputs/ai_sales_review_previews \
+  --report-json outputs/ai_sales_review_with_preview.json
+```
+
 Renderização em lote:
 
 ```bash
@@ -694,6 +702,12 @@ Endpoints disponíveis:
 - `POST /template`
 
 O endpoint `POST /render` também pode receber `include_review: true` para devolver a revisão heurística junto com o resultado do render/dry-run.
+
+Também já existe um playground/editor local bem inicial servindo HTML em:
+
+- `GET /playground`
+
+Ele permite colar/editar JSON e acionar validate/review/preview/render diretamente contra a API local.
 
 Exemplo de validação por API:
 

@@ -54,6 +54,46 @@ def test_cli_review_generates_report(tmp_path: Path, capsys) -> None:
     assert "balance_warning_count" in payload
 
 
+def test_cli_review_can_attach_preview_result_with_real_artifact_preference(tmp_path: Path, monkeypatch) -> None:
+    from ppt_creator import cli as cli_module
+
+    report_path = tmp_path / "review_with_preview_report.json"
+    preview_dir = tmp_path / "review_with_preview_artifacts"
+
+    monkeypatch.setattr(
+        cli_module,
+        "render_previews_for_rendered_artifact",
+        lambda *args, **kwargs: (
+            {
+                "mode": "preview-pptx",
+                "preview_count": 10,
+                "previews": [],
+                "thumbnail_sheet": str(preview_dir / "thumbs.png"),
+                "preview_artifact_review": {"status": "ok"},
+                "visual_regression": None,
+                "backend_used": "office",
+            },
+            "rendered_pptx",
+        ),
+    )
+
+    result = main(
+        [
+            "review",
+            "examples/ai_sales.json",
+            "--preview-dir",
+            str(preview_dir),
+            "--report-json",
+            str(report_path),
+        ]
+    )
+
+    assert result == 0
+    payload = json.loads(report_path.read_text(encoding="utf-8"))
+    assert payload["preview_source"] == "rendered_pptx"
+    assert payload["preview_result"]["mode"] == "preview-pptx"
+
+
 def test_cli_validate_emits_informational_logs(capsys) -> None:
     result = main(["validate", "examples/product_strategy.json"])
     captured = capsys.readouterr()

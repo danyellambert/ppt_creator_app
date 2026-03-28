@@ -35,6 +35,11 @@ def test_api_health_and_templates_endpoints() -> None:
         status, templates_payload = _request_json(f"{base_url}/templates")
         assert status == 200
         assert templates_payload["domains"] == ["consulting", "product", "sales", "strategy"]
+
+        req = request.Request(f"{base_url}/playground", method="GET")
+        with request.urlopen(req, timeout=5) as response:
+            html = response.read().decode("utf-8")
+        assert "PPT Creator Playground" in html
     finally:
         server.shutdown()
         server.server_close()
@@ -239,6 +244,48 @@ def test_api_render_can_generate_previews_from_rendered_pptx(tmp_path: Path) -> 
         assert render_payload["result"]["preview_output_dir"] == str(preview_dir)
         assert render_payload["result"]["preview_source"] == "rendered_pptx"
         assert render_payload["result"]["preview_result"]["mode"] == "preview-pptx"
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
+def test_api_review_can_attach_preview_result_with_real_artifact_preference(tmp_path: Path) -> None:
+    from ppt_creator import api as api_module
+
+    server = build_api_server("127.0.0.1", 0, asset_root="examples")
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    try:
+        base_url = f"http://127.0.0.1:{server.server_address[1]}"
+        spec_payload = PresentationInput.from_path("examples/ai_sales.json").model_dump(mode="json")
+        preview_dir = tmp_path / "api_review_previews"
+
+        api_module.render_previews_for_rendered_artifact = lambda *args, **kwargs: (
+            {
+                "mode": "preview-pptx",
+                "preview_count": 10,
+                "previews": [],
+                "thumbnail_sheet": str(preview_dir / "thumbs.png"),
+                "preview_artifact_review": {"status": "ok"},
+                "visual_regression": None,
+                "backend_used": "office",
+            },
+            "rendered_pptx",
+        )
+
+        status, review_payload = _request_json(
+            f"{base_url}/review",
+            {
+                "spec": spec_payload,
+                "preview_output_dir": str(preview_dir),
+            },
+            method="POST",
+        )
+        assert status == 200
+        assert review_payload["result"]["preview_source"] == "rendered_pptx"
+        assert review_payload["result"]["preview_result"]["mode"] == "preview-pptx"
     finally:
         server.shutdown()
         server.server_close()

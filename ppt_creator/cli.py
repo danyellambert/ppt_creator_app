@@ -4,6 +4,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from pydantic import ValidationError
 
@@ -178,6 +179,25 @@ def build_parser() -> argparse.ArgumentParser:
     review_parser.add_argument("input_json", help="Path to the structured JSON input")
     review_parser.add_argument("--theme", help="Override the theme declared in the JSON")
     review_parser.add_argument("--asset-root", help="Base directory for resolving relative image paths")
+    review_parser.add_argument(
+        "--preview-dir",
+        help="Optional directory to generate previews as part of the review flow; when possible this prefers the final rendered .pptx artifact",
+    )
+    review_parser.add_argument(
+        "--preview-backend",
+        choices=["auto", "synthetic", "office"],
+        default="auto",
+        help="Preview backend to use when --preview-dir is requested during review",
+    )
+    review_parser.add_argument(
+        "--preview-baseline-dir",
+        help="Optional baseline preview directory for visual regression during review",
+    )
+    review_parser.add_argument(
+        "--preview-write-diff-images",
+        action="store_true",
+        help="Write diff images when preview regression is enabled during review",
+    )
     review_parser.add_argument("--report-json", help="Optional path to write a JSON review report")
 
     template_parser = subparsers.add_parser(
@@ -365,12 +385,49 @@ def review_one(
     *,
     theme_name: str | None = None,
     asset_root: str | None = None,
+    preview_dir: str | Path | None = None,
+    preview_backend: str = "auto",
+    preview_baseline_dir: str | Path | None = None,
+    preview_write_diff_images: bool = False,
 ) -> dict[str, object]:
     input_path = Path(input_json)
     print_info(f"Loading input: {input_path}")
     spec = PresentationInput.from_path(input_path)
     resolved_asset_root = resolve_asset_root(input_path, asset_root)
     result = review_presentation(spec, asset_root=resolved_asset_root, theme_name=theme_name)
+    preview_result: dict[str, object] | None = None
+    preview_source: str | None = None
+    if preview_dir:
+        if preview_backend != "synthetic":
+            with TemporaryDirectory(prefix="ppt_creator_review_preview_") as tmpdir:
+                temp_pptx = Path(tmpdir) / f"{input_path.stem}.pptx"
+                PresentationRenderer(
+                    theme_name=theme_name or spec.presentation.theme,
+                    asset_root=resolved_asset_root,
+                ).render(spec, temp_pptx)
+                preview_result, preview_source = render_previews_for_rendered_artifact(
+                    spec,
+                    preview_dir,
+                    rendered_pptx=temp_pptx,
+                    theme_name=theme_name or spec.presentation.theme,
+                    asset_root=resolved_asset_root,
+                    basename=input_path.stem,
+                    backend=preview_backend,
+                    baseline_dir=preview_baseline_dir,
+                    write_diff_images=preview_write_diff_images,
+                )
+        else:
+            preview_result, preview_source = render_previews_for_rendered_artifact(
+                spec,
+                preview_dir,
+                rendered_pptx=None,
+                theme_name=theme_name or spec.presentation.theme,
+                asset_root=resolved_asset_root,
+                basename=input_path.stem,
+                backend=preview_backend,
+                baseline_dir=preview_baseline_dir,
+                write_diff_images=preview_write_diff_images,
+            )
     print(
         f"[OK] Review completed: {result['issue_count']} issue(s), average score {result['average_score']}"
     )
@@ -390,8 +447,17 @@ def review_one(
         print_info(
             f"Balance heuristics flagged {result['balance_warning_count']} signal(s) across the deck"
         )
+    if preview_result is not None:
+        print_info(
+            "Preview-backed review: "
+            f"source={preview_source}, backend={preview_result.get('backend_used')}, "
+            f"artifact_status={preview_result.get('preview_artifact_review', {}).get('status')}"
+        )
     return {
         "input_path": str(input_path),
+        "preview_output_dir": str(preview_dir) if preview_dir else None,
+        "preview_source": preview_source,
+        "preview_result": preview_result,
         **result,
     }
 
@@ -710,6 +776,10 @@ def main(argv: list[str] | None = None) -> int:
                 args.input_json,
                 theme_name=args.theme,
                 asset_root=args.asset_root,
+                preview_dir=args.preview_dir,
+                preview_backend=args.preview_backend,
+                preview_baseline_dir=args.preview_baseline_dir,
+                preview_write_diff_images=args.preview_write_diff_images,
             )
             if args.report_json:
                 write_report(args.report_json, report)
