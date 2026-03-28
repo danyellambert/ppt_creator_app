@@ -927,24 +927,42 @@ class PreviewRenderer:
     def _render_title(self, draw: ImageDraw.ImageDraw, image: Image.Image, slide_spec: Slide, meta: PresentationMeta) -> None:
         colors = self.theme.colors
         variant = slide_spec.layout_variant or "split_panel"
+        asset = self.resolve_asset(slide_spec.image_path)
         if variant == "hero_cover":
             draw.rectangle((92, 72, 1188, 82), fill=_rgb_tuple(colors.accent))
             top = self._render_heading(draw, slide_spec, eyebrow_default=meta.client_name or meta.subtitle)
             if slide_spec.body:
                 body_font = _load_font(24)
                 self._draw_text_block(draw, slide_spec.body, (92, top + 20, 780, 470), font=body_font, fill=_rgb_tuple(colors.text))
-            self._draw_panel(draw, (900, 150, 1188, 460))
+            if asset:
+                loaded = Image.open(asset).convert("RGB")
+                resampling = getattr(getattr(Image, "Resampling", Image), "LANCZOS")
+                fitted = ImageOps.fit(
+                    loaded,
+                    (288, 310),
+                    method=resampling,
+                    centering=(
+                        slide_spec.image_focal_x if slide_spec.image_focal_x is not None else 0.5,
+                        slide_spec.image_focal_y if slide_spec.image_focal_y is not None else 0.5,
+                    ),
+                )
+                image.paste(fitted, (900, 150))
+                self._draw_panel(draw, (916, 352, 1172, 452))
+            else:
+                self._draw_panel(draw, (900, 150, 1188, 460))
             panel_title = _load_font(18, bold=True)
             body_font = _load_font(22, bold=True)
             small_font = _load_font(18)
-            draw.text((928, 178), "CONTEXT", fill=_rgb_tuple(colors.muted), font=panel_title)
+            base_x = 934 if asset else 928
+            base_y = 366 if asset else 178
+            draw.text((base_x, base_y), "CONTEXT", fill=_rgb_tuple(colors.muted), font=panel_title)
             if meta.client_name:
-                draw.text((928, 220), meta.client_name, fill=_rgb_tuple(colors.navy), font=body_font)
+                draw.text((base_x, base_y + 30), meta.client_name, fill=_rgb_tuple(colors.navy), font=body_font)
             if meta.author:
-                draw.text((928, 272), meta.author, fill=_rgb_tuple(colors.text), font=small_font)
+                draw.text((base_x, base_y + 72), meta.author, fill=_rgb_tuple(colors.text), font=small_font)
             if meta.date:
-                draw.text((928, 306), meta.date, fill=_rgb_tuple(colors.muted), font=small_font)
-            draw.text((928, 346), self.theme.name.replace("_", " ").title(), fill=_rgb_tuple(colors.accent), font=small_font)
+                draw.text((base_x, base_y + 98), meta.date, fill=_rgb_tuple(colors.muted), font=small_font)
+            draw.text((base_x, base_y + 124), self.theme.name.replace("_", " ").title(), fill=_rgb_tuple(colors.accent), font=small_font)
             return
 
         draw.rectangle((92, 88, 104, 236), fill=_rgb_tuple(colors.accent))
@@ -952,24 +970,40 @@ class PreviewRenderer:
         if slide_spec.body:
             body_font = _load_font(24)
             self._draw_text_block(draw, slide_spec.body, (128, top + 30, 720, 470), font=body_font, fill=_rgb_tuple(colors.text))
-        self._draw_panel(draw, (860, 120, 1170, 470))
+        if asset:
+            loaded = Image.open(asset).convert("RGB")
+            resampling = getattr(getattr(Image, "Resampling", Image), "LANCZOS")
+            fitted = ImageOps.fit(
+                loaded,
+                (310, 350),
+                method=resampling,
+                centering=(
+                    slide_spec.image_focal_x if slide_spec.image_focal_x is not None else 0.5,
+                    slide_spec.image_focal_y if slide_spec.image_focal_y is not None else 0.5,
+                ),
+            )
+            image.paste(fitted, (860, 120))
+            self._draw_panel(draw, (880, 356, 1150, 456))
+        else:
+            self._draw_panel(draw, (860, 120, 1170, 470))
         small_font = _load_font(16, bold=True)
         body_font = _load_font(22, bold=True)
         text_font = _load_font(18)
-        y = 152
-        draw.text((890, y), "DECK", fill=_rgb_tuple(colors.accent), font=small_font)
+        y = 370 if asset else 152
+        x = 898 if asset else 890
+        draw.text((x, y), "DECK", fill=_rgb_tuple(colors.accent), font=small_font)
         y += 36
-        draw.text((890, y), meta.title, fill=_rgb_tuple(colors.navy), font=body_font)
+        draw.text((x, y), meta.title, fill=_rgb_tuple(colors.navy), font=body_font)
         y += 52
         if meta.client_name:
-            draw.text((890, y), "Client", fill=_rgb_tuple(colors.muted), font=small_font)
+            draw.text((x, y), "Client", fill=_rgb_tuple(colors.muted), font=small_font)
             y += 28
-            draw.text((890, y), meta.client_name, fill=_rgb_tuple(colors.text), font=text_font)
+            draw.text((x, y), meta.client_name, fill=_rgb_tuple(colors.text), font=text_font)
             y += 40
         if meta.author:
-            draw.text((890, y), "Author", fill=_rgb_tuple(colors.muted), font=small_font)
+            draw.text((x, y), "Author", fill=_rgb_tuple(colors.muted), font=small_font)
             y += 28
-            draw.text((890, y), meta.author, fill=_rgb_tuple(colors.text), font=text_font)
+            draw.text((x, y), meta.author, fill=_rgb_tuple(colors.text), font=text_font)
 
     def _render_section(self, draw: ImageDraw.ImageDraw, image: Image.Image, slide_spec: Slide, meta: PresentationMeta) -> None:
         colors = self.theme.colors

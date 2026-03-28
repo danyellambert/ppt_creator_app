@@ -415,3 +415,56 @@ def test_preview_image_text_respects_focal_point_when_cover_cropping(tmp_path: P
 
     sampled = rendered.getpixel((974, 370))
     assert sampled[0] > sampled[2]
+
+
+def test_preview_title_hero_cover_respects_focal_point_when_image_present(tmp_path: Path) -> None:
+    asset_path = tmp_path / "title_focus.png"
+    image = Image.new("RGB", (400, 200), (0, 0, 255))
+    draw = ImageDraw.Draw(image)
+    draw.rectangle((0, 0, 199, 199), fill=(255, 0, 0))
+    image.save(asset_path)
+
+    spec = PresentationInput.model_validate(
+        {
+            "presentation": {"title": "Deck", "theme": "executive_premium_minimal"},
+            "slides": [
+                {
+                    "type": "title",
+                    "title": "Focused cover",
+                    "layout_variant": "hero_cover",
+                    "image_path": str(asset_path),
+                    "image_focal_x": 0.15,
+                }
+            ],
+        }
+    )
+
+    renderer = PreviewRenderer(asset_root=tmp_path)
+    rendered = renderer.render_slide(spec.presentation, spec.slides[0], 1, 1)
+
+    sampled = rendered.getpixel((960, 230))
+    assert sampled[0] > sampled[2]
+
+
+def test_title_layout_with_cover_image_renders_without_crashing(tmp_path: Path) -> None:
+    asset_path = tmp_path / "title_cover.png"
+    Image.new("RGB", (400, 200), (120, 140, 180)).save(asset_path)
+    spec = PresentationInput.model_validate(
+        {
+            "presentation": {"title": "Deck", "theme": "executive_premium_minimal"},
+            "slides": [
+                {
+                    "type": "title",
+                    "title": "Cover with image",
+                    "layout_variant": "hero_cover",
+                    "image_path": str(asset_path),
+                }
+            ],
+        }
+    )
+    output = tmp_path / "title-cover-image.pptx"
+
+    renderer = PresentationRenderer(asset_root=tmp_path)
+    rendered = renderer.render(spec, output)
+
+    assert rendered.exists()

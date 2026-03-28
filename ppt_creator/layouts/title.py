@@ -61,6 +61,7 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
     variant = renderer.resolve_layout_variant(slide_spec, "split_panel")
 
     logo_asset = renderer.resolve_brand_logo(meta)
+    cover_asset = renderer.resolve_asset(slide_spec.image_path)
 
     if variant == "hero_cover":
         renderer.add_accent_bar(slide, g.content_left, 0.78, g.content_width, 0.08, color=colors.accent)
@@ -127,24 +128,51 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
             )
             renderer.fit_text_frame(body_box.text_frame, max_size=t.body_size)
 
-        renderer.add_panel(
-            slide,
-            panel_left,
-            1.6,
-            panel_width,
-            3.7,
-            fill_color=colors.surface,
-            line_color=colors.line,
-        )
-        renderer.add_accent_bar(slide, panel_left, 1.6, panel_width, renderer.theme.components.accent_bar_height, color=colors.navy)
-
-        content_left, content_top, content_width, content_height = renderer.panel_inner_bounds(
-            left=panel_left,
-            top=1.6,
-            width=panel_width,
-            height=3.7,
-            padding=0.28,
-        )
+        if cover_asset:
+            renderer.add_image_cover(
+                slide,
+                cover_asset,
+                left=panel_left,
+                top=1.6,
+                width=panel_width,
+                height=3.7,
+                focal_x=slide_spec.image_focal_x,
+                focal_y=slide_spec.image_focal_y,
+            )
+            renderer.add_panel(
+                slide,
+                panel_left + 0.16,
+                4.12,
+                panel_width - 0.32,
+                1.0,
+                fill_color=colors.surface,
+                line_color=colors.line,
+            )
+            content_left, content_top, content_width, content_height = renderer.panel_inner_bounds(
+                left=panel_left + 0.16,
+                top=4.12,
+                width=panel_width - 0.32,
+                height=1.0,
+                padding=0.18,
+            )
+        else:
+            renderer.add_panel(
+                slide,
+                panel_left,
+                1.6,
+                panel_width,
+                3.7,
+                fill_color=colors.surface,
+                line_color=colors.line,
+            )
+            renderer.add_accent_bar(slide, panel_left, 1.6, panel_width, renderer.theme.components.accent_bar_height, color=colors.navy)
+            content_left, content_top, content_width, content_height = renderer.panel_inner_bounds(
+                left=panel_left,
+                top=1.6,
+                width=panel_width,
+                height=3.7,
+                padding=0.28,
+            )
         _render_meta_blocks(
             renderer,
             slide,
@@ -244,23 +272,51 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
         )
         renderer.fit_text_frame(body_box.text_frame, max_size=t.body_size)
 
-    renderer.add_panel(
-        slide,
-        panel_left,
-        1.05,
-        panel_width,
-        4.65,
-        fill_color=colors.surface,
-        line_color=colors.line,
-    )
+    if cover_asset:
+        renderer.add_image_cover(
+            slide,
+            cover_asset,
+            left=panel_left,
+            top=1.05,
+            width=panel_width,
+            height=4.65,
+            focal_x=slide_spec.image_focal_x,
+            focal_y=slide_spec.image_focal_y,
+        )
+        renderer.add_panel(
+            slide,
+            panel_left + 0.2,
+            3.95,
+            panel_width - 0.4,
+            1.35,
+            fill_color=colors.surface,
+            line_color=colors.line,
+        )
+        content_left, content_top, content_width, content_height = renderer.panel_inner_bounds(
+            left=panel_left + 0.2,
+            top=3.95,
+            width=panel_width - 0.4,
+            height=1.35,
+            padding=0.22,
+        )
+    else:
+        renderer.add_panel(
+            slide,
+            panel_left,
+            1.05,
+            panel_width,
+            4.65,
+            fill_color=colors.surface,
+            line_color=colors.line,
+        )
 
-    content_left, content_top, content_width, content_height = renderer.panel_inner_bounds(
-        left=panel_left,
-        top=1.05,
-        width=panel_width,
-        height=4.65,
-        padding=0.40,
-    )
+        content_left, content_top, content_width, content_height = renderer.panel_inner_bounds(
+            left=panel_left,
+            top=1.05,
+            width=panel_width,
+            height=4.65,
+            padding=0.40,
+        )
     _render_meta_blocks(
         renderer,
         slide,

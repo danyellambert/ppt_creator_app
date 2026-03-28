@@ -217,6 +217,8 @@ Você também pode orientar melhor o crop da imagem em slides com mídia usando 
 
 Esses campos ajudam o render e o preview a manterem áreas mais relevantes da imagem quando o encaixe precisa fazer crop em modo cover-fit.
 
+Além do `image_text`, o projeto agora também começou a reutilizar esse pipeline de crop/focal point em **covers do tipo `title` com `hero_cover`**, permitindo usar imagem de apoio no bloco visual lateral da capa.
+
 Exemplo de `timeline`:
 
 ```json

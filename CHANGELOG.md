@@ -39,6 +39,7 @@ The format is inspired by Keep a Changelog, and the project aims to follow Seman
 - AI briefing slide-level image suggestions now include contextual asset-style and focal-point hints for downstream image selection/cropping
 - AI briefing regeneration/refine loops can now also consider preview-derived visual feedback when preview generation is enabled
 - the optional briefing layer can now derive outline/context/key messages from a freer `briefing_text`, not only fully structured fields
+- cover-image handling now starts to extend beyond `image_text`, including title hero-cover imagery with the same focal-point-aware crop behavior
 - optional office-aware preview backend selection with automatic fallback to synthetic previews
 - initial layout primitive helpers for panel inner bounds and stacked vertical regions
 - initial application of layout primitives to comparison, faq, cards, and two-column slides
