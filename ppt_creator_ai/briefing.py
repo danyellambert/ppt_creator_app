@@ -333,12 +333,72 @@ def review_presentation_density(spec: PresentationInput) -> dict[str, object]:
     }
 
 
+def build_generation_feedback_from_review(
+    review: dict[str, object],
+    *,
+    max_messages: int = 8,
+) -> list[str]:
+    messages: list[str] = []
+
+    def add(message: str) -> None:
+        normalized = message.strip()
+        if normalized and normalized not in messages and len(messages) < max_messages:
+            messages.append(normalized)
+
+    if int(review.get("overflow_risk_count") or 0) > 0:
+        add("Reduce slide density overall; prefer fewer bullets, shorter bodies, and more whitespace.")
+    if int(review.get("clipping_risk_count") or 0) > 0:
+        add("Keep content farther from slide edges and avoid long lines that may clip in the final layout.")
+    if int(review.get("balance_warning_count") or 0) > 0:
+        add("Balance content more evenly across panels and columns so no region looks overloaded.")
+
+    for slide_review in review.get("top_risk_slides", []) or []:
+        if not isinstance(slide_review, dict):
+            continue
+        slide_number = slide_review.get("slide_number")
+        slide_type = str(slide_review.get("slide_type") or "slide")
+        title = str(slide_review.get("title") or slide_type)
+        if slide_type in {"agenda", "bullets", "summary", "image_text"}:
+            add(f"Slide {slide_number} '{title}' should use at most 4 concise bullets and a shorter narrative body.")
+        elif slide_type in {"comparison", "two_column"}:
+            add(f"Slide {slide_number} '{title}' should distribute content more evenly across both columns and reduce per-column bullets.")
+        elif slide_type == "timeline":
+            add(f"Slide {slide_number} '{title}' should use fewer timeline items or shorter milestone text.")
+        elif slide_type == "table":
+            add(f"Slide {slide_number} '{title}' should reduce table rows/columns and simplify cell text.")
+        elif slide_type == "faq":
+            add(f"Slide {slide_number} '{title}' should keep fewer FAQ items with shorter answers.")
+        else:
+            add(f"Slide {slide_number} '{title}' should be rewritten with a tighter executive narrative and less dense content.")
+
+        if len(messages) >= max_messages:
+            break
+
+    for slide_review in review.get("slides", []) or []:
+        if len(messages) >= max_messages:
+            break
+        if not isinstance(slide_review, dict):
+            continue
+        issues = slide_review.get("issues") or []
+        if not issues:
+            continue
+        title = str(slide_review.get("title") or slide_review.get("slide_type") or "slide")
+        add(f"Address QA issues on '{title}': {'; '.join(str(issue) for issue in issues[:2])}.")
+
+    return messages
+
+
 def build_briefing_analysis(
     briefing: BriefingInput,
     *,
     theme_name: str | None = None,
+    feedback_messages: list[str] | None = None,
 ) -> dict[str, object]:
-    spec = generate_presentation_input_from_briefing(briefing, theme_name=theme_name)
+    spec = generate_presentation_input_from_briefing(
+        briefing,
+        theme_name=theme_name,
+        feedback_messages=feedback_messages,
+    )
     summary_source = " ".join(
         filter(
             None,
@@ -355,6 +415,7 @@ def build_briefing_analysis(
         "briefing_title": briefing.title,
         "theme": spec.presentation.theme,
         "generated_slide_count": len(spec.slides),
+        "feedback_messages": feedback_messages or [],
         "executive_summary_bullets": briefing.recommendations[:3]
         or summarize_text_to_executive_bullets(summary_source, max_bullets=3),
         "image_suggestions": suggest_image_queries_from_briefing(briefing),
@@ -366,11 +427,13 @@ def generate_presentation_payload_from_briefing(
     briefing: BriefingInput,
     *,
     theme_name: str | None = None,
+    feedback_messages: list[str] | None = None,
 ) -> dict[str, object]:
     effective_theme = theme_name or briefing.theme
+    compact_mode = bool(feedback_messages)
     derived_context_bullets = summarize_text_to_executive_bullets(
         " ".join(filter(None, [briefing.objective, briefing.context])),
-        max_bullets=4,
+        max_bullets=3 if compact_mode else 4,
     )
     slides: list[dict[str, object]] = [
         {
@@ -383,7 +446,7 @@ def generate_presentation_payload_from_briefing(
         }
     ]
 
-    agenda = _infer_agenda(briefing)
+    agenda = _infer_agenda(briefing)[: 4 if compact_mode else 6]
     if agenda:
         slides.append(
             {
@@ -394,7 +457,7 @@ def generate_presentation_payload_from_briefing(
             }
         )
 
-    context_bullets = (briefing.key_messages[:6] or derived_context_bullets[:6])
+    context_bullets = (briefing.key_messages[: (4 if compact_mode else 6)] or derived_context_bullets[: (4 if compact_mode else 6)])
     if briefing.objective or briefing.context or context_bullets:
         slides.append(
             {
@@ -413,7 +476,7 @@ def generate_presentation_payload_from_briefing(
                 "type": "metrics",
                 "title": "Headline metrics",
                 "subtitle": "Signals extracted from the briefing",
-                "metrics": [metric.model_dump(mode="json") for metric in briefing.metrics[:4]],
+                "metrics": [metric.model_dump(mode="json") for metric in briefing.metrics[: (3 if compact_mode else 4)]],
             }
         )
 
@@ -429,7 +492,7 @@ def generate_presentation_payload_from_briefing(
                         "body": milestone.detail,
                         "tag": milestone.phase,
                     }
-                    for milestone in briefing.milestones[:5]
+                    for milestone in briefing.milestones[: (4 if compact_mode else 5)]
                 ],
             }
         )
@@ -451,12 +514,12 @@ def generate_presentation_payload_from_briefing(
                 "title": "Executive FAQ",
                 "faq_items": [
                     {"title": faq.question, "body": faq.answer}
-                    for faq in briefing.faqs[:4]
+                    for faq in briefing.faqs[: (3 if compact_mode else 4)]
                 ],
             }
         )
 
-    summary_bullets = (briefing.recommendations or briefing.key_messages or derived_context_bullets)[:6]
+    summary_bullets = (briefing.recommendations or briefing.key_messages or derived_context_bullets)[: (4 if compact_mode else 6)]
     if summary_bullets or briefing.context:
         slides.append(
             {
@@ -494,6 +557,11 @@ def generate_presentation_input_from_briefing(
     briefing: BriefingInput,
     *,
     theme_name: str | None = None,
+    feedback_messages: list[str] | None = None,
 ) -> PresentationInput:
-    payload = generate_presentation_payload_from_briefing(briefing, theme_name=theme_name)
+    payload = generate_presentation_payload_from_briefing(
+        briefing,
+        theme_name=theme_name,
+        feedback_messages=feedback_messages,
+    )
     return PresentationInput.model_validate(payload)

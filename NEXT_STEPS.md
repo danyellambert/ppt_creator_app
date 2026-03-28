@@ -405,7 +405,8 @@ Qualquer camada de IA deve ser opcional.
   - [x] primeira integração prática de generate + review + render dentro da CLI opcional de briefing
   - [x] primeira iteração automática heurística de refine/re-review na CLI opcional
   - [x] integração inicial de preview visual no pipeline opcional de briefing
-  - [ ] evoluir para revisão opcional/regeração iterativa automática
+  - [x] primeira regeneração automática baseada em feedback heurístico do review
+  - [ ] evoluir para revisão opcional/regeração iterativa automática mais forte
 
 ### Resultado esperado
 

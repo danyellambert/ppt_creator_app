@@ -30,8 +30,17 @@ class OllamaBriefingProvider:
     def resolve_model_name(self) -> str:
         return (os.environ.get("PPT_CREATOR_AI_OLLAMA_MODEL") or "llama3.1").strip()
 
-    def build_prompt(self, briefing: BriefingInput, *, theme_name: str | None = None) -> str:
-        return self._structured_helper.build_prompt(briefing, theme_name=theme_name)
+    def build_prompt(
+        self,
+        briefing: BriefingInput,
+        *,
+        theme_name: str | None = None,
+        feedback_messages: list[str] | None = None,
+    ) -> str:
+        prompt = self._structured_helper.build_prompt(briefing, theme_name=theme_name)
+        if feedback_messages:
+            prompt += "\n\nAdditional regeneration guidance:\n- " + "\n- ".join(feedback_messages)
+        return prompt
 
     def request_generation(self, prompt: str, *, model_name: str) -> str:
         base_url = self.resolve_base_url()
@@ -84,9 +93,10 @@ class OllamaBriefingProvider:
         briefing: BriefingInput,
         *,
         theme_name: str | None = None,
+        feedback_messages: list[str] | None = None,
     ) -> BriefingGenerationResult:
         model_name = self.resolve_model_name()
-        prompt = self.build_prompt(briefing, theme_name=theme_name)
+        prompt = self.build_prompt(briefing, theme_name=theme_name, feedback_messages=feedback_messages)
         raw_output = self.request_generation(prompt, model_name=model_name)
         payload = self._structured_helper.extract_json_payload(raw_output)
         normalized_payload = self._structured_helper.normalize_generated_payload(
@@ -115,6 +125,7 @@ class OllamaBriefingProvider:
             "base_url": self.resolve_base_url(),
             "theme": spec.presentation.theme,
             "generated_slide_count": len(spec.slides),
+            "feedback_messages": feedback_messages or [],
             "executive_summary_bullets": briefing.recommendations[:3]
             or summarize_text_to_executive_bullets(summary_source, max_bullets=3),
             "image_suggestions": suggest_image_queries_from_briefing(briefing),

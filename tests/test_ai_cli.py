@@ -152,6 +152,94 @@ def test_ai_cli_can_auto_refine_generated_deck(tmp_path: Path, monkeypatch) -> N
     assert len(output_payload["slides"][1]["bullets"]) <= 4
 
 
+def test_ai_cli_can_auto_regenerate_generated_deck(tmp_path: Path, monkeypatch) -> None:
+    output = tmp_path / "generated_regenerated_deck.json"
+    report = tmp_path / "generated_regenerated_report.json"
+    provider = get_provider("heuristic")
+
+    long_bullet = (
+        "This bullet is intentionally too long and too detailed for a clean executive slide so the regeneration pass should tighten it significantly."
+    )
+    noisy_payload = {
+        "presentation": {
+            "title": "AI copilots for sales teams",
+            "theme": "executive_premium_minimal",
+        },
+        "slides": [
+            {"type": "title", "title": "AI copilots for sales teams"},
+            {
+                "type": "agenda",
+                "title": "Agenda",
+                "body": "This introduction paragraph is intentionally verbose and dense so the provider regeneration loop has a clear reason to regenerate the deck.",
+                "bullets": [long_bullet, long_bullet, long_bullet, long_bullet, long_bullet, long_bullet],
+            },
+            {
+                "type": "summary",
+                "title": "Summary",
+                "body": "Another intentionally dense paragraph that should improve once the provider receives review-based feedback.",
+                "bullets": [long_bullet, long_bullet, long_bullet, long_bullet, long_bullet],
+            },
+            {"type": "closing", "title": "Closing", "quote": "Done."},
+        ],
+    }
+    improved_payload = {
+        "presentation": {
+            "title": "AI copilots for sales teams",
+            "theme": "executive_premium_minimal",
+        },
+        "slides": [
+            {"type": "title", "title": "AI copilots for sales teams"},
+            {
+                "type": "agenda",
+                "title": "Agenda",
+                "body": "Tighter intro for an executive audience.",
+                "bullets": ["Context", "Pilot scope", "Decision", "Metrics"],
+            },
+            {
+                "type": "summary",
+                "title": "Summary",
+                "body": "Focused summary for the decision meeting.",
+                "bullets": ["Start narrow", "Measure lift", "Scale winners"],
+            },
+            {"type": "closing", "title": "Closing", "quote": "Done."},
+        ],
+    }
+
+    def _generate(briefing, theme_name=None, feedback_messages=None):
+        payload = improved_payload if feedback_messages else noisy_payload
+        return BriefingGenerationResult(
+            provider_name="heuristic",
+            payload=payload,
+            analysis={
+                "image_suggestions": ["sales leadership dashboard"],
+                "density_review": {"status": "review", "warning_count": 2, "warnings": ["dense"], "slides": []},
+            },
+        )
+
+    monkeypatch.setattr(provider, "generate", _generate)
+
+    result = main(
+        [
+            "generate",
+            "examples/briefing_sales.json",
+            str(output),
+            "--auto-regenerate",
+            "--regenerate-passes",
+            "2",
+            "--report-json",
+            str(report),
+        ]
+    )
+
+    assert result == 0
+    output_payload = json.loads(output.read_text(encoding="utf-8"))
+    report_payload = json.loads(report.read_text(encoding="utf-8"))
+    assert report_payload["auto_regenerate_enabled"] is True
+    assert report_payload["auto_regenerate_applied"] is True
+    assert report_payload["generated_deck_issue_count"] < report_payload["initial_generated_deck_issue_count"]
+    assert output_payload["slides"][1]["body"] == "Tighter intro for an executive audience."
+
+
 def test_ai_cli_can_generate_previews_for_generated_deck(tmp_path: Path) -> None:
     output_json = tmp_path / "generated_deck.json"
     preview_dir = tmp_path / "generated_previews"

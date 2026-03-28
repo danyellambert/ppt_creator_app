@@ -13,6 +13,7 @@ from ppt_creator.renderer import PresentationRenderer
 from ppt_creator.schema import PresentationInput
 from ppt_creator_ai.briefing import (
     BriefingInput,
+    build_generation_feedback_from_review,
 )
 from ppt_creator_ai.providers import get_provider, list_provider_names
 from ppt_creator_ai.refine import refine_presentation_input
@@ -72,6 +73,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="Write diff images when preview regression is enabled",
     )
     generate_parser.add_argument(
+        "--auto-regenerate",
+        action="store_true",
+        help="Ask the provider to regenerate the deck using heuristic QA feedback when review flags issues",
+    )
+    generate_parser.add_argument(
+        "--regenerate-passes",
+        type=int,
+        default=1,
+        help="Maximum number of provider regeneration passes to attempt when --auto-regenerate is enabled",
+    )
+    generate_parser.add_argument(
         "--auto-refine",
         action="store_true",
         help="Run a heuristic refine pass on the generated deck when QA signals issues",
@@ -106,6 +118,18 @@ def write_json(path: str | Path, payload: dict[str, object]) -> Path:
     return output_path
 
 
+def _provider_generate(
+    provider,
+    briefing: BriefingInput,
+    *,
+    theme_name: str | None = None,
+    feedback_messages: list[str] | None = None,
+):
+    if feedback_messages:
+        return provider.generate(briefing, theme_name=theme_name, feedback_messages=feedback_messages)
+    return provider.generate(briefing, theme_name=theme_name)
+
+
 def generate_from_briefing(
     input_briefing: str | Path,
     output_json: str | Path,
@@ -121,6 +145,8 @@ def generate_from_briefing(
     preview_backend: str = "auto",
     preview_baseline_dir: str | Path | None = None,
     preview_write_diff_images: bool = False,
+    auto_regenerate: bool = False,
+    regenerate_passes: int = 1,
     auto_refine: bool = False,
     refine_passes: int = 1,
 ) -> dict[str, object]:
@@ -129,7 +155,7 @@ def generate_from_briefing(
     briefing = BriefingInput.from_path(input_path)
     provider = get_provider(provider_name)
     print_info(f"Using provider: {provider.name}")
-    result = provider.generate(briefing, theme_name=theme_name)
+    result = _provider_generate(provider, briefing, theme_name=theme_name)
     payload = result.payload
     spec = PresentationInput.model_validate(payload)
     resolved_asset_root = Path(asset_root).resolve() if asset_root else input_path.parent.resolve()
@@ -137,6 +163,63 @@ def generate_from_briefing(
     analysis = result.analysis
     initial_deck_review = review_presentation(spec, asset_root=resolved_asset_root, theme_name=spec.presentation.theme)
     deck_review = initial_deck_review
+    regeneration_history: list[dict[str, object]] = []
+    regenerate_applied = False
+
+    if auto_regenerate:
+        current_result = result
+        current_spec = spec
+        current_review = initial_deck_review
+        for pass_index in range(max(1, regenerate_passes)):
+            if current_review["issue_count"] == 0:
+                break
+            feedback_messages = build_generation_feedback_from_review(current_review)
+            if not feedback_messages:
+                break
+            candidate_result = _provider_generate(
+                provider,
+                briefing,
+                theme_name=theme_name,
+                feedback_messages=feedback_messages,
+            )
+            candidate_spec = PresentationInput.model_validate(candidate_result.payload)
+            candidate_review = review_presentation(
+                candidate_spec,
+                asset_root=resolved_asset_root,
+                theme_name=candidate_spec.presentation.theme,
+            )
+            payload_changed = candidate_spec.model_dump(mode="json") != current_spec.model_dump(mode="json")
+            regeneration_history.append(
+                {
+                    "pass": pass_index + 1,
+                    "feedback_messages": feedback_messages,
+                    "before_issue_count": current_review["issue_count"],
+                    "after_issue_count": candidate_review["issue_count"],
+                    "before_average_score": current_review["average_score"],
+                    "after_average_score": candidate_review["average_score"],
+                }
+            )
+            improved = (
+                candidate_review["issue_count"] < current_review["issue_count"]
+                or candidate_review["average_score"] > current_review["average_score"]
+                or (
+                    payload_changed
+                    and candidate_review["issue_count"] <= current_review["issue_count"]
+                    and candidate_review["average_score"] >= current_review["average_score"]
+                )
+            )
+            if not improved:
+                break
+            current_result = candidate_result
+            current_spec = candidate_spec
+            current_review = candidate_review
+            regenerate_applied = True
+
+        result = current_result
+        analysis = current_result.analysis
+        spec = current_spec
+        deck_review = current_review
+
     refinement_history: list[dict[str, object]] = []
     refine_applied = False
 
@@ -192,6 +275,7 @@ def generate_from_briefing(
                 **analysis,
                 "initial_generated_deck_review": initial_deck_review,
                 "generated_deck_review": deck_review,
+                "regeneration_history": regeneration_history,
                 "refinement_history": refinement_history,
             },
         )
@@ -234,6 +318,10 @@ def generate_from_briefing(
         "render_output_pptx": rendered_pptx_path,
         "preview_output_dir": preview_path,
         "preview_report_json": str(preview_report_json) if preview_report_json else None,
+        "auto_regenerate_enabled": auto_regenerate,
+        "auto_regenerate_applied": regenerate_applied,
+        "regenerate_passes_requested": regenerate_passes if auto_regenerate else 0,
+        "regenerate_passes_completed": len(regeneration_history),
         "auto_refine_enabled": auto_refine,
         "auto_refine_applied": refine_applied,
         "refine_passes_requested": refine_passes if auto_refine else 0,
@@ -283,6 +371,8 @@ def main(argv: list[str] | None = None) -> int:
             preview_backend=args.preview_backend,
             preview_baseline_dir=args.preview_baseline_dir,
             preview_write_diff_images=args.preview_write_diff_images,
+            auto_regenerate=args.auto_regenerate,
+            regenerate_passes=args.regenerate_passes,
             auto_refine=args.auto_refine,
             refine_passes=args.refine_passes,
         )

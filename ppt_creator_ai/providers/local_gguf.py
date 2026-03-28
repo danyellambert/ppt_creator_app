@@ -79,7 +79,7 @@ class PPTAgentLocalProvider:
     def build_prompt(self, briefing: BriefingInput, *, theme_name: str | None = None) -> str:
         effective_theme = theme_name or briefing.theme
         briefing_payload = briefing.model_dump(mode="json")
-        return (
+        prompt = (
             "You are generating structured JSON for a PowerPoint deck renderer. "
             "Return only valid JSON with top-level keys 'presentation' and 'slides'. "
             "Do not wrap the result in markdown. Do not explain your reasoning. "
@@ -90,6 +90,7 @@ class PPTAgentLocalProvider:
             f"{json.dumps(briefing_payload, ensure_ascii=False, indent=2)}\n\n"
             "Return a single JSON object now."
         )
+        return prompt
 
     def build_presentation_meta(
         self,
@@ -473,9 +474,12 @@ class PPTAgentLocalProvider:
         briefing: BriefingInput,
         *,
         theme_name: str | None = None,
+        feedback_messages: list[str] | None = None,
     ) -> BriefingGenerationResult:
         model_path = self.resolve_model_path()
         prompt = self.build_prompt(briefing, theme_name=theme_name)
+        if feedback_messages:
+            prompt += "\n\nAdditional regeneration guidance:\n- " + "\n- ".join(feedback_messages)
         raw_output = self.run_model(model_path, prompt)
         payload = self.extract_json_payload(raw_output)
         normalized_payload = self.normalize_generated_payload(payload, briefing, theme_name=theme_name)
@@ -498,6 +502,7 @@ class PPTAgentLocalProvider:
             "model_path": str(model_path),
             "theme": spec.presentation.theme,
             "generated_slide_count": len(spec.slides),
+            "feedback_messages": feedback_messages or [],
             "executive_summary_bullets": briefing.recommendations[:3]
             or summarize_text_to_executive_bullets(summary_source, max_bullets=3),
             "image_suggestions": suggest_image_queries_from_briefing(briefing),

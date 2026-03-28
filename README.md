@@ -423,6 +423,20 @@ Esse fluxo tenta:
 - aplicar um pass de refinamento em slides mais densos
 - reavaliar o deck refinado
 
+Também já existe uma primeira camada de **regeneração automática baseada em feedback do review**:
+
+```bash
+python -m ppt_creator_ai.cli generate examples/briefing_sales.json outputs/briefing_sales_deck.json \
+  --auto-regenerate --regenerate-passes 2 --report-json outputs/briefing_sales_regeneration_report.json
+```
+
+Esse fluxo tenta:
+
+- gerar um deck inicial com o provider escolhido
+- rodar review heurístico no deck gerado
+- transformar os principais riscos em mensagens de feedback
+- pedir uma nova geração ao provider com esse feedback
+
 E agora você também pode acoplar **preview visual** diretamente nesse pipeline opcional:
 
 ```bash

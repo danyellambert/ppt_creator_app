@@ -22,4 +22,5 @@ class BriefingProvider(Protocol):
         briefing: BriefingInput,
         *,
         theme_name: str | None = None,
+        feedback_messages: list[str] | None = None,
     ) -> BriefingGenerationResult: ...
