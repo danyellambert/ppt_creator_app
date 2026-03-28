@@ -192,6 +192,58 @@ def test_api_validate_render_and_template_endpoints(tmp_path: Path) -> None:
         thread.join(timeout=5)
 
 
+def test_api_render_can_generate_previews_from_rendered_pptx(tmp_path: Path) -> None:
+    from ppt_creator import preview as preview_module
+
+    server = build_api_server("127.0.0.1", 0, asset_root="examples")
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    try:
+        base_url = f"http://127.0.0.1:{server.server_address[1]}"
+        spec_payload = PresentationInput.from_path("examples/ai_sales.json").model_dump(mode="json")
+
+        def _fake_run(command, capture_output, text, check):
+            outdir = Path(command[command.index("--outdir") + 1])
+            source_pptx = Path(command[-1])
+            slide_count = len(PptxPresentation(str(source_pptx)).slides)
+            outdir.mkdir(parents=True, exist_ok=True)
+            for index in range(1, slide_count + 1):
+                Image.new("RGB", (1280, 720), (245, 245, 245)).save(outdir / f"api-render-preview-{index:02d}.png")
+
+            class _Completed:
+                returncode = 0
+                stdout = ""
+                stderr = ""
+
+            return _Completed()
+
+        preview_module.find_office_runtime = lambda: "/usr/bin/soffice"
+        preview_module.subprocess.run = _fake_run
+
+        output_path = tmp_path / "api_render_with_preview_output.pptx"
+        preview_dir = tmp_path / "api_render_previews"
+        status, render_payload = _request_json(
+            f"{base_url}/render",
+            {
+                "spec": spec_payload,
+                "output_path": str(output_path),
+                "preview_output_dir": str(preview_dir),
+            },
+            method="POST",
+        )
+
+        assert status == 200
+        assert render_payload["result"]["rendered"] is True
+        assert render_payload["result"]["preview_output_dir"] == str(preview_dir)
+        assert render_payload["result"]["preview_source"] == "rendered_pptx"
+        assert render_payload["result"]["preview_result"]["mode"] == "preview-pptx"
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
 def test_api_preview_pptx_falls_back_to_pdf_rasterization_when_needed(tmp_path: Path) -> None:
     from ppt_creator import preview as preview_module
 

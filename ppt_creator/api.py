@@ -8,7 +8,11 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from ppt_creator.preview import render_previews, render_previews_from_pptx
+from ppt_creator.preview import (
+    render_previews,
+    render_previews_for_rendered_artifact,
+    render_previews_from_pptx,
+)
 from ppt_creator.qa import review_presentation
 from ppt_creator.renderer import PresentationRenderer
 from ppt_creator.schema import PresentationInput
@@ -79,6 +83,10 @@ def render_spec_payload(
     dry_run: bool = False,
     check_assets: bool = False,
     include_review: bool = False,
+    preview_output_dir: str | Path | None = None,
+    preview_backend: str = "auto",
+    preview_baseline_dir: str | Path | None = None,
+    preview_write_diff_images: bool = False,
 ) -> dict[str, object]:
     spec = PresentationInput.model_validate(spec_payload)
     effective_theme = theme_name or spec.presentation.theme
@@ -99,8 +107,24 @@ def render_spec_payload(
         if include_review
         else None
     )
+    preview_result: dict[str, object] | None = None
+    preview_source: str | None = None
 
     if dry_run:
+        if preview_output_dir:
+            preview_result, preview_source = render_previews_for_rendered_artifact(
+                spec,
+                preview_output_dir,
+                rendered_pptx=None,
+                theme_name=effective_theme,
+                asset_root=_resolve_service_asset_root(asset_root),
+                primary_color=primary_color,
+                secondary_color=secondary_color,
+                basename=destination.stem,
+                backend=preview_backend,
+                baseline_dir=preview_baseline_dir,
+                write_diff_images=preview_write_diff_images,
+            )
         return {
             "mode": "render",
             "rendered": False,
@@ -112,9 +136,26 @@ def render_spec_payload(
             "missing_asset_count": len(missing_assets) if check_assets else 0,
             "missing_assets": missing_assets if check_assets else [],
             "quality_review": quality_review,
+            "preview_output_dir": str(preview_output_dir) if preview_output_dir else None,
+            "preview_source": preview_source,
+            "preview_result": preview_result,
         }
 
     rendered_output = renderer.render(spec, destination)
+    if preview_output_dir:
+        preview_result, preview_source = render_previews_for_rendered_artifact(
+            spec,
+            preview_output_dir,
+            rendered_pptx=rendered_output,
+            theme_name=effective_theme,
+            asset_root=_resolve_service_asset_root(asset_root),
+            primary_color=primary_color,
+            secondary_color=secondary_color,
+            basename=destination.stem,
+            backend=preview_backend,
+            baseline_dir=preview_baseline_dir,
+            write_diff_images=preview_write_diff_images,
+        )
     return {
         "mode": "render",
         "rendered": True,
@@ -126,6 +167,9 @@ def render_spec_payload(
         "missing_asset_count": len(missing_assets) if check_assets else 0,
         "missing_assets": missing_assets if check_assets else [],
         "quality_review": quality_review,
+        "preview_output_dir": str(preview_output_dir) if preview_output_dir else None,
+        "preview_source": preview_source,
+        "preview_result": preview_result,
     }
 
 
@@ -302,6 +346,10 @@ class PptCreatorAPIHandler(BaseHTTPRequestHandler):
                     dry_run=bool(payload.get("dry_run", False)),
                     check_assets=bool(payload.get("check_assets", False)),
                     include_review=bool(payload.get("include_review", False)),
+                    preview_output_dir=payload.get("preview_output_dir"),
+                    preview_backend=str(payload["preview_backend"]) if payload.get("preview_backend") else "auto",
+                    preview_baseline_dir=payload.get("preview_baseline_dir"),
+                    preview_write_diff_images=bool(payload.get("preview_write_diff_images", False)),
                 )
                 self._json_response(HTTPStatus.OK, {"result": result})
                 return

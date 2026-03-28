@@ -1273,3 +1273,112 @@ def render_previews_from_pptx(
         backend="office",
     )
     return renderer.render_pptx_previews(input_pptx, output_dir, basename=basename)
+
+
+def render_previews_for_rendered_artifact(
+    spec: PresentationInput,
+    output_dir: str | Path,
+    *,
+    rendered_pptx: str | Path | None = None,
+    theme_name: str | None = None,
+    asset_root: str | Path | None = None,
+    primary_color: str | None = None,
+    secondary_color: str | None = None,
+    basename: str | None = None,
+    debug_grid: bool = False,
+    debug_safe_areas: bool = False,
+    backend: str = "auto",
+    baseline_dir: str | Path | None = None,
+    diff_threshold: float = 0.01,
+    write_diff_images: bool = False,
+) -> tuple[dict[str, object], str]:
+    if rendered_pptx is None:
+        return (
+            render_previews(
+                spec,
+                output_dir,
+                theme_name=theme_name,
+                asset_root=asset_root,
+                primary_color=primary_color,
+                secondary_color=secondary_color,
+                basename=basename,
+                debug_grid=debug_grid,
+                debug_safe_areas=debug_safe_areas,
+                backend=backend,
+                baseline_dir=baseline_dir,
+                diff_threshold=diff_threshold,
+                write_diff_images=write_diff_images,
+            ),
+            "spec",
+        )
+
+    if backend == "synthetic":
+        return (
+            render_previews(
+                spec,
+                output_dir,
+                theme_name=theme_name,
+                asset_root=asset_root,
+                primary_color=primary_color,
+                secondary_color=secondary_color,
+                basename=basename,
+                debug_grid=debug_grid,
+                debug_safe_areas=debug_safe_areas,
+                backend="synthetic",
+                baseline_dir=baseline_dir,
+                diff_threshold=diff_threshold,
+                write_diff_images=write_diff_images,
+            ),
+            "spec",
+        )
+
+    if backend == "office":
+        return (
+            render_previews_from_pptx(
+                rendered_pptx,
+                output_dir,
+                theme_name=theme_name,
+                basename=basename,
+                baseline_dir=baseline_dir,
+                diff_threshold=diff_threshold,
+                write_diff_images=write_diff_images,
+            ),
+            "rendered_pptx",
+        )
+
+    runtime = find_office_runtime()
+    if runtime:
+        try:
+            return (
+                render_previews_from_pptx(
+                    rendered_pptx,
+                    output_dir,
+                    theme_name=theme_name,
+                    basename=basename,
+                    baseline_dir=baseline_dir,
+                    diff_threshold=diff_threshold,
+                    write_diff_images=write_diff_images,
+                ),
+                "rendered_pptx",
+            )
+        except Exception:
+            pass
+
+    return (
+        render_previews(
+            spec,
+            output_dir,
+            theme_name=theme_name,
+            asset_root=asset_root,
+            primary_color=primary_color,
+            secondary_color=secondary_color,
+            basename=basename,
+            debug_grid=debug_grid,
+            debug_safe_areas=debug_safe_areas,
+            backend="synthetic",
+            baseline_dir=baseline_dir,
+            diff_threshold=diff_threshold,
+            write_diff_images=write_diff_images,
+        ),
+        "spec",
+    )

@@ -356,6 +356,14 @@ Esse relatório agora pode incluir:
 - `balance_warning_count`
 - análise por slide
 
+Você também pode pedir que o comando de render já gere previews no mesmo fluxo. Quando há runtime Office disponível, ele passa a preferir o preview do **`.pptx` final renderizado**:
+
+```bash
+python -m ppt_creator.cli render examples/ai_sales.json outputs/ai_sales.pptx \
+  --preview-dir outputs/ai_sales_render_previews \
+  --preview-report-json outputs/ai_sales_render_preview_report.json
+```
+
 Rodar uma revisão heurística de qualidade:
 
 ```bash

@@ -7,7 +7,11 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from ppt_creator.preview import render_previews, render_previews_from_pptx
+from ppt_creator.preview import (
+    render_previews,
+    render_previews_for_rendered_artifact,
+    render_previews_from_pptx,
+)
 from ppt_creator.qa import review_presentation
 from ppt_creator.renderer import PresentationRenderer
 from ppt_creator.schema import PresentationInput
@@ -43,6 +47,29 @@ def build_parser() -> argparse.ArgumentParser:
         "--check-assets",
         action="store_true",
         help="Warn when referenced image assets cannot be resolved",
+    )
+    render_parser.add_argument(
+        "--preview-dir",
+        help="Optional directory to generate previews while rendering; when possible, this prefers previews from the final rendered .pptx",
+    )
+    render_parser.add_argument(
+        "--preview-backend",
+        choices=["auto", "synthetic", "office"],
+        default="auto",
+        help="Preview backend to use when --preview-dir is requested",
+    )
+    render_parser.add_argument(
+        "--preview-baseline-dir",
+        help="Optional baseline preview directory for visual regression when --preview-dir is used",
+    )
+    render_parser.add_argument(
+        "--preview-write-diff-images",
+        action="store_true",
+        help="Write diff images when preview regression is enabled during render",
+    )
+    render_parser.add_argument(
+        "--preview-report-json",
+        help="Optional path to write a JSON preview report when --preview-dir is used",
     )
 
     preview_parser = subparsers.add_parser(
@@ -231,6 +258,9 @@ def build_report(
     rendered: bool,
     missing_assets: list[str],
     quality_review: dict[str, object] | None = None,
+    preview_output_dir: Path | None = None,
+    preview_source: str | None = None,
+    preview_result: dict[str, object] | None = None,
 ) -> dict[str, object]:
     return {
         "mode": mode,
@@ -244,6 +274,9 @@ def build_report(
         "missing_asset_count": len(missing_assets),
         "missing_assets": missing_assets,
         "quality_review": quality_review,
+        "preview_output_dir": str(preview_output_dir) if preview_output_dir else None,
+        "preview_source": preview_source,
+        "preview_result": preview_result,
     }
 
 
@@ -347,6 +380,11 @@ def render_one(
     dry_run: bool = False,
     check_assets: bool = False,
     review: bool = False,
+    preview_dir: str | Path | None = None,
+    preview_backend: str = "auto",
+    preview_baseline_dir: str | Path | None = None,
+    preview_write_diff_images: bool = False,
+    preview_report_json: str | Path | None = None,
 ) -> dict[str, object]:
     input_path = Path(input_json)
     print_info(f"Loading input: {input_path}")
@@ -364,11 +402,14 @@ def render_one(
     output_path = renderer.validate_output_path(output_pptx)
     print_info(f"Planned output: {output_path}")
     missing_assets = renderer.collect_missing_assets(spec)
+    preview_output_path = Path(preview_dir) if preview_dir else None
     quality_review = (
         review_presentation(spec, asset_root=resolved_asset_root, theme_name=effective_theme)
         if review
         else None
     )
+    preview_result: dict[str, object] | None = None
+    preview_source: str | None = None
 
     if check_assets and missing_assets:
         emit_missing_asset_warnings(missing_assets)
@@ -382,6 +423,22 @@ def render_one(
         )
 
     if dry_run:
+        if preview_output_path:
+            preview_result, preview_source = render_previews_for_rendered_artifact(
+                spec,
+                preview_output_path,
+                rendered_pptx=None,
+                theme_name=effective_theme,
+                asset_root=resolved_asset_root,
+                primary_color=primary_color,
+                secondary_color=secondary_color,
+                basename=output_path.stem,
+                backend=preview_backend,
+                baseline_dir=preview_baseline_dir,
+                write_diff_images=preview_write_diff_images,
+            )
+            if preview_report_json:
+                write_report(preview_report_json, preview_result)
         print(f"[OK] Dry run: {input_path} -> {output_path} ({len(spec.slides)} slides)")
         return build_report(
             mode="render",
@@ -393,9 +450,28 @@ def render_one(
             rendered=False,
             missing_assets=missing_assets,
             quality_review=quality_review,
+            preview_output_dir=preview_output_path,
+            preview_source=preview_source,
+            preview_result=preview_result,
         )
 
     rendered_output = renderer.render(spec, output_path)
+    if preview_output_path:
+        preview_result, preview_source = render_previews_for_rendered_artifact(
+            spec,
+            preview_output_path,
+            rendered_pptx=rendered_output,
+            theme_name=effective_theme,
+            asset_root=resolved_asset_root,
+            primary_color=primary_color,
+            secondary_color=secondary_color,
+            basename=output_path.stem,
+            backend=preview_backend,
+            baseline_dir=preview_baseline_dir,
+            write_diff_images=preview_write_diff_images,
+        )
+        if preview_report_json:
+            write_report(preview_report_json, preview_result)
     print(f"[OK] Generated deck: {rendered_output} ({len(spec.slides)} slides)")
     return build_report(
         mode="render",
@@ -407,6 +483,9 @@ def render_one(
         rendered=True,
         missing_assets=missing_assets,
         quality_review=quality_review,
+        preview_output_dir=preview_output_path,
+        preview_source=preview_source,
+        preview_result=preview_result,
     )
 
 
@@ -703,6 +782,11 @@ def main(argv: list[str] | None = None) -> int:
             dry_run=args.dry_run,
             check_assets=args.check_assets,
             review=args.review,
+            preview_dir=args.preview_dir,
+            preview_backend=args.preview_backend,
+            preview_baseline_dir=args.preview_baseline_dir,
+            preview_write_diff_images=args.preview_write_diff_images,
+            preview_report_json=args.preview_report_json,
         )
         if args.report_json:
             write_report(args.report_json, report)

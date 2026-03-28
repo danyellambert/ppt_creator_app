@@ -98,6 +98,55 @@ def test_cli_render_dry_run_can_include_quality_review(tmp_path: Path) -> None:
     assert "top_risk_slides" in payload["quality_review"]
 
 
+def test_cli_render_can_generate_preview_report_from_rendered_pptx(tmp_path: Path, monkeypatch) -> None:
+    from ppt_creator import preview as preview_module
+
+    output = tmp_path / "render_with_preview.pptx"
+    preview_dir = tmp_path / "render_previews"
+    preview_report_path = tmp_path / "render_preview_report.json"
+    report_path = tmp_path / "render_report.json"
+
+    def _fake_run(command, capture_output, text, check):
+        outdir = Path(command[command.index("--outdir") + 1])
+        source_pptx = Path(command[-1])
+        slide_count = len(PptxPresentation(str(source_pptx)).slides)
+        outdir.mkdir(parents=True, exist_ok=True)
+        for index in range(1, slide_count + 1):
+            Image.new("RGB", (1280, 720), (245, 245, 245)).save(outdir / f"render-preview-{index:02d}.png")
+
+        class _Completed:
+            returncode = 0
+            stdout = ""
+            stderr = ""
+
+        return _Completed()
+
+    monkeypatch.setattr(preview_module, "find_office_runtime", lambda: "/usr/bin/soffice")
+    monkeypatch.setattr(preview_module.subprocess, "run", _fake_run)
+
+    result = main(
+        [
+            "render",
+            "examples/ai_sales.json",
+            str(output),
+            "--preview-dir",
+            str(preview_dir),
+            "--preview-report-json",
+            str(preview_report_path),
+            "--report-json",
+            str(report_path),
+        ]
+    )
+
+    assert result == 0
+    payload = json.loads(report_path.read_text(encoding="utf-8"))
+    preview_payload = json.loads(preview_report_path.read_text(encoding="utf-8"))
+    assert payload["rendered"] is True
+    assert payload["preview_output_dir"] == str(preview_dir)
+    assert payload["preview_source"] == "rendered_pptx"
+    assert preview_payload["mode"] == "preview-pptx"
+
+
 def test_cli_render_batch_review_report_includes_aggregate_risk_fields(tmp_path: Path) -> None:
     output_dir = tmp_path / "batch_review_output"
     report_path = tmp_path / "batch_review_report.json"
