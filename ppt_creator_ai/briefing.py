@@ -260,6 +260,154 @@ def suggest_image_queries_from_briefing(
     return suggestions[:max_suggestions]
 
 
+def suggest_slide_image_queries_from_briefing(
+    briefing: BriefingInput,
+    *,
+    max_queries_per_slide: int = 3,
+) -> list[dict[str, object]]:
+    suggestions: list[dict[str, object]] = []
+
+    def _queries(*values: str | None) -> list[str]:
+        deduped: list[str] = []
+        for value in values:
+            if not value:
+                continue
+            cleaned = value.strip()
+            if cleaned and cleaned not in deduped:
+                deduped.append(cleaned)
+        return deduped[:max_queries_per_slide]
+
+    title_context = briefing.title.lower()
+    audience_context = briefing.audience or "executive leadership team"
+
+    suggestions.append(
+        {
+            "slide_key": "title",
+            "slide_type": "title",
+            "title": briefing.title,
+            "queries": _queries(
+                f"{briefing.title} executive presentation cover image",
+                f"{audience_context} strategy meeting hero background",
+            ),
+        }
+    )
+
+    if briefing.objective or briefing.context or briefing.key_messages:
+        suggestions.append(
+            {
+                "slide_key": "situation_overview",
+                "slide_type": "bullets",
+                "title": "Situation overview",
+                "queries": _queries(
+                    f"{briefing.title} business context workshop",
+                    f"{audience_context} planning session",
+                    "executive team discussion around business priorities",
+                ),
+            }
+        )
+
+    if briefing.metrics:
+        metric_labels = ", ".join(metric.label for metric in briefing.metrics[:2])
+        suggestions.append(
+            {
+                "slide_key": "headline_metrics",
+                "slide_type": "metrics",
+                "title": "Headline metrics",
+                "queries": _queries(
+                    f"executive KPI dashboard for {briefing.title}",
+                    f"business performance dashboard showing {metric_labels}" if metric_labels else None,
+                    "leadership dashboard with clean charts and metric cards",
+                ),
+            }
+        )
+
+    if briefing.milestones:
+        milestone_titles = ", ".join(item.title for item in briefing.milestones[:3])
+        suggestions.append(
+            {
+                "slide_key": "execution_timeline",
+                "slide_type": "timeline",
+                "title": "Execution timeline",
+                "queries": _queries(
+                    f"program roadmap timeline for {briefing.title}",
+                    f"milestone planning workshop covering {milestone_titles}" if milestone_titles else None,
+                    "strategy roadmap with milestone planning board",
+                ),
+            }
+        )
+
+    if len(briefing.options) == 2:
+        left, right = briefing.options
+        suggestions.append(
+            {
+                "slide_key": "option_framing",
+                "slide_type": "comparison",
+                "title": "Option framing",
+                "queries": _queries(
+                    f"executive decision workshop comparing {left.title} and {right.title}",
+                    "comparison whiteboard for strategic options",
+                    f"leadership team evaluating {briefing.title} scenarios",
+                ),
+            }
+        )
+
+    if len(briefing.faqs) >= 2:
+        first_question = briefing.faqs[0].question
+        suggestions.append(
+            {
+                "slide_key": "executive_faq",
+                "slide_type": "faq",
+                "title": "Executive FAQ",
+                "queries": _queries(
+                    f"executive Q&A session about {briefing.title}",
+                    f"leadership meeting addressing question: {first_question}",
+                    "boardroom discussion handling objections and decisions",
+                ),
+            }
+        )
+
+    if briefing.recommendations or briefing.key_messages:
+        suggestions.append(
+            {
+                "slide_key": "executive_summary",
+                "slide_type": "summary",
+                "title": "Executive summary",
+                "queries": _queries(
+                    f"executive summary visual for {briefing.title}",
+                    "leadership alignment and decision summary",
+                    "final recommendation slide background for executive meeting",
+                ),
+            }
+        )
+
+    if "sales" in title_context or "revenue" in title_context:
+        for suggestion in suggestions:
+            if suggestion["slide_key"] == "headline_metrics":
+                suggestion["queries"] = _queries(
+                    *suggestion["queries"],
+                    "sales pipeline dashboard and revenue forecast review",
+                )
+            if suggestion["slide_key"] == "situation_overview":
+                suggestion["queries"] = _queries(
+                    *suggestion["queries"],
+                    "sales leadership meeting discussing pipeline and enablement",
+                )
+    elif "product" in title_context:
+        for suggestion in suggestions:
+            if suggestion["slide_key"] == "execution_timeline":
+                suggestion["queries"] = _queries(
+                    *suggestion["queries"],
+                    "product roadmap planning session with milestones",
+                )
+            if suggestion["slide_key"] == "situation_overview":
+                suggestion["queries"] = _queries(
+                    *suggestion["queries"],
+                    "product strategy workshop with leadership team",
+                )
+
+    return suggestions
+
+
 def _infer_agenda(briefing: BriefingInput) -> list[str]:
     if briefing.outline:
         return briefing.outline[:6]
@@ -479,6 +627,7 @@ def build_briefing_analysis(
         "executive_summary_bullets": briefing.recommendations[:3]
         or summarize_text_to_executive_bullets(summary_source, max_bullets=3),
         "image_suggestions": suggest_image_queries_from_briefing(briefing),
+        "slide_image_suggestions": suggest_slide_image_queries_from_briefing(briefing),
         "density_review": review_presentation_density(spec),
     }
 

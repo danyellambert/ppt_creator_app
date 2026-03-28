@@ -31,6 +31,7 @@ The format is inspired by Keep a Changelog, and the project aims to follow Seman
 - AI analysis reports now include initial slide-by-slide critique guidance derived from heuristic QA findings
 - initial cover-fit/crop handling for fixed image boxes, applied to image-text rendering and preview flows
 - Office-backed preview now falls back from direct PPTX->PNG export to PPTX->PDF->per-page PNG rasterization via Ghostscript when needed
+- AI briefing analysis now includes more granular image suggestions per slide/type, not only deck-level suggestions
 - optional office-aware preview backend selection with automatic fallback to synthetic previews
 - initial layout primitive helpers for panel inner bounds and stacked vertical regions
 - initial application of layout primitives to comparison, faq, cards, and two-column slides

@@ -385,6 +385,7 @@ Se você quiser também um relatório heurístico com:
 
 - resumo executivo em bullets
 - sugestões de imagens/placeholders
+- sugestões de imagem mais granulares por slide
 - revisão de densidade dos slides gerados
 
 rode:
@@ -786,6 +787,7 @@ Essa camada tenta:
 - montar slides estruturados de contexto, métricas, timeline, comparação, FAQ e summary
 - resumir texto mais longo em bullets executivos
 - sugerir direções de imagem / placeholder automaticamente
+- sugerir direções de imagem também por tipo de slide, não só no nível geral do briefing
 - revisar densidade do deck gerado para sinalizar slides potencialmente carregados
 
 Ela **não depende de LLM** nesta fase: é um gerador heurístico, útil como ponto de partida para pipelines futuros.

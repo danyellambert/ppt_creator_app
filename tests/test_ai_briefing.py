@@ -6,6 +6,7 @@ from ppt_creator_ai.briefing import (
     build_briefing_analysis,
     generate_presentation_input_from_briefing,
     generate_presentation_payload_from_briefing,
+    suggest_slide_image_queries_from_briefing,
     summarize_text_to_executive_bullets,
 )
 from ppt_creator_ai.providers import get_provider, list_provider_names
@@ -49,7 +50,20 @@ def test_briefing_analysis_provides_image_suggestions_and_density_review() -> No
 
     assert analysis["executive_summary_bullets"]
     assert analysis["image_suggestions"]
+    assert analysis["slide_image_suggestions"]
     assert analysis["density_review"]["status"] in {"ok", "review"}
+
+
+def test_slide_image_suggestions_are_granular_by_slide_type() -> None:
+    briefing = BriefingInput.from_path("examples/briefing_sales.json")
+
+    suggestions = suggest_slide_image_queries_from_briefing(briefing)
+
+    slide_types = {item["slide_type"] for item in suggestions}
+    assert "title" in slide_types
+    assert "metrics" in slide_types
+    assert "timeline" in slide_types
+    assert any(item["queries"] for item in suggestions)
 
 
 def test_provider_registry_exposes_heuristic_provider() -> None:
