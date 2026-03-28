@@ -326,26 +326,29 @@ def test_ai_cli_auto_regenerate_can_use_preview_feedback(tmp_path: Path, monkeyp
     monkeypatch.setattr(provider, "generate", _generate)
     monkeypatch.setattr(
         ai_cli_module,
-        "render_previews",
-        lambda *args, **kwargs: {
-            "mode": "preview",
-            "preview_count": 3,
-            "previews": [],
-            "thumbnail_sheet": str(preview_dir / "thumbs.png"),
-            "quality_review": {"status": "review", "warning_count": 1},
-            "preview_artifact_review": {
-                "status": "review",
-                "edge_contact_count": 0,
-                "edge_density_warning_count": 1,
-                "body_edge_contact_count": 1,
-                "safe_area_intrusion_count": 1,
-                "footer_intrusion_count": 1,
-                "corner_density_warning_count": 1,
+        "render_previews_for_rendered_artifact",
+        lambda *args, **kwargs: (
+            {
+                "mode": "preview",
+                "preview_count": 3,
+                "previews": [],
+                "thumbnail_sheet": str(preview_dir / "thumbs.png"),
+                "quality_review": {"status": "review", "warning_count": 1},
+                "preview_artifact_review": {
+                    "status": "review",
+                    "edge_contact_count": 0,
+                    "edge_density_warning_count": 1,
+                    "body_edge_contact_count": 1,
+                    "safe_area_intrusion_count": 1,
+                    "footer_intrusion_count": 1,
+                    "corner_density_warning_count": 1,
+                },
+                "visual_regression": None,
+                "backend_requested": kwargs.get("backend"),
+                "backend_used": "synthetic",
             },
-            "visual_regression": None,
-            "backend_requested": "synthetic",
-            "backend_used": "synthetic",
-        },
+            "spec",
+        ),
     )
 
     result = main(
@@ -478,6 +481,57 @@ def test_ai_cli_can_generate_previews_for_generated_deck(tmp_path: Path) -> None
     assert generation_payload["preview_output_dir"] == str(preview_dir)
 
 
+def test_ai_cli_prefers_rendered_pptx_preview_by_default_when_render_output_exists(tmp_path: Path, monkeypatch) -> None:
+    from ppt_creator_ai import cli as ai_cli_module
+
+    output_json = tmp_path / "generated_deck.json"
+    output_pptx = tmp_path / "generated_deck.pptx"
+    preview_dir = tmp_path / "generated_real_previews"
+    report_path = tmp_path / "generated_report.json"
+
+    captured: dict[str, object] = {}
+
+    def _fake_render_previews_for_rendered_artifact(spec, output_dir, **kwargs):
+        captured["rendered_pptx"] = str(kwargs.get("rendered_pptx")) if kwargs.get("rendered_pptx") else None
+        captured["backend"] = kwargs.get("backend")
+        Path(output_dir).mkdir(parents=True, exist_ok=True)
+        return (
+            {
+                "mode": "preview-pptx",
+                "preview_count": 8,
+                "previews": [],
+                "thumbnail_sheet": str(Path(output_dir) / "thumbs.png"),
+                "quality_review": None,
+                "preview_artifact_review": {"status": "ok"},
+                "visual_regression": None,
+                "backend_requested": kwargs.get("backend"),
+                "backend_used": "office",
+            },
+            "rendered_pptx",
+        )
+
+    monkeypatch.setattr(ai_cli_module, "render_previews_for_rendered_artifact", _fake_render_previews_for_rendered_artifact)
+
+    result = main(
+        [
+            "generate",
+            "examples/briefing_sales.json",
+            str(output_json),
+            "--render-pptx",
+            str(output_pptx),
+            "--preview-dir",
+            str(preview_dir),
+            "--report-json",
+            str(report_path),
+        ]
+    )
+
+    assert result == 0
+    assert captured["rendered_pptx"] == str(output_pptx)
+    payload = json.loads(report_path.read_text(encoding="utf-8"))
+    assert payload["preview_source"] == "rendered_pptx"
+
+
 def test_ai_cli_can_generate_previews_from_rendered_pptx(tmp_path: Path, monkeypatch) -> None:
     from ppt_creator_ai import cli as ai_cli_module
 
@@ -488,24 +542,27 @@ def test_ai_cli_can_generate_previews_from_rendered_pptx(tmp_path: Path, monkeyp
 
     captured: dict[str, object] = {}
 
-    def _fake_preview_from_pptx(input_pptx, output_dir, **kwargs):
-        captured["input_pptx"] = str(input_pptx)
+    def _fake_render_previews_for_rendered_artifact(spec, output_dir, **kwargs):
+        captured["input_pptx"] = str(kwargs.get("rendered_pptx"))
         captured["output_dir"] = str(output_dir)
         Path(output_dir).mkdir(parents=True, exist_ok=True)
-        return {
-            "mode": "preview-pptx",
-            "preview_count": 8,
-            "previews": [],
-            "thumbnail_sheet": str(Path(output_dir) / "thumbs.png"),
-            "quality_review": None,
-            "preview_artifact_review": {"status": "ok"},
-            "visual_regression": None,
-            "backend_requested": "office",
-            "backend_used": "office",
-            "office_conversion_strategy": "pdf_via_ghostscript",
-        }
+        return (
+            {
+                "mode": "preview-pptx",
+                "preview_count": 8,
+                "previews": [],
+                "thumbnail_sheet": str(Path(output_dir) / "thumbs.png"),
+                "quality_review": None,
+                "preview_artifact_review": {"status": "ok"},
+                "visual_regression": None,
+                "backend_requested": kwargs.get("backend"),
+                "backend_used": "office",
+                "office_conversion_strategy": "pdf_via_ghostscript",
+            },
+            "rendered_pptx",
+        )
 
-    monkeypatch.setattr(ai_cli_module, "render_previews_from_pptx", _fake_preview_from_pptx)
+    monkeypatch.setattr(ai_cli_module, "render_previews_for_rendered_artifact", _fake_render_previews_for_rendered_artifact)
 
     result = main(
         [

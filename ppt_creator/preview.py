@@ -1161,9 +1161,24 @@ class PreviewRenderer:
             image.paste(fitted, (box[0], box[1]))
         else:
             self._draw_panel(draw, box)
-            draw.text((box[0] + 90, box[1] + 110), "Image unavailable", fill=_rgb_tuple(self.theme.colors.muted), font=_load_font(24, bold=True))
+            inner_box = (box[0] + 44, box[1] + 46, box[2] - 44, box[1] + 182)
+            draw.rounded_rectangle(inner_box, radius=16, fill=_rgb_tuple(self.theme.colors.soft_fill), outline=_rgb_tuple(self.theme.colors.line), width=2)
+            draw.line((inner_box[0] + 16, inner_box[1] + 16, inner_box[2] - 16, inner_box[3] - 16), fill=_rgb_tuple(self.theme.colors.line), width=3)
+            draw.line((inner_box[2] - 16, inner_box[1] + 16, inner_box[0] + 16, inner_box[3] - 16), fill=_rgb_tuple(self.theme.colors.line), width=3)
+            draw.text((box[0] + 66, box[1] + 18), "VISUAL PLACEHOLDER", fill=_rgb_tuple(self.theme.colors.accent), font=_load_font(15, bold=True))
+            draw.text((box[0] + 78, box[1] + 214), "Image unavailable", fill=_rgb_tuple(self.theme.colors.muted), font=_load_font(24, bold=True))
             if slide_spec.image_path:
-                draw.text((box[0] + 48, box[1] + 154), f"Missing asset: {slide_spec.image_path}", fill=_rgb_tuple(self.theme.colors.muted), font=_load_font(16))
+                draw.text((box[0] + 54, box[1] + 294), f"Missing asset: {slide_spec.image_path}", fill=_rgb_tuple(self.theme.colors.muted), font=_load_font(16))
+            draw.text(
+                (box[0] + 54, box[1] + 248),
+                _truncate_text(
+                    slide_spec.image_caption
+                    or "Use a contextual image, screenshot, or diagram once the final asset is available.",
+                    max_chars=74,
+                ),
+                fill=_rgb_tuple(self.theme.colors.text),
+                font=_load_font(15),
+            )
 
     def _render_timeline(self, draw: ImageDraw.ImageDraw, image: Image.Image, slide_spec: Slide, meta: PresentationMeta) -> None:
         self._render_heading(draw, slide_spec)

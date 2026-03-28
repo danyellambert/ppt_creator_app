@@ -156,6 +156,7 @@ def test_missing_image_uses_placeholder_text(tmp_path: Path) -> None:
     texts = [shape.text for shape in image_slide.shapes if hasattr(shape, "text")]
     joined = "\n".join(texts)
 
+    assert "VISUAL PLACEHOLDER" in joined
     assert "Image unavailable" in joined
     assert "Missing asset: missing-image.png" in joined
 
@@ -410,6 +411,14 @@ def test_long_content_layouts_render_with_initial_autofit(tmp_path: Path) -> Non
                     ],
                 },
                 {
+                    "type": "bullets",
+                    "title": "A bullets slide title that is intentionally long so the layout needs stronger autofit behavior in the heading boxes",
+                    "subtitle": "A similarly verbose subtitle makes sure the manual bullets heading path also participates in the broader autofit rollout.",
+                    "eyebrow": "Executive framing under pressure",
+                    "layout_variant": "full_width",
+                    "bullets": [long_bullet, long_bullet, long_bullet, long_bullet],
+                },
+                {
                     "type": "title",
                     "layout_variant": "hero_cover",
                     "title": "A longer title cover that should still stay readable after more semantic split logic and autofit are applied",
@@ -466,4 +475,4 @@ def test_long_content_layouts_render_with_initial_autofit(tmp_path: Path) -> Non
 
     assert rendered.exists()
     presentation = Presentation(str(rendered))
-    assert len(presentation.slides) == 11
+    assert len(presentation.slides) == 12

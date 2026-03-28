@@ -343,9 +343,11 @@ Como a qualidade percebida do deck depende muito da inspeção visual, existe um
   - [x] primeiro fluxo explícito de preview a partir de `.pptx` real via CLI/API
   - [x] fallback mais robusto quando o Office não exporta um PNG por slide diretamente (`.pptx` -> `.pdf` -> PNG por página)
   - [x] integração inicial desse caminho ao fluxo principal de render, preferindo o artefato final quando possível
+  - [x] camada opcional de geração/preview agora também prefere automaticamente o `.pptx` final renderizado em mais cenários
   - [ ] evoluir para usar isso como caminho preferencial em mais cenários de QA/regressão
 - [ ] adicionar regressão visual baseada em previews reais/golden files
   - [x] primeira camada de comparação contra golden previews com diffs opcionais
+  - [x] caminhos opcionais com `render-pptx` + baseline agora passam a favorecer preview real quando disponível
   - [ ] evoluir para comparação baseada preferencialmente em preview do `.pptx` real
 - [ ] criar detectores mais fortes de colisão, overflow e clipping
   - [x] primeira camada heurística de risco de overflow e desbalanceamento exposta no review/QA
@@ -538,6 +540,7 @@ Se a meta for perseguir o nível “deck quase pronto sem retoque manual”, a o
   - [x] primeira expansão da estratégia para além de `image_text`, aplicada a `title.hero_cover`
   - [ ] expandir a estratégia para mais layouts e regras de focal point/contexto
 - [ ] placeholders mais premium e contextuais
+  - [x] primeira evolução visual do placeholder estruturado em `image_text`
 - [ ] sugestões de imagem por tipo de slide, não só por briefing geral
   - [x] primeira camada de sugestões mais granulares por slide/tipo na análise heurística de briefing
   - [x] evoluir para sugestões mais contextuais com focal point/asset style

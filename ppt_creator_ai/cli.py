@@ -8,7 +8,9 @@ from tempfile import TemporaryDirectory
 
 from pydantic import ValidationError
 
-from ppt_creator.preview import render_previews, render_previews_from_pptx
+from ppt_creator.preview import (
+    render_previews_for_rendered_artifact,
+)
 from ppt_creator.qa import review_presentation
 from ppt_creator.renderer import PresentationRenderer
 from ppt_creator.schema import PresentationInput
@@ -184,59 +186,23 @@ def _build_preview_feedback_for_spec(
     with TemporaryDirectory(prefix="ppt_creator_ai_preview_feedback_") as tmpdir:
         temp_root = Path(tmpdir)
         temp_preview_dir = temp_root / "previews"
-
+        rendered_candidate = None
         if prefer_rendered_pptx:
             temp_pptx = temp_root / f"{basename}.pptx"
             PresentationRenderer(theme_name=spec.presentation.theme, asset_root=resolved_asset_root).render(spec, temp_pptx)
-            if preview_backend == "synthetic":
-                preview_result = render_previews(
-                    spec,
-                    temp_preview_dir,
-                    theme_name=spec.presentation.theme,
-                    asset_root=resolved_asset_root,
-                    basename=basename,
-                    backend="synthetic",
-                    baseline_dir=preview_baseline_dir,
-                    write_diff_images=preview_write_diff_images,
-                )
-                preview_source = "spec"
-            else:
-                try:
-                    preview_result = render_previews_from_pptx(
-                        temp_pptx,
-                        temp_preview_dir,
-                        theme_name=spec.presentation.theme,
-                        basename=basename,
-                        baseline_dir=preview_baseline_dir,
-                        write_diff_images=preview_write_diff_images,
-                    )
-                    preview_source = "rendered_pptx"
-                except Exception:
-                    if preview_backend == "office":
-                        raise
-                    preview_result = render_previews(
-                        spec,
-                        temp_preview_dir,
-                        theme_name=spec.presentation.theme,
-                        asset_root=resolved_asset_root,
-                        basename=basename,
-                        backend="synthetic",
-                        baseline_dir=preview_baseline_dir,
-                        write_diff_images=preview_write_diff_images,
-                    )
-                    preview_source = "spec"
-        else:
-            preview_result = render_previews(
-                spec,
-                temp_preview_dir,
-                theme_name=spec.presentation.theme,
-                asset_root=resolved_asset_root,
-                basename=basename,
-                backend=preview_backend,
-                baseline_dir=preview_baseline_dir,
-                write_diff_images=preview_write_diff_images,
-            )
-            preview_source = "spec"
+            rendered_candidate = temp_pptx
+
+        preview_result, preview_source = render_previews_for_rendered_artifact(
+            spec,
+            temp_preview_dir,
+            rendered_pptx=rendered_candidate,
+            theme_name=spec.presentation.theme,
+            asset_root=resolved_asset_root,
+            basename=basename,
+            backend=preview_backend,
+            baseline_dir=preview_baseline_dir,
+            write_diff_images=preview_write_diff_images,
+        )
 
     return preview_result, build_generation_feedback_from_preview(preview_result), preview_source
 
@@ -288,7 +254,7 @@ def generate_from_briefing(
         current_preview_result, current_preview_feedback, current_preview_source = _build_preview_feedback_for_spec(
             current_spec,
             preview_enabled=preview_feedback_enabled,
-            prefer_rendered_pptx=preview_from_rendered_pptx,
+            prefer_rendered_pptx=preview_from_rendered_pptx or preview_backend != "synthetic",
             resolved_asset_root=resolved_asset_root,
             preview_backend=preview_backend,
             preview_baseline_dir=preview_baseline_dir,
@@ -320,7 +286,7 @@ def generate_from_briefing(
             candidate_preview_result, candidate_preview_feedback, candidate_preview_source = _build_preview_feedback_for_spec(
                 candidate_spec,
                 preview_enabled=preview_feedback_enabled,
-                prefer_rendered_pptx=preview_from_rendered_pptx,
+                prefer_rendered_pptx=preview_from_rendered_pptx or preview_backend != "synthetic",
                 resolved_asset_root=resolved_asset_root,
                 preview_backend=preview_backend,
                 preview_baseline_dir=preview_baseline_dir,
@@ -387,7 +353,7 @@ def generate_from_briefing(
         current_preview_result, _, _ = _build_preview_feedback_for_spec(
             current_spec,
             preview_enabled=preview_feedback_enabled,
-            prefer_rendered_pptx=preview_from_rendered_pptx,
+            prefer_rendered_pptx=preview_from_rendered_pptx or preview_backend != "synthetic",
             resolved_asset_root=resolved_asset_root,
             preview_backend=preview_backend,
             preview_baseline_dir=preview_baseline_dir,
@@ -407,7 +373,7 @@ def generate_from_briefing(
             candidate_preview_result, _, _ = _build_preview_feedback_for_spec(
                 candidate_spec,
                 preview_enabled=preview_feedback_enabled,
-                prefer_rendered_pptx=preview_from_rendered_pptx,
+                prefer_rendered_pptx=preview_from_rendered_pptx or preview_backend != "synthetic",
                 resolved_asset_root=resolved_asset_root,
                 preview_backend=preview_backend,
                 preview_baseline_dir=preview_baseline_dir,
@@ -463,6 +429,7 @@ def generate_from_briefing(
     rendered_pptx_path: str | None = None
     preview_path: str | None = None
     preview_result: dict[str, object] | None = None
+    preview_source: str | None = None
     if analysis_json:
         analysis_output = write_json(
             analysis_json,
@@ -489,25 +456,20 @@ def generate_from_briefing(
         if preview_from_rendered_pptx:
             if not rendered_pptx_path:
                 raise ValueError("--preview-from-rendered-pptx requires --render-pptx in the same command")
-            preview_result = render_previews_from_pptx(
-                rendered_pptx_path,
-                preview_output_dir,
-                theme_name=spec.presentation.theme,
-                basename=output_path.stem,
-                baseline_dir=preview_baseline_dir,
-                write_diff_images=preview_write_diff_images,
-            )
-        else:
-            preview_result = render_previews(
-                spec,
-                preview_output_dir,
-                theme_name=spec.presentation.theme,
-                asset_root=resolved_asset_root,
-                basename=output_path.stem,
-                backend=preview_backend,
-                baseline_dir=preview_baseline_dir,
-                write_diff_images=preview_write_diff_images,
-            )
+        effective_preview_backend = preview_backend
+        if preview_from_rendered_pptx and effective_preview_backend == "synthetic":
+            effective_preview_backend = "auto"
+        preview_result, preview_source = render_previews_for_rendered_artifact(
+            spec,
+            preview_output_dir,
+            rendered_pptx=rendered_pptx_path if rendered_pptx_path and effective_preview_backend != "synthetic" else None,
+            theme_name=spec.presentation.theme,
+            asset_root=resolved_asset_root,
+            basename=output_path.stem,
+            backend=effective_preview_backend,
+            baseline_dir=preview_baseline_dir,
+            write_diff_images=preview_write_diff_images,
+        )
         preview_path = str(preview_output_dir)
         print_info(f"Generated previews from generated deck: {preview_output_dir}")
         if preview_report_json:
@@ -528,6 +490,7 @@ def generate_from_briefing(
         "review_output_json": review_path,
         "render_output_pptx": rendered_pptx_path,
         "preview_output_dir": preview_path,
+        "preview_source": preview_source,
         "preview_report_json": str(preview_report_json) if preview_report_json else None,
         "preview_from_rendered_pptx": preview_from_rendered_pptx,
         "auto_regenerate_enabled": auto_regenerate,

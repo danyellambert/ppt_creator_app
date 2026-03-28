@@ -12,13 +12,16 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
     if slide_spec.eyebrow:
         eyebrow_box = renderer.textbox(slide, c.margin_x, 0.78, 5.4, 0.25)
         renderer.write_paragraph(eyebrow_box.text_frame, slide_spec.eyebrow.upper(), size=t.eyebrow_size, color=colors.accent, bold=True)
+        renderer.fit_text_frame(eyebrow_box.text_frame, max_size=t.eyebrow_size, bold=True)
 
     title_box = renderer.textbox(slide, c.margin_x, 1.02, 6.4, 0.85)
     renderer.write_paragraph(title_box.text_frame, slide_spec.title or "", size=t.title_size, color=colors.navy, bold=True)
+    renderer.fit_text_frame(title_box.text_frame, max_size=t.title_size, bold=True)
 
     if slide_spec.subtitle:
         subtitle_box = renderer.textbox(slide, c.margin_x, 1.82, 5.8, 0.45)
         renderer.write_paragraph(subtitle_box.text_frame, slide_spec.subtitle, size=t.subtitle_size, color=colors.muted)
+        renderer.fit_text_frame(subtitle_box.text_frame, max_size=t.subtitle_size)
 
     if variant == "insight_panel":
         split_weights = [

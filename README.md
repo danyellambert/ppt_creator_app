@@ -466,6 +466,8 @@ Esse fluxo tenta:
 
 Quando você também pede `--preview-dir`, essa regeneração heurística começa a incorporar sinais vindos do preview visual, como crowding perto do footer, intrusão em safe areas e empacotamento agressivo nas bordas.
 
+Quando o mesmo comando também usa `--render-pptx`, o pipeline opcional agora passa a **preferir automaticamente o preview do `.pptx` final renderizado** em vez do caminho baseado apenas no spec, sempre que isso fizer sentido para o backend escolhido.
+
 E agora você também pode acoplar **preview visual** diretamente nesse pipeline opcional:
 
 ```bash
@@ -927,3 +929,5 @@ Essa análise agora também começou a observar melhor o **corpo útil do slide*
 - densidade suspeita em cantos críticos
 
 Também começou a entrar uma primeira camada de **crop/cover-fit mais inteligente** para imagens encaixadas em caixas fixas, especialmente no layout `image_text` e no preview correspondente, reduzindo distorção e melhorando o aproveitamento visual da área de imagem.
+
+Os placeholders de imagem também começaram a ganhar uma apresentação mais premium/estruturada, deixando mais claro quando um slide ainda espera um asset real sem parecer apenas um bloco vazio.

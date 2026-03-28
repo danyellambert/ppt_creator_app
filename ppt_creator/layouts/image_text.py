@@ -44,7 +44,7 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
         )
     else:
         panel = renderer.add_panel(slide, image_left, image_top, image_width, image_height, fill_color=colors.surface, line_color=colors.line)
-        renderer.add_accent_bar(slide, image_left, image_top, image_width, components.accent_bar_height, color=colors.line)
+        renderer.add_accent_bar(slide, image_left, image_top, image_width, components.accent_bar_height, color=colors.accent)
         placeholder = slide.shapes.add_shape(
             MSO_AUTO_SHAPE_TYPE.RECTANGLE,
             panel.left,
@@ -55,7 +55,50 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
         placeholder.fill.solid()
         placeholder.fill.fore_color.rgb = panel.fill.fore_color.rgb
         placeholder.line.fill.background()
-        heading_box = renderer.textbox(slide, image_left + 0.55, image_top + 1.55, image_width - 1.1, 0.35)
+
+        inner_left = image_left + 0.55
+        inner_top = image_top + 0.72
+        inner_width = image_width - 1.1
+        inner_height = 1.42
+        renderer.add_panel(
+            slide,
+            inner_left,
+            inner_top,
+            inner_width,
+            inner_height,
+            fill_color=colors.soft_fill,
+            line_color=colors.line,
+        )
+        renderer.add_rule(
+            slide,
+            inner_left + 0.18,
+            inner_top + 0.18,
+            inner_left + inner_width - 0.18,
+            inner_top + inner_height - 0.18,
+            color=colors.line,
+            width_pt=1.0,
+        )
+        renderer.add_rule(
+            slide,
+            inner_left + inner_width - 0.18,
+            inner_top + 0.18,
+            inner_left + 0.18,
+            inner_top + inner_height - 0.18,
+            color=colors.line,
+            width_pt=1.0,
+        )
+
+        label_box = renderer.textbox(slide, image_left + 0.55, image_top + 0.35, 2.1, 0.26)
+        renderer.write_paragraph(
+            label_box.text_frame,
+            "VISUAL PLACEHOLDER",
+            size=t.small_size,
+            color=colors.accent,
+            bold=True,
+        )
+        renderer.fit_text_frame(label_box.text_frame, max_size=t.small_size, bold=True)
+
+        heading_box = renderer.textbox(slide, image_left + 0.55, image_top + 2.36, image_width - 1.1, 0.35)
         renderer.write_paragraph(
             heading_box.text_frame,
             "Image unavailable" if slide_spec.image_path else "Image placeholder",
@@ -65,17 +108,18 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
         )
         renderer.fit_text_frame(heading_box.text_frame, max_size=t.body_size, bold=True)
 
-        caption_box = renderer.textbox(slide, image_left + 0.55, image_top + 1.98, image_width - 1.1, 1.05)
+        caption_box = renderer.textbox(slide, image_left + 0.55, image_top + 2.78, image_width - 1.1, 0.9)
         renderer.write_paragraph(
             caption_box.text_frame,
-            slide_spec.image_caption or "Add a real image later or keep this area as a structured visual placeholder.",
+            slide_spec.image_caption
+            or "Use a premium contextual image, screenshot, or diagram to reinforce the narrative once the final asset is available.",
             size=t.small_size + 1,
             color=colors.text,
         )
         renderer.fit_text_frame(caption_box.text_frame, max_size=t.small_size + 1)
 
         if slide_spec.image_path:
-            path_box = renderer.textbox(slide, image_left + 0.55, image_top + 3.35, image_width - 1.1, 0.55)
+            path_box = renderer.textbox(slide, image_left + 0.55, image_top + 3.82, image_width - 1.1, 0.55)
             renderer.write_paragraph(
                 path_box.text_frame,
                 f"Missing asset: {slide_spec.image_path}",

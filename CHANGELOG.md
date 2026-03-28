@@ -41,6 +41,7 @@ The format is inspired by Keep a Changelog, and the project aims to follow Seman
 - the optional briefing layer can now derive outline/context/key messages from a freer `briefing_text`, not only fully structured fields
 - cover-image handling now starts to extend beyond `image_text`, including title hero-cover imagery with the same focal-point-aware crop behavior
 - heuristic QA now includes a first layout-pressure/collision signal layer that uses slide-specific composition bounds more directly
+- the optional AI generation flow now prefers real rendered-PPTX previews automatically in more preview/regression scenarios, while image placeholders and bullets heading autofit were further refined
 - optional office-aware preview backend selection with automatic fallback to synthetic previews
 - initial layout primitive helpers for panel inner bounds and stacked vertical regions
 - initial application of layout primitives to comparison, faq, cards, and two-column slides
