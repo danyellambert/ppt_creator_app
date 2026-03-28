@@ -114,6 +114,17 @@ def _changed_ratio_against_background(
     return changed_pixels / total_pixels
 
 
+def _foreground_bbox_against_background(
+    image: Image.Image,
+    background_rgb: tuple[int, int, int],
+    *,
+    box: tuple[int, int, int, int] | None = None,
+) -> tuple[int, int, int, int] | None:
+    region = image.crop(box) if box else image
+    background = Image.new("RGB", region.size, background_rgb)
+    return ImageChops.difference(region.convert("RGB"), background).getbbox()
+
+
 def _wrap_text(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.ImageFont, max_width: int) -> list[str]:
     lines: list[str] = []
     for paragraph in text.splitlines() or [text]:
@@ -645,18 +656,33 @@ class PreviewRenderer:
     def build_preview_artifact_review(self, preview_paths: list[str]) -> dict[str, object]:
         background_rgb = _rgb_tuple(self.theme.colors.background)
         strip = 16
+        corner_box = 40
         edge_contact_count = 0
         safe_margin_warning_count = 0
         edge_density_warning_count = 0
+        body_edge_contact_count = 0
+        safe_area_intrusion_count = 0
+        footer_intrusion_count = 0
+        corner_density_warning_count = 0
         slides: list[dict[str, object]] = []
 
         for index, preview_path in enumerate(preview_paths, start=1):
             image = Image.open(preview_path).convert("RGB")
             width, height = image.size
-            background = Image.new("RGB", image.size, background_rgb)
-            bbox = ImageChops.difference(image, background).getbbox()
+            bbox = _foreground_bbox_against_background(image, background_rgb)
             if bbox is None:
                 bbox = (0, 0, 0, 0)
+
+            footer_line_y = self._y(self.theme.grid.footer_line_y)
+            safe_left = self._x(self.theme.grid.content_left)
+            safe_right = self._x(self.theme.grid.content_right)
+            safe_top = self._y(self.theme.canvas.margin_top)
+            safe_bottom = min(self._y(self.theme.canvas.height - self.theme.canvas.margin_bottom), footer_line_y)
+
+            body_box = (0, 0, width, max(1, footer_line_y))
+            body_bbox = _foreground_bbox_against_background(image, background_rgb, box=body_box)
+            if body_bbox is None:
+                body_bbox = (0, 0, 0, 0)
 
             left_ratio = _changed_ratio_against_background(image, background_rgb, box=(0, 0, strip, height))
             right_ratio = _changed_ratio_against_background(image, background_rgb, box=(width - strip, 0, width, height))
@@ -664,12 +690,61 @@ class PreviewRenderer:
             bottom_ratio = _changed_ratio_against_background(image, background_rgb, box=(0, height - strip, width, height))
             max_edge_ratio = max(left_ratio, right_ratio, top_ratio, bottom_ratio)
 
+            body_left_ratio = _changed_ratio_against_background(image, background_rgb, box=(0, 0, strip, footer_line_y))
+            body_right_ratio = _changed_ratio_against_background(
+                image,
+                background_rgb,
+                box=(width - strip, 0, width, footer_line_y),
+            )
+            body_top_ratio = _changed_ratio_against_background(image, background_rgb, box=(0, 0, width, strip))
+            body_bottom_ratio = _changed_ratio_against_background(
+                image,
+                background_rgb,
+                box=(0, max(0, footer_line_y - strip), width, footer_line_y),
+            )
+            body_max_edge_ratio = max(body_left_ratio, body_right_ratio, body_top_ratio, body_bottom_ratio)
+
+            corner_ratios = {
+                "top_left": _changed_ratio_against_background(image, background_rgb, box=(0, 0, corner_box, corner_box)),
+                "top_right": _changed_ratio_against_background(
+                    image,
+                    background_rgb,
+                    box=(width - corner_box, 0, width, corner_box),
+                ),
+                "bottom_left": _changed_ratio_against_background(
+                    image,
+                    background_rgb,
+                    box=(0, max(0, footer_line_y - corner_box), corner_box, footer_line_y),
+                ),
+                "bottom_right": _changed_ratio_against_background(
+                    image,
+                    background_rgb,
+                    box=(width - corner_box, max(0, footer_line_y - corner_box), width, footer_line_y),
+                ),
+            }
+            max_corner_ratio = max(corner_ratios.values())
+
             edge_contact = bool(bbox != (0, 0, 0, 0) and (bbox[0] <= 8 or bbox[1] <= 8 or bbox[2] >= width - 8 or bbox[3] >= height - 8))
             safe_margin_warning = bool(
                 bbox != (0, 0, 0, 0)
                 and (bbox[0] <= 24 or bbox[1] <= 24 or bbox[2] >= width - 24 or bbox[3] >= height - 24)
             )
             edge_density_warning = max_edge_ratio >= 0.015
+            body_edge_contact = bool(
+                body_bbox != (0, 0, 0, 0)
+                and (body_bbox[0] <= 8 or body_bbox[1] <= 8 or body_bbox[2] >= width - 8 or body_bbox[3] >= footer_line_y - 8)
+            )
+            safe_area_intrusion = bool(
+                body_bbox != (0, 0, 0, 0)
+                and (
+                    body_bbox[0] < safe_left - 8
+                    or body_bbox[1] < safe_top - 8
+                    or body_bbox[2] > safe_right + 8
+                    or body_bbox[3] > safe_bottom + 8
+                )
+            )
+            footer_intrusion_warning = bool(body_bbox != (0, 0, 0, 0) and body_bbox[3] >= footer_line_y - 24)
+            corner_density_warning = max_corner_ratio >= 0.05 or body_max_edge_ratio >= 0.03
 
             issues: list[str] = []
             if edge_contact:
@@ -681,6 +756,18 @@ class PreviewRenderer:
             if edge_density_warning:
                 edge_density_warning_count += 1
                 issues.append("edge density suggests possible clipping or aggressive packing")
+            if body_edge_contact:
+                body_edge_contact_count += 1
+                issues.append("body content touches a slide boundary before the footer region")
+            if safe_area_intrusion:
+                safe_area_intrusion_count += 1
+                issues.append("body content appears to intrude into an unsafe margin region")
+            if footer_intrusion_warning:
+                footer_intrusion_count += 1
+                issues.append("body content approaches the footer boundary and may clip or collide")
+            if corner_density_warning:
+                corner_density_warning_count += 1
+                issues.append("corner density suggests content is packed into unsafe corners")
 
             slides.append(
                 {
@@ -692,21 +779,45 @@ class PreviewRenderer:
                         "right": int(bbox[2]),
                         "bottom": int(bbox[3]),
                     },
+                    "body_foreground_bbox": {
+                        "left": int(body_bbox[0]),
+                        "top": int(body_bbox[1]),
+                        "right": int(body_bbox[2]),
+                        "bottom": int(body_bbox[3]),
+                    },
                     "edge_contact": edge_contact,
                     "safe_margin_warning": safe_margin_warning,
                     "edge_density_warning": edge_density_warning,
+                    "body_edge_contact": body_edge_contact,
+                    "safe_area_intrusion": safe_area_intrusion,
+                    "footer_intrusion_warning": footer_intrusion_warning,
+                    "corner_density_warning": corner_density_warning,
                     "max_edge_ratio": round(max_edge_ratio, 6),
+                    "body_max_edge_ratio": round(body_max_edge_ratio, 6),
+                    "max_corner_ratio": round(max_corner_ratio, 6),
                     "issues": issues,
                 }
             )
 
-        status = "review" if (edge_contact_count or safe_margin_warning_count or edge_density_warning_count) else "ok"
+        status = "review" if (
+            edge_contact_count
+            or safe_margin_warning_count
+            or edge_density_warning_count
+            or body_edge_contact_count
+            or safe_area_intrusion_count
+            or footer_intrusion_count
+            or corner_density_warning_count
+        ) else "ok"
         return {
             "status": status,
             "preview_count": len(preview_paths),
             "edge_contact_count": edge_contact_count,
             "safe_margin_warning_count": safe_margin_warning_count,
             "edge_density_warning_count": edge_density_warning_count,
+            "body_edge_contact_count": body_edge_contact_count,
+            "safe_area_intrusion_count": safe_area_intrusion_count,
+            "footer_intrusion_count": footer_intrusion_count,
+            "corner_density_warning_count": corner_density_warning_count,
             "slides": slides,
         }
 

@@ -350,6 +350,7 @@ Como a qualidade percebida do deck depende muito da inspeção visual, existe um
   - [x] primeira camada heurística de risco de overflow e desbalanceamento exposta no review/QA
   - [x] sumarização de slides mais arriscados e sinais de clipping/overflow em relatórios de QA
   - [x] primeira análise de artefatos no próprio preview (edge contact / edge density)
+  - [x] nova camada de sinais baseados no corpo útil do preview (safe-area intrusion, footer-boundary crowding, unsafe corner density)
   - [ ] evoluir para detectores mais próximos de colisão/clipping real com base em preview/layout final
 
 Racional:

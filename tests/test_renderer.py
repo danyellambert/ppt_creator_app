@@ -3,10 +3,11 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from PIL import Image
+from PIL import Image, ImageDraw
 from pptx import Presentation
 from pptx.util import Inches
 
+from ppt_creator.preview import PREVIEW_HEIGHT, PREVIEW_WIDTH, PreviewRenderer
 from ppt_creator.renderer import PresentationRenderer
 from ppt_creator.schema import PresentationInput
 
@@ -322,3 +323,35 @@ def test_add_image_cover_applies_crop_for_mismatched_aspect_ratio(tmp_path: Path
 
     assert picture.crop_left > 0
     assert picture.crop_right == pytest.approx(picture.crop_left)
+
+
+def test_preview_artifact_review_flags_body_content_packed_into_corner(tmp_path: Path) -> None:
+    renderer = PreviewRenderer()
+    image = Image.new("RGB", (PREVIEW_WIDTH, PREVIEW_HEIGHT), (246, 244, 240))
+    draw = ImageDraw.Draw(image)
+    draw.rectangle((0, 0, 64, 64), fill=(20, 30, 40))
+
+    preview_path = tmp_path / "corner-packed.png"
+    image.save(preview_path)
+
+    review = renderer.build_preview_artifact_review([str(preview_path)])
+
+    assert review["corner_density_warning_count"] == 1
+    assert review["body_edge_contact_count"] == 1
+    assert review["slides"][0]["corner_density_warning"] is True
+
+
+def test_preview_artifact_review_flags_body_content_near_footer_boundary(tmp_path: Path) -> None:
+    renderer = PreviewRenderer()
+    image = Image.new("RGB", (PREVIEW_WIDTH, PREVIEW_HEIGHT), (246, 244, 240))
+    draw = ImageDraw.Draw(image)
+    footer_line_y = renderer._y(renderer.theme.grid.footer_line_y)
+    draw.rectangle((220, footer_line_y - 20, 1060, footer_line_y - 4), fill=(20, 30, 40))
+
+    preview_path = tmp_path / "footer-intrusion.png"
+    image.save(preview_path)
+
+    review = renderer.build_preview_artifact_review([str(preview_path)])
+
+    assert review["footer_intrusion_count"] == 1
+    assert review["slides"][0]["footer_intrusion_warning"] is True
