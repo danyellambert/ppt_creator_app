@@ -53,6 +53,7 @@ def test_api_helpers_are_exposed() -> None:
     assert ppt_creator.build_api_server is not None
     assert ppt_creator.compare_pptx_artifacts is not None
     assert ppt_creator.compare_pptx_payload is not None
+    assert ppt_creator.generate_briefing_payload is not None
     assert ppt_creator.get_asset_collection is not None
     assert ppt_creator.get_audience_profile is not None
     assert ppt_creator.list_asset_collections is not None

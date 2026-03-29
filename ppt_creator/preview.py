@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 import shutil
 import subprocess
@@ -19,6 +20,7 @@ PREVIEW_HEIGHT = 720
 THUMBNAIL_WIDTH = 320
 THUMBNAIL_HEIGHT = 180
 CONTACT_SHEET_COLUMNS = 3
+PREVIEW_MANIFEST_FILENAME = "preview-manifest.json"
 
 
 def _risk_badge_fill(*, status: str | None, risk_level: str | None) -> tuple[int, int, int]:
@@ -77,6 +79,94 @@ def _list_preview_images(path: str | Path) -> list[Path]:
         for file_path in root.glob("*.png")
         if not file_path.name.endswith("-thumbnails.png") and "-diff-" not in file_path.stem
     )
+
+
+def _preview_manifest_path(path: str | Path) -> Path:
+    return Path(path) / PREVIEW_MANIFEST_FILENAME
+
+
+def _load_preview_manifest(path: str | Path) -> dict[str, object] | None:
+    manifest_path = _preview_manifest_path(path)
+    if not manifest_path.exists() or not manifest_path.is_file():
+        return None
+    try:
+        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def _resolve_preview_sequence(path: str | Path) -> tuple[list[Path], dict[str, object] | None]:
+    root = Path(path)
+    manifest = _load_preview_manifest(root)
+    if manifest is not None:
+        slides = manifest.get("slides")
+        if isinstance(slides, list):
+            resolved: list[Path] = []
+            for item in slides:
+                if not isinstance(item, dict):
+                    continue
+                filename = item.get("filename")
+                if not isinstance(filename, str) or not filename.strip():
+                    continue
+                candidate = root / filename
+                if candidate.exists() and candidate.is_file():
+                    resolved.append(candidate)
+            if resolved:
+                return resolved, manifest
+    return _list_preview_images(root), manifest
+
+
+def _is_real_preview_source(value: object) -> bool:
+    if not isinstance(value, str):
+        return False
+    return value in {"rendered_pptx", "input_pptx"}
+
+
+def _write_preview_manifest(
+    output_dir: str | Path,
+    *,
+    mode: str,
+    preview_paths: list[str],
+    basename: str,
+    preview_source: str,
+    presentation_title: str | None,
+    theme_name: str | None,
+    backend_requested: str,
+    backend_used: str,
+    office_runtime: str | None,
+    office_conversion_strategy: str | None,
+    input_pptx: str | None = None,
+) -> Path:
+    destination = Path(output_dir)
+    destination.mkdir(parents=True, exist_ok=True)
+    manifest_path = _preview_manifest_path(destination)
+    payload = {
+        "manifest_version": 1,
+        "mode": mode,
+        "basename": basename,
+        "output_dir": str(destination.resolve()),
+        "presentation_title": presentation_title,
+        "theme": theme_name,
+        "preview_count": len(preview_paths),
+        "preview_source": preview_source,
+        "real_preview": _is_real_preview_source(preview_source),
+        "backend_requested": backend_requested,
+        "backend_used": backend_used,
+        "office_runtime": office_runtime,
+        "office_conversion_strategy": office_conversion_strategy,
+        "input_pptx": input_pptx,
+        "slides": [
+            {
+                "slide_number": index,
+                "filename": Path(preview_path).name,
+                "path": str(Path(preview_path).resolve()),
+            }
+            for index, preview_path in enumerate(preview_paths, start=1)
+        ],
+    }
+    manifest_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    return manifest_path
 
 
 def _normalized_diff_score(generated: Image.Image, baseline: Image.Image) -> tuple[float, float, Image.Image]:
@@ -158,6 +248,7 @@ class PreviewRenderer:
         baseline_dir: str | Path | None = None,
         diff_threshold: float = 0.01,
         write_diff_images: bool = False,
+        require_real_previews: bool = False,
     ):
         self.requested_theme_name = theme_name
         self.requested_primary_color = primary_color
@@ -169,6 +260,7 @@ class PreviewRenderer:
         self.baseline_dir = Path(baseline_dir).resolve() if baseline_dir else None
         self.diff_threshold = diff_threshold
         self.write_diff_images = write_diff_images
+        self.require_real_previews = require_real_previews
         self.theme = get_theme(theme_name, primary_color=primary_color, secondary_color=secondary_color)
 
     def _run_office_convert(
@@ -280,22 +372,33 @@ class PreviewRenderer:
         backend_used = "synthetic"
         fallback_reason: str | None = None
         office_conversion_strategy: str | None = None
+        preview_source = "spec"
 
         if self.backend == "office":
             if not runtime:
                 raise RuntimeError("Office preview backend requested but no 'soffice' or 'libreoffice' executable was found")
             preview_paths, office_conversion_strategy = self.render_office_previews(spec, destination, base, runtime=runtime)
             backend_used = "office"
+            preview_source = "rendered_pptx"
         elif self.backend == "auto" and runtime:
             try:
                 preview_paths, office_conversion_strategy = self.render_office_previews(spec, destination, base, runtime=runtime)
                 backend_used = "office"
+                preview_source = "rendered_pptx"
             except Exception as exc:  # noqa: BLE001
+                if self.require_real_previews:
+                    raise RuntimeError(
+                        f"real preview was required but Office-backed preview failed: {exc}"
+                    ) from exc
                 fallback_reason = f"Office preview unavailable, falling back to synthetic preview: {exc}"
                 preview_paths = self.render_synthetic_previews(spec, destination, base)
                 backend_used = "synthetic"
         else:
             if self.backend == "auto" and not runtime:
+                if self.require_real_previews:
+                    raise RuntimeError(
+                        "real preview was required but no 'soffice' or 'libreoffice' runtime was found"
+                    )
                 fallback_reason = "Office runtime not found; using synthetic preview backend"
             preview_paths = self.render_synthetic_previews(spec, destination, base)
 
@@ -309,10 +412,27 @@ class PreviewRenderer:
             quality_review=quality_review,
         )
 
+        manifest_path = _write_preview_manifest(
+            destination,
+            mode="preview",
+            preview_paths=preview_paths,
+            basename=base,
+            preview_source=preview_source,
+            presentation_title=spec.presentation.title,
+            theme_name=self.theme.name,
+            backend_requested=self.backend,
+            backend_used=backend_used,
+            office_runtime=runtime,
+            office_conversion_strategy=office_conversion_strategy,
+        )
+        manifest = _load_preview_manifest(destination)
+
         visual_regression = self.build_visual_regression_report(
             preview_paths,
             destination,
             base,
+            current_preview_source=preview_source,
+            current_manifest=manifest,
         )
         preview_artifact_review = self.build_preview_artifact_review(preview_paths)
 
@@ -327,6 +447,9 @@ class PreviewRenderer:
             "visual_regression": visual_regression,
             "debug_grid": self.debug_grid,
             "debug_safe_areas": self.debug_safe_areas,
+            "preview_source": preview_source,
+            "real_preview": _is_real_preview_source(preview_source),
+            "preview_manifest": str(manifest_path),
             "backend_requested": self.backend,
             "backend_used": backend_used,
             "backend_fallback_reason": fallback_reason,
@@ -433,7 +556,29 @@ class PreviewRenderer:
         ]
         self.render_contact_sheet(meta, slides, preview_paths, contact_sheet_path)
 
-        visual_regression = self.build_visual_regression_report(preview_paths, destination, base)
+        manifest_path = _write_preview_manifest(
+            destination,
+            mode="preview-pptx",
+            preview_paths=preview_paths,
+            basename=base,
+            preview_source="input_pptx",
+            presentation_title=input_path.stem,
+            theme_name=self.theme.name,
+            backend_requested="office",
+            backend_used="office",
+            office_runtime=runtime,
+            office_conversion_strategy=office_conversion_strategy,
+            input_pptx=str(input_path),
+        )
+        manifest = _load_preview_manifest(destination)
+
+        visual_regression = self.build_visual_regression_report(
+            preview_paths,
+            destination,
+            base,
+            current_preview_source="input_pptx",
+            current_manifest=manifest,
+        )
         preview_artifact_review = self.build_preview_artifact_review(preview_paths)
 
         return {
@@ -446,6 +591,9 @@ class PreviewRenderer:
             "quality_review": None,
             "preview_artifact_review": preview_artifact_review,
             "visual_regression": visual_regression,
+            "preview_source": "input_pptx",
+            "real_preview": True,
+            "preview_manifest": str(manifest_path),
             "backend_requested": "office",
             "backend_used": "office",
             "backend_fallback_reason": None,
@@ -597,16 +745,43 @@ class PreviewRenderer:
         preview_paths: list[str],
         output_dir: Path,
         base: str,
+        *,
+        current_preview_source: str | None = None,
+        current_manifest: dict[str, object] | None = None,
+        current_manifest_path: str | Path | None = None,
     ) -> dict[str, object] | None:
         if self.baseline_dir is None:
             return None
 
-        baseline_images = _list_preview_images(self.baseline_dir)
+        baseline_images, baseline_manifest = _resolve_preview_sequence(self.baseline_dir)
+        baseline_manifest_path = _preview_manifest_path(self.baseline_dir)
+        resolved_current_manifest_path = (
+            Path(current_manifest_path)
+            if current_manifest_path is not None
+            else _preview_manifest_path(output_dir)
+        )
+        current_source = current_preview_source or (
+            str(current_manifest.get("preview_source")) if current_manifest and current_manifest.get("preview_source") else None
+        )
+        baseline_source = (
+            str(baseline_manifest.get("preview_source"))
+            if baseline_manifest and baseline_manifest.get("preview_source")
+            else None
+        )
+        current_real_preview = _is_real_preview_source(current_source)
+        baseline_real_preview = _is_real_preview_source(baseline_source)
+        if self.require_real_previews and not current_real_preview:
+            raise ValueError("visual regression requires the current preview set to be based on a real PPTX preview")
+        if self.require_real_previews and not baseline_real_preview:
+            raise ValueError("visual regression requires the baseline preview set to be based on a real PPTX preview")
+
         compared = min(len(preview_paths), len(baseline_images))
         diff_images: list[str] = []
         slide_reports: list[dict[str, object]] = []
         diff_count = 0
         missing_baseline_count = max(0, len(preview_paths) - len(baseline_images))
+        extra_baseline_count = max(0, len(baseline_images) - len(preview_paths))
+        source_mismatch = bool(current_source and baseline_source and current_source != baseline_source)
 
         for index in range(compared):
             generated_path = Path(preview_paths[index])
@@ -638,17 +813,25 @@ class PreviewRenderer:
             )
 
         status = "ok"
-        if diff_count or missing_baseline_count:
+        if diff_count or missing_baseline_count or extra_baseline_count or source_mismatch:
             status = "review"
 
         return {
             "status": status,
             "baseline_dir": str(self.baseline_dir),
+            "current_manifest": str(resolved_current_manifest_path) if resolved_current_manifest_path.exists() else None,
+            "baseline_manifest": str(baseline_manifest_path) if baseline_manifest_path.exists() else None,
             "threshold": self.diff_threshold,
             "compared_preview_count": compared,
+            "current_preview_source": current_source,
+            "baseline_preview_source": baseline_source,
+            "current_real_preview": current_real_preview,
+            "baseline_real_preview": baseline_real_preview,
+            "source_mismatch": source_mismatch,
             "baseline_preview_count": len(baseline_images),
             "diff_count": diff_count,
             "missing_baseline_count": missing_baseline_count,
+            "extra_baseline_count": extra_baseline_count,
             "slides": slide_reports,
             "diff_images": diff_images,
         }
@@ -1288,6 +1471,7 @@ def render_previews(
     baseline_dir: str | Path | None = None,
     diff_threshold: float = 0.01,
     write_diff_images: bool = False,
+    require_real_previews: bool = False,
 ) -> dict[str, object]:
     renderer = PreviewRenderer(
         theme_name=theme_name,
@@ -1300,6 +1484,7 @@ def render_previews(
         baseline_dir=baseline_dir,
         diff_threshold=diff_threshold,
         write_diff_images=write_diff_images,
+        require_real_previews=require_real_previews,
     )
     return renderer.render(spec, output_dir, basename=basename)
 
@@ -1313,6 +1498,7 @@ def render_previews_from_pptx(
     baseline_dir: str | Path | None = None,
     diff_threshold: float = 0.01,
     write_diff_images: bool = False,
+    require_real_previews: bool = False,
 ) -> dict[str, object]:
     renderer = PreviewRenderer(
         theme_name=theme_name,
@@ -1320,6 +1506,7 @@ def render_previews_from_pptx(
         diff_threshold=diff_threshold,
         write_diff_images=write_diff_images,
         backend="office",
+        require_real_previews=require_real_previews,
     )
     return renderer.render_pptx_previews(input_pptx, output_dir, basename=basename)
 
@@ -1333,6 +1520,7 @@ def review_pptx_artifact(
     baseline_dir: str | Path | None = None,
     diff_threshold: float = 0.01,
     write_diff_images: bool = False,
+    require_real_previews: bool = False,
 ) -> dict[str, object]:
     preview_result = render_previews_from_pptx(
         input_pptx,
@@ -1342,6 +1530,7 @@ def review_pptx_artifact(
         baseline_dir=baseline_dir,
         diff_threshold=diff_threshold,
         write_diff_images=write_diff_images,
+        require_real_previews=require_real_previews,
     )
     review = review_preview_artifacts(preview_result, input_pptx=str(Path(input_pptx).resolve()))
     return {
@@ -1362,6 +1551,7 @@ def compare_preview_directories(
     basename: str | None = None,
     diff_threshold: float = 0.01,
     write_diff_images: bool = False,
+    require_real_previews: bool = False,
 ) -> dict[str, object]:
     current_root = Path(current_dir).resolve()
     baseline_root = Path(baseline_dir).resolve()
@@ -1372,8 +1562,9 @@ def compare_preview_directories(
     if not baseline_root.exists() or not baseline_root.is_dir():
         raise FileNotFoundError(f"Baseline preview directory not found: {baseline_root}")
 
-    current_images = [str(path) for path in _list_preview_images(current_root)]
-    baseline_images = _list_preview_images(baseline_root)
+    current_images_resolved, current_manifest = _resolve_preview_sequence(current_root)
+    baseline_images, baseline_manifest = _resolve_preview_sequence(baseline_root)
+    current_images = [str(path) for path in current_images_resolved]
     if not current_images:
         raise FileNotFoundError(f"No preview PNGs found in current directory: {current_root}")
     if not baseline_images:
@@ -1387,8 +1578,20 @@ def compare_preview_directories(
         diff_threshold=diff_threshold,
         write_diff_images=write_diff_images,
         backend="synthetic",
+        require_real_previews=require_real_previews,
     )
-    comparison = renderer.build_visual_regression_report(current_images, destination, base)
+    comparison = renderer.build_visual_regression_report(
+        current_images,
+        destination,
+        base,
+        current_preview_source=(
+            str(current_manifest.get("preview_source"))
+            if current_manifest and current_manifest.get("preview_source")
+            else None
+        ),
+        current_manifest=current_manifest,
+        current_manifest_path=_preview_manifest_path(current_root),
+    )
     return {
         "mode": "compare-previews",
         "current_dir": str(current_root),
@@ -1396,6 +1599,10 @@ def compare_preview_directories(
         "output_dir": str(destination),
         "current_preview_count": len(current_images),
         "baseline_preview_count": len(baseline_images),
+        "current_manifest": str(_preview_manifest_path(current_root)) if _preview_manifest_path(current_root).exists() else None,
+        "baseline_manifest": str(_preview_manifest_path(baseline_root)) if _preview_manifest_path(baseline_root).exists() else None,
+        "current_preview_source": current_manifest.get("preview_source") if current_manifest else None,
+        "baseline_preview_source": baseline_manifest.get("preview_source") if baseline_manifest else None,
         "comparison": comparison,
     }
 
@@ -1409,6 +1616,7 @@ def compare_pptx_artifacts(
     basename: str | None = None,
     diff_threshold: float = 0.01,
     write_diff_images: bool = False,
+    require_real_previews: bool = False,
 ) -> dict[str, object]:
     before_path = Path(before_pptx).resolve()
     after_path = Path(after_pptx).resolve()
@@ -1432,6 +1640,7 @@ def compare_pptx_artifacts(
             basename="before",
             diff_threshold=diff_threshold,
             write_diff_images=False,
+            require_real_previews=True,
         )
         after_result = render_previews_from_pptx(
             after_path,
@@ -1440,6 +1649,7 @@ def compare_pptx_artifacts(
             basename="after",
             diff_threshold=diff_threshold,
             write_diff_images=False,
+            require_real_previews=True,
         )
         comparison = compare_preview_directories(
             after_preview_dir,
@@ -1449,6 +1659,7 @@ def compare_pptx_artifacts(
             basename=basename or f"{_safe_basename(after_path.stem)}-vs-{_safe_basename(before_path.stem)}",
             diff_threshold=diff_threshold,
             write_diff_images=write_diff_images,
+            require_real_previews=True,
         )
 
     return {
@@ -1458,6 +1669,8 @@ def compare_pptx_artifacts(
         "output_dir": str(Path(output_dir).resolve()),
         "before_preview_count": before_result["preview_count"],
         "after_preview_count": after_result["preview_count"],
+        "before_preview_manifest": before_result.get("preview_manifest"),
+        "after_preview_manifest": after_result.get("preview_manifest"),
         "before_office_conversion_strategy": before_result.get("office_conversion_strategy"),
         "after_office_conversion_strategy": after_result.get("office_conversion_strategy"),
         "comparison": comparison["comparison"],
@@ -1480,6 +1693,7 @@ def render_previews_for_rendered_artifact(
     baseline_dir: str | Path | None = None,
     diff_threshold: float = 0.01,
     write_diff_images: bool = False,
+    require_real_previews: bool = False,
 ) -> tuple[dict[str, object], str]:
     if rendered_pptx is None:
         return (
@@ -1497,6 +1711,7 @@ def render_previews_for_rendered_artifact(
                 baseline_dir=baseline_dir,
                 diff_threshold=diff_threshold,
                 write_diff_images=write_diff_images,
+                require_real_previews=require_real_previews,
             ),
             "spec",
         )
@@ -1517,6 +1732,7 @@ def render_previews_for_rendered_artifact(
                 baseline_dir=baseline_dir,
                 diff_threshold=diff_threshold,
                 write_diff_images=write_diff_images,
+                require_real_previews=require_real_previews,
             ),
             "spec",
         )
@@ -1531,6 +1747,7 @@ def render_previews_for_rendered_artifact(
                 baseline_dir=baseline_dir,
                 diff_threshold=diff_threshold,
                 write_diff_images=write_diff_images,
+                require_real_previews=require_real_previews,
             ),
             "rendered_pptx",
         )
@@ -1547,6 +1764,7 @@ def render_previews_for_rendered_artifact(
                     baseline_dir=baseline_dir,
                     diff_threshold=diff_threshold,
                     write_diff_images=write_diff_images,
+                    require_real_previews=require_real_previews,
                 ),
                 "rendered_pptx",
             )
@@ -1568,6 +1786,7 @@ def render_previews_for_rendered_artifact(
             baseline_dir=baseline_dir,
             diff_threshold=diff_threshold,
             write_diff_images=write_diff_images,
+            require_real_previews=require_real_previews,
         ),
         "spec",
     )

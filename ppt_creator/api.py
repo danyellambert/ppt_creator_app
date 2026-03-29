@@ -12,6 +12,8 @@ from urllib.parse import parse_qs, urlparse
 
 from pydantic import ValidationError
 
+from ppt_creator_ai.briefing import BriefingInput
+from ppt_creator_ai.providers import get_provider, list_provider_names
 from ppt_creator.assets import get_asset_collection, list_asset_collections
 from ppt_creator.preview import (
     compare_pptx_artifacts,
@@ -377,6 +379,7 @@ def render_spec_payload(
     preview_backend: str = "auto",
     preview_baseline_dir: str | Path | None = None,
     preview_write_diff_images: bool = False,
+    preview_require_real: bool = False,
 ) -> dict[str, object]:
     spec = PresentationInput.model_validate(spec_payload)
     effective_theme = theme_name or spec.presentation.theme
@@ -414,6 +417,7 @@ def render_spec_payload(
                 backend=preview_backend,
                 baseline_dir=preview_baseline_dir,
                 write_diff_images=preview_write_diff_images,
+                require_real_previews=preview_require_real,
             )
         return {
             "mode": "render",
@@ -445,6 +449,7 @@ def render_spec_payload(
             backend=preview_backend,
             baseline_dir=preview_baseline_dir,
             write_diff_images=preview_write_diff_images,
+            require_real_previews=preview_require_real,
         )
     return {
         "mode": "render",
@@ -472,6 +477,7 @@ def review_spec_payload(
     preview_backend: str = "auto",
     preview_baseline_dir: str | Path | None = None,
     preview_write_diff_images: bool = False,
+    preview_require_real: bool = False,
 ) -> dict[str, object]:
     spec = PresentationInput.model_validate(spec_payload)
     review_result = review_presentation(
@@ -500,6 +506,7 @@ def review_spec_payload(
                     backend=preview_backend,
                     baseline_dir=preview_baseline_dir,
                     write_diff_images=preview_write_diff_images,
+                    require_real_previews=preview_require_real,
                 )
         else:
             preview_result, preview_source = render_previews_for_rendered_artifact(
@@ -512,6 +519,7 @@ def review_spec_payload(
                 backend=preview_backend,
                 baseline_dir=preview_baseline_dir,
                 write_diff_images=preview_write_diff_images,
+                require_real_previews=preview_require_real,
             )
         review_result = augment_review_with_preview_artifacts(review_result, preview_result)
     return {
@@ -537,6 +545,7 @@ def preview_spec_payload(
     baseline_dir: str | Path | None = None,
     diff_threshold: float = 0.01,
     write_diff_images: bool = False,
+    require_real_previews: bool = False,
 ) -> dict[str, object]:
     spec = PresentationInput.model_validate(spec_payload)
     effective_theme = theme_name or spec.presentation.theme
@@ -554,6 +563,7 @@ def preview_spec_payload(
         baseline_dir=baseline_dir,
         diff_threshold=diff_threshold,
         write_diff_images=write_diff_images,
+        require_real_previews=require_real_previews,
     )
 
 
@@ -566,6 +576,7 @@ def preview_pptx_payload(
     baseline_dir: str | Path | None = None,
     diff_threshold: float = 0.01,
     write_diff_images: bool = False,
+    require_real_previews: bool = False,
 ) -> dict[str, object]:
     return render_previews_from_pptx(
         input_pptx,
@@ -575,7 +586,34 @@ def preview_pptx_payload(
         baseline_dir=baseline_dir,
         diff_threshold=diff_threshold,
         write_diff_images=write_diff_images,
+        require_real_previews=require_real_previews,
     )
+
+
+def generate_briefing_payload(
+    briefing_payload: dict[str, object],
+    *,
+    provider_name: str = "heuristic",
+    theme_name: str | None = None,
+    feedback_messages: list[str] | None = None,
+) -> dict[str, object]:
+    briefing = BriefingInput.model_validate(briefing_payload)
+    provider = get_provider(provider_name)
+    result = provider.generate(
+        briefing,
+        theme_name=theme_name,
+        feedback_messages=feedback_messages,
+    )
+    spec = PresentationInput.model_validate(result.payload)
+    return {
+        "mode": "generate",
+        "provider": provider.name,
+        "presentation_title": spec.presentation.title,
+        "theme": spec.presentation.theme,
+        "slide_count": len(spec.slides),
+        "payload": spec.model_dump(mode="json"),
+        "analysis": result.analysis,
+    }
 
 
 def review_pptx_payload(
@@ -587,6 +625,7 @@ def review_pptx_payload(
     baseline_dir: str | Path | None = None,
     diff_threshold: float = 0.01,
     write_diff_images: bool = False,
+    require_real_previews: bool = False,
 ) -> dict[str, object]:
     return review_pptx_artifact(
         input_pptx,
@@ -596,6 +635,7 @@ def review_pptx_payload(
         baseline_dir=baseline_dir,
         diff_threshold=diff_threshold,
         write_diff_images=write_diff_images,
+        require_real_previews=require_real_previews,
     )
 
 
@@ -608,6 +648,7 @@ def compare_pptx_payload(
     basename: str | None = None,
     diff_threshold: float = 0.01,
     write_diff_images: bool = False,
+    require_real_previews: bool = False,
 ) -> dict[str, object]:
     return compare_pptx_artifacts(
         before_pptx,
@@ -617,6 +658,7 @@ def compare_pptx_payload(
         basename=basename,
         diff_threshold=diff_threshold,
         write_diff_images=write_diff_images,
+        require_real_previews=require_real_previews,
     )
 
 
@@ -726,6 +768,9 @@ class PptCreatorAPIHandler(BaseHTTPRequestHandler):
                 {"workflows": [get_workflow_preset(name) for name in list_workflow_presets()]},
             )
             return
+        if parsed.path == "/ai/providers":
+            self._json_response(HTTPStatus.OK, {"providers": list_provider_names()})
+            return
         if parsed.path == "/templates":
             self._json_response(HTTPStatus.OK, {"domains": list_template_domains()})
             return
@@ -774,6 +819,7 @@ class PptCreatorAPIHandler(BaseHTTPRequestHandler):
                     preview_backend=str(payload["preview_backend"]) if payload.get("preview_backend") else "auto",
                     preview_baseline_dir=payload.get("preview_baseline_dir"),
                     preview_write_diff_images=bool(payload.get("preview_write_diff_images", False)),
+                    preview_require_real=bool(payload.get("preview_require_real", False)),
                 )
                 self._json_response(HTTPStatus.OK, {"result": result})
                 return
@@ -788,6 +834,7 @@ class PptCreatorAPIHandler(BaseHTTPRequestHandler):
                     preview_backend=str(payload["preview_backend"]) if payload.get("preview_backend") else "auto",
                     preview_baseline_dir=payload.get("preview_baseline_dir"),
                     preview_write_diff_images=bool(payload.get("preview_write_diff_images", False)),
+                    preview_require_real=bool(payload.get("preview_require_real", False)),
                 )
                 self._json_response(HTTPStatus.OK, {"result": result})
                 return
@@ -810,8 +857,56 @@ class PptCreatorAPIHandler(BaseHTTPRequestHandler):
                     baseline_dir=payload.get("baseline_dir"),
                     diff_threshold=float(payload.get("diff_threshold", 0.01)),
                     write_diff_images=bool(payload.get("write_diff_images", False)),
+                    require_real_previews=bool(payload.get("require_real_previews", False)),
                 )
                 self._json_response(HTTPStatus.OK, {"result": result})
+                return
+
+            if self.path == "/generate":
+                briefing_payload = payload.get("briefing") if isinstance(payload.get("briefing"), dict) else payload
+                result = generate_briefing_payload(
+                    briefing_payload,
+                    provider_name=str(payload.get("provider_name") or "heuristic"),
+                    theme_name=str(payload["theme_name"]) if payload.get("theme_name") else None,
+                    feedback_messages=[
+                        str(item) for item in (payload.get("feedback_messages") or []) if str(item).strip()
+                    ],
+                )
+                self._json_response(HTTPStatus.OK, {"result": result})
+                return
+
+            if self.path == "/generate-and-render":
+                if "output_path" not in payload:
+                    raise APIRequestError("'output_path' is required for /generate-and-render")
+                briefing_payload = payload.get("briefing") if isinstance(payload.get("briefing"), dict) else payload
+                generation_result = generate_briefing_payload(
+                    briefing_payload,
+                    provider_name=str(payload.get("provider_name") or "heuristic"),
+                    theme_name=str(payload["theme_name"]) if payload.get("theme_name") else None,
+                    feedback_messages=[
+                        str(item) for item in (payload.get("feedback_messages") or []) if str(item).strip()
+                    ],
+                )
+                render_result = render_spec_payload(
+                    generation_result["payload"],
+                    output_path=str(payload["output_path"]),
+                    theme_name=str(payload["theme_name"]) if payload.get("theme_name") else None,
+                    asset_root=payload.get("asset_root") or default_asset_root,
+                    primary_color=str(payload["primary_color"]) if payload.get("primary_color") else None,
+                    secondary_color=str(payload["secondary_color"]) if payload.get("secondary_color") else None,
+                    dry_run=bool(payload.get("dry_run", False)),
+                    check_assets=bool(payload.get("check_assets", False)),
+                    include_review=bool(payload.get("include_review", False)),
+                    preview_output_dir=payload.get("preview_output_dir"),
+                    preview_backend=str(payload["preview_backend"]) if payload.get("preview_backend") else "auto",
+                    preview_baseline_dir=payload.get("preview_baseline_dir"),
+                    preview_write_diff_images=bool(payload.get("preview_write_diff_images", False)),
+                    preview_require_real=bool(payload.get("preview_require_real", False)),
+                )
+                self._json_response(
+                    HTTPStatus.OK,
+                    {"result": {"generation": generation_result, "render": render_result}},
+                )
                 return
 
             if self.path == "/preview-pptx":
@@ -827,6 +922,7 @@ class PptCreatorAPIHandler(BaseHTTPRequestHandler):
                     baseline_dir=payload.get("baseline_dir"),
                     diff_threshold=float(payload.get("diff_threshold", 0.01)),
                     write_diff_images=bool(payload.get("write_diff_images", False)),
+                    require_real_previews=bool(payload.get("require_real_previews", False)),
                 )
                 self._json_response(HTTPStatus.OK, {"result": result})
                 return
@@ -844,6 +940,7 @@ class PptCreatorAPIHandler(BaseHTTPRequestHandler):
                     baseline_dir=payload.get("baseline_dir"),
                     diff_threshold=float(payload.get("diff_threshold", 0.01)),
                     write_diff_images=bool(payload.get("write_diff_images", False)),
+                    require_real_previews=bool(payload.get("require_real_previews", False)),
                 )
                 self._json_response(HTTPStatus.OK, {"result": result})
                 return
@@ -863,6 +960,7 @@ class PptCreatorAPIHandler(BaseHTTPRequestHandler):
                     basename=str(payload["basename"]) if payload.get("basename") else None,
                     diff_threshold=float(payload.get("diff_threshold", 0.01)),
                     write_diff_images=bool(payload.get("write_diff_images", False)),
+                    require_real_previews=bool(payload.get("require_real_previews", False)),
                 )
                 self._json_response(HTTPStatus.OK, {"result": result})
                 return

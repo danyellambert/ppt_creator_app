@@ -3,6 +3,7 @@
 from ppt_creator.api import (
     build_api_server,
     compare_pptx_payload,
+    generate_briefing_payload,
     preview_spec_payload,
     render_spec_payload,
     review_spec_payload,
@@ -74,6 +75,7 @@ __all__ = [
     "build_api_server",
     "compare_pptx_artifacts",
     "compare_pptx_payload",
+    "generate_briefing_payload",
     "build_domain_template",
     "build_workflow_packet",
     "get_asset_collection",

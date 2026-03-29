@@ -426,6 +426,26 @@ def test_cli_preview_supports_visual_regression_against_baseline(tmp_path: Path)
     assert payload["visual_regression"]["diff_count"] == 0
     assert payload["visual_regression"]["compared_preview_count"] == 10
     assert len(payload["visual_regression"]["diff_images"]) == 10
+    assert payload["visual_regression"]["current_manifest"]
+    assert payload["visual_regression"]["baseline_manifest"]
+    assert payload["visual_regression"]["source_mismatch"] is False
+
+
+def test_cli_preview_require_real_fails_without_office_runtime(tmp_path: Path, monkeypatch) -> None:
+    from ppt_creator import preview as preview_module
+
+    monkeypatch.setattr(preview_module, "find_office_runtime", lambda: None)
+
+    result = main(
+        [
+            "preview",
+            "examples/ai_sales.json",
+            str(tmp_path / "require_real_preview"),
+            "--require-real-previews",
+        ]
+    )
+
+    assert result == 1
 
 
 def test_cli_preview_pptx_generates_pngs_via_office_backend_mock(tmp_path: Path, monkeypatch) -> None:
@@ -576,6 +596,10 @@ def test_cli_compare_pptx_generates_visual_comparison_report(tmp_path: Path, mon
     assert payload["mode"] == "compare-pptx"
     assert payload["comparison"]["status"] == "ok"
     assert payload["comparison"]["diff_count"] == 0
+    assert payload["before_preview_manifest"]
+    assert payload["after_preview_manifest"]
+    assert payload["comparison"]["current_real_preview"] is True
+    assert payload["comparison"]["baseline_real_preview"] is True
 
 
 def test_cli_review_pptx_generates_real_artifact_review_report(tmp_path: Path, monkeypatch) -> None:

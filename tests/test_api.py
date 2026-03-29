@@ -48,11 +48,54 @@ def test_api_health_and_templates_endpoints() -> None:
         assert status == 200
         assert workflows_payload["workflows"]
 
+        status, providers_payload = _request_json(f"{base_url}/ai/providers")
+        assert status == 200
+        assert providers_payload["providers"] == ["heuristic", "local_service"]
+
         req = request.Request(f"{base_url}/playground", method="GET")
         with request.urlopen(req, timeout=5) as response:
             html = response.read().decode("utf-8")
         assert "PPT Creator Playground" in html
         assert "workflowPreset" in html
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
+def test_api_generate_and_generate_and_render_endpoints(tmp_path: Path) -> None:
+    server = build_api_server("127.0.0.1", 0, asset_root="examples")
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    try:
+        base_url = f"http://127.0.0.1:{server.server_address[1]}"
+        briefing_payload = json.loads(Path("examples/briefing_sales.json").read_text(encoding="utf-8"))
+
+        status, generate_payload = _request_json(
+            f"{base_url}/generate",
+            {"briefing": briefing_payload},
+            method="POST",
+        )
+        assert status == 200
+        assert generate_payload["result"]["mode"] == "generate"
+        assert generate_payload["result"]["provider"] == "heuristic"
+        assert generate_payload["result"]["slide_count"] >= 4
+
+        output_path = tmp_path / "generated_from_api.pptx"
+        status, generate_render_payload = _request_json(
+            f"{base_url}/generate-and-render",
+            {
+                "briefing": briefing_payload,
+                "output_path": str(output_path),
+                "include_review": True,
+            },
+            method="POST",
+        )
+        assert status == 200
+        assert generate_render_payload["result"]["generation"]["mode"] == "generate"
+        assert generate_render_payload["result"]["render"]["rendered"] is True
+        assert Path(generate_render_payload["result"]["render"]["output_path"]).exists()
     finally:
         server.shutdown()
         server.server_close()
@@ -188,6 +231,9 @@ def test_api_validate_render_and_template_endpoints(tmp_path: Path) -> None:
         assert status == 200
         assert regression_preview_payload["result"]["visual_regression"] is not None
         assert regression_preview_payload["result"]["visual_regression"]["diff_count"] == 0
+        assert regression_preview_payload["result"]["visual_regression"]["current_manifest"]
+        assert regression_preview_payload["result"]["visual_regression"]["baseline_manifest"]
+        assert regression_preview_payload["result"]["visual_regression"]["source_mismatch"] is False
 
         pptx_path = tmp_path / "api_preview_source.pptx"
         PresentationRenderer(asset_root="examples").render(PresentationInput.model_validate(spec_payload), pptx_path)
@@ -427,6 +473,41 @@ def test_api_compare_pptx_endpoint_generates_visual_comparison(tmp_path: Path) -
         assert comparison_payload["result"]["mode"] == "compare-pptx"
         assert comparison_payload["result"]["comparison"]["status"] == "ok"
         assert comparison_payload["result"]["comparison"]["diff_count"] == 0
+        assert comparison_payload["result"]["before_preview_manifest"]
+        assert comparison_payload["result"]["after_preview_manifest"]
+        assert comparison_payload["result"]["comparison"]["current_real_preview"] is True
+        assert comparison_payload["result"]["comparison"]["baseline_real_preview"] is True
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
+def test_api_preview_can_require_real_previews(tmp_path: Path) -> None:
+    from ppt_creator import preview as preview_module
+
+    server = build_api_server("127.0.0.1", 0, asset_root="examples")
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    try:
+        base_url = f"http://127.0.0.1:{server.server_address[1]}"
+        spec_payload = PresentationInput.from_path("examples/ai_sales.json").model_dump(mode="json")
+        preview_module.find_office_runtime = lambda: None
+
+        try:
+            _request_json(
+                f"{base_url}/preview",
+                {
+                    "spec": spec_payload,
+                    "output_dir": str(tmp_path / "api_require_real_preview"),
+                    "require_real_previews": True,
+                },
+                method="POST",
+            )
+            assert False, "request should fail when real previews are required without office runtime"
+        except Exception as exc:  # noqa: BLE001
+            assert "HTTP Error 500" in str(exc)
     finally:
         server.shutdown()
         server.server_close()

@@ -7,7 +7,14 @@ from PIL import Image, ImageDraw
 from pptx import Presentation
 from pptx.util import Inches
 
-from ppt_creator.preview import PREVIEW_HEIGHT, PREVIEW_WIDTH, PreviewRenderer
+from ppt_creator.preview import (
+    PREVIEW_HEIGHT,
+    PREVIEW_MANIFEST_FILENAME,
+    PREVIEW_WIDTH,
+    PreviewRenderer,
+    compare_preview_directories,
+    render_previews,
+)
 from ppt_creator.renderer import PresentationRenderer
 from ppt_creator.schema import PresentationInput
 
@@ -557,6 +564,49 @@ def test_preview_artifact_review_flags_body_content_near_footer_boundary(tmp_pat
 
     assert review["footer_intrusion_count"] == 1
     assert review["slides"][0]["footer_intrusion_warning"] is True
+
+
+def test_preview_manifest_ignores_unlisted_pngs_during_regression(tmp_path: Path) -> None:
+    spec = PresentationInput.model_validate(
+        {
+            "presentation": {"title": "Manifest deck", "theme": "executive_premium_minimal"},
+            "slides": [{"type": "title", "title": "Only slide"}],
+        }
+    )
+    baseline_dir = tmp_path / "baseline"
+    current_dir = tmp_path / "current"
+    comparison_dir = tmp_path / "comparison"
+
+    render_previews(spec, baseline_dir, basename="baseline-manifest")
+    render_previews(spec, current_dir, basename="current-manifest")
+    Image.new("RGB", (1280, 720), (255, 0, 0)).save(baseline_dir / "stray-extra.png")
+
+    comparison = compare_preview_directories(current_dir, baseline_dir, comparison_dir)
+
+    assert (baseline_dir / PREVIEW_MANIFEST_FILENAME).exists()
+    assert comparison["baseline_preview_count"] == 1
+    assert comparison["comparison"]["extra_baseline_count"] == 0
+    assert comparison["comparison"]["diff_count"] == 0
+
+
+def test_preview_require_real_previews_fails_without_office_runtime(monkeypatch, tmp_path: Path) -> None:
+    from ppt_creator import preview as preview_module
+
+    spec = PresentationInput.model_validate(
+        {
+            "presentation": {"title": "Require real", "theme": "executive_premium_minimal"},
+            "slides": [{"type": "title", "title": "Only slide"}],
+        }
+    )
+    monkeypatch.setattr(preview_module, "find_office_runtime", lambda: None)
+
+    with pytest.raises(RuntimeError, match="real preview was required"):
+        render_previews(
+            spec,
+            tmp_path / "require-real",
+            backend="auto",
+            require_real_previews=True,
+        )
 
 
 def test_preview_image_text_respects_focal_point_when_cover_cropping(tmp_path: Path) -> None:

@@ -74,6 +74,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Write diff images when preview regression is enabled during render",
     )
     render_parser.add_argument(
+        "--preview-require-real",
+        action="store_true",
+        help="Fail preview/regression during render when a real PPTX-based preview cannot be used",
+    )
+    render_parser.add_argument(
         "--preview-report-json",
         help="Optional path to write a JSON preview report when --preview-dir is used",
     )
@@ -120,6 +125,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Write per-slide diff images when running baseline comparison",
     )
+    preview_parser.add_argument(
+        "--require-real-previews",
+        action="store_true",
+        help="Fail when a real PPTX-based preview set is required but only synthetic preview is available",
+    )
     preview_parser.add_argument("--report-json", help="Optional path to write a JSON preview report")
 
     preview_pptx_parser = subparsers.add_parser(
@@ -141,6 +151,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--write-diff-images",
         action="store_true",
         help="Write per-slide diff images when running baseline comparison",
+    )
+    preview_pptx_parser.add_argument(
+        "--require-real-previews",
+        action="store_true",
+        help="Require real PPTX-based preview provenance for regression checks",
     )
     preview_pptx_parser.add_argument("--report-json", help="Optional path to write a JSON PPTX preview report")
 
@@ -164,6 +179,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Write per-slide diff images when running review against a baseline",
     )
+    review_pptx_parser.add_argument(
+        "--require-real-previews",
+        action="store_true",
+        help="Require real PPTX-based preview provenance for regression checks in review-pptx",
+    )
     review_pptx_parser.add_argument("--report-json", help="Optional path to write a JSON PPTX review report")
 
     compare_pptx_parser = subparsers.add_parser(
@@ -185,6 +205,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--write-diff-images",
         action="store_true",
         help="Write per-slide diff images when comparing the two PPTX artifacts",
+    )
+    compare_pptx_parser.add_argument(
+        "--require-real-previews",
+        action="store_true",
+        help="Require real PPTX-based preview provenance for comparison inputs and baseline pairing",
     )
     compare_pptx_parser.add_argument("--report-json", help="Optional path to write a JSON comparison report")
 
@@ -243,6 +268,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--preview-write-diff-images",
         action="store_true",
         help="Write diff images when preview regression is enabled during review",
+    )
+    review_parser.add_argument(
+        "--preview-require-real",
+        action="store_true",
+        help="Fail preview/regression during review when a real PPTX-based preview cannot be used",
     )
     review_parser.add_argument("--report-json", help="Optional path to write a JSON review report")
 
@@ -436,6 +466,7 @@ def review_one(
     preview_backend: str = "auto",
     preview_baseline_dir: str | Path | None = None,
     preview_write_diff_images: bool = False,
+    preview_require_real: bool = False,
 ) -> dict[str, object]:
     input_path = Path(input_json)
     print_info(f"Loading input: {input_path}")
@@ -444,6 +475,7 @@ def review_one(
     result = review_presentation(spec, asset_root=resolved_asset_root, theme_name=theme_name)
     preview_result: dict[str, object] | None = None
     preview_source: str | None = None
+
     if preview_dir:
         if preview_backend != "synthetic":
             with TemporaryDirectory(prefix="ppt_creator_review_preview_") as tmpdir:
@@ -462,6 +494,7 @@ def review_one(
                     backend=preview_backend,
                     baseline_dir=preview_baseline_dir,
                     write_diff_images=preview_write_diff_images,
+                    require_real_previews=preview_require_real,
                 )
         else:
             preview_result, preview_source = render_previews_for_rendered_artifact(
@@ -474,26 +507,21 @@ def review_one(
                 backend=preview_backend,
                 baseline_dir=preview_baseline_dir,
                 write_diff_images=preview_write_diff_images,
+                require_real_previews=preview_require_real,
             )
-    print(
-        f"[OK] Review completed: {result['issue_count']} issue(s), average score {result['average_score']}"
-    )
+
+    print(f"[OK] Review completed: {result['issue_count']} issue(s), average score {result['average_score']}")
     if result["overflow_risk_count"]:
-        print_info(
-            f"Overflow risk heuristics flagged {result['overflow_risk_count']} signal(s) across the deck"
-        )
+        print_info(f"Overflow risk heuristics flagged {result['overflow_risk_count']} signal(s) across the deck")
     if result["clipping_risk_count"]:
-        print_info(
-            f"Clipping risk heuristics flagged {result['clipping_risk_count']} signal(s) across the deck"
-        )
+        print_info(f"Clipping risk heuristics flagged {result['clipping_risk_count']} signal(s) across the deck")
     if result["collision_risk_count"]:
         print_info(
             f"Collision/layout-pressure heuristics flagged {result['collision_risk_count']} signal(s) across the deck"
         )
     if result["balance_warning_count"]:
-        print_info(
-            f"Balance heuristics flagged {result['balance_warning_count']} signal(s) across the deck"
-        )
+        print_info(f"Balance heuristics flagged {result['balance_warning_count']} signal(s) across the deck")
+
     if preview_result is not None:
         result = augment_review_with_preview_artifacts(result, preview_result)
         print_info(
@@ -501,6 +529,7 @@ def review_one(
             f"source={preview_source}, backend={preview_result.get('backend_used')}, "
             f"artifact_status={preview_result.get('preview_artifact_review', {}).get('status')}"
         )
+
     return {
         "input_path": str(input_path),
         "preview_output_dir": str(preview_dir) if preview_dir else None,
@@ -526,6 +555,7 @@ def render_one(
     preview_baseline_dir: str | Path | None = None,
     preview_write_diff_images: bool = False,
     preview_report_json: str | Path | None = None,
+    preview_require_real: bool = False,
 ) -> dict[str, object]:
     input_path = Path(input_json)
     print_info(f"Loading input: {input_path}")
@@ -577,9 +607,11 @@ def render_one(
                 backend=preview_backend,
                 baseline_dir=preview_baseline_dir,
                 write_diff_images=preview_write_diff_images,
+                require_real_previews=preview_require_real,
             )
             if preview_report_json:
                 write_report(preview_report_json, preview_result)
+
         print(f"[OK] Dry run: {input_path} -> {output_path} ({len(spec.slides)} slides)")
         return build_report(
             mode="render",
@@ -610,9 +642,11 @@ def render_one(
             backend=preview_backend,
             baseline_dir=preview_baseline_dir,
             write_diff_images=preview_write_diff_images,
+            require_real_previews=preview_require_real,
         )
         if preview_report_json:
             write_report(preview_report_json, preview_result)
+
     print(f"[OK] Generated deck: {rendered_output} ({len(spec.slides)} slides)")
     return build_report(
         mode="render",
@@ -645,6 +679,7 @@ def preview_one(
     baseline_dir: str | None = None,
     diff_threshold: float = 0.01,
     write_diff_images: bool = False,
+    require_real_previews: bool = False,
 ) -> dict[str, object]:
     input_path = Path(input_json)
     print_info(f"Loading input: {input_path}")
@@ -671,14 +706,12 @@ def preview_one(
         baseline_dir=baseline_dir,
         diff_threshold=diff_threshold,
         write_diff_images=write_diff_images,
+        require_real_previews=require_real_previews,
     )
-    print(
-        f"[OK] Generated previews: {result['preview_count']} slide image(s) + thumbnail sheet"
-    )
+
+    print(f"[OK] Generated previews: {result['preview_count']} slide image(s) + thumbnail sheet")
     if result["quality_review"]["warning_count"]:
-        print_info(
-            f"Preview quality review flagged {result['quality_review']['warning_count']} issue(s)"
-        )
+        print_info(f"Preview quality review flagged {result['quality_review']['warning_count']} issue(s)")
     if result["preview_artifact_review"]["status"] != "ok":
         print_info(
             "Preview artifact review: "
@@ -691,6 +724,9 @@ def preview_one(
             f"{result['visual_regression']['diff_count']} diff(s), "
             f"{result['visual_regression']['missing_baseline_count']} missing baseline(s)"
         )
+        if result["visual_regression"].get("source_mismatch"):
+            print_warning("Preview regression paired preview sets with different provenance; inspect manifest metadata")
+
     return build_preview_report(
         input_path=input_path,
         spec=spec,
@@ -709,6 +745,7 @@ def preview_pptx_one(
     baseline_dir: str | None = None,
     diff_threshold: float = 0.01,
     write_diff_images: bool = False,
+    require_real_previews: bool = False,
 ) -> dict[str, object]:
     input_path = Path(input_pptx)
     output_path = Path(output_dir)
@@ -722,6 +759,7 @@ def preview_pptx_one(
         baseline_dir=baseline_dir,
         diff_threshold=diff_threshold,
         write_diff_images=write_diff_images,
+        require_real_previews=require_real_previews,
     )
     print(f"[OK] Generated PPTX previews: {result['preview_count']} slide image(s) + thumbnail sheet")
     if result["preview_artifact_review"]["status"] != "ok":
@@ -748,6 +786,7 @@ def compare_pptx_one(
     basename: str | None = None,
     diff_threshold: float = 0.01,
     write_diff_images: bool = False,
+    require_real_previews: bool = False,
 ) -> dict[str, object]:
     before_path = Path(before_pptx)
     after_path = Path(after_pptx)
@@ -762,6 +801,7 @@ def compare_pptx_one(
         basename=basename,
         diff_threshold=diff_threshold,
         write_diff_images=write_diff_images,
+        require_real_previews=require_real_previews,
     )
     print(
         "[OK] Compared PPTX artifacts: "
@@ -780,6 +820,7 @@ def review_pptx_one(
     baseline_dir: str | None = None,
     diff_threshold: float = 0.01,
     write_diff_images: bool = False,
+    require_real_previews: bool = False,
 ) -> dict[str, object]:
     input_path = Path(input_pptx)
     output_path = Path(output_dir)
@@ -793,10 +834,9 @@ def review_pptx_one(
         baseline_dir=baseline_dir,
         diff_threshold=diff_threshold,
         write_diff_images=write_diff_images,
+        require_real_previews=require_real_previews,
     )
-    print(
-        f"[OK] PPTX review completed: {result['issue_count']} issue(s), average score {result['average_score']}"
-    )
+    print(f"[OK] PPTX review completed: {result['issue_count']} issue(s), average score {result['average_score']}")
     return result
 
 
@@ -909,6 +949,7 @@ def main(argv: list[str] | None = None) -> int:
                 preview_backend=args.preview_backend,
                 preview_baseline_dir=args.preview_baseline_dir,
                 preview_write_diff_images=args.preview_write_diff_images,
+                preview_require_real=args.preview_require_real,
             )
             if args.report_json:
                 write_report(args.report_json, report)
@@ -929,6 +970,7 @@ def main(argv: list[str] | None = None) -> int:
                 baseline_dir=args.baseline_dir,
                 diff_threshold=args.diff_threshold,
                 write_diff_images=args.write_diff_images,
+                require_real_previews=args.require_real_previews,
             )
             if args.report_json:
                 write_report(args.report_json, report)
@@ -943,6 +985,7 @@ def main(argv: list[str] | None = None) -> int:
                 baseline_dir=args.baseline_dir,
                 diff_threshold=args.diff_threshold,
                 write_diff_images=args.write_diff_images,
+                require_real_previews=args.require_real_previews,
             )
             if args.report_json:
                 write_report(args.report_json, report)
@@ -957,6 +1000,7 @@ def main(argv: list[str] | None = None) -> int:
                 baseline_dir=args.baseline_dir,
                 diff_threshold=args.diff_threshold,
                 write_diff_images=args.write_diff_images,
+                require_real_previews=args.require_real_previews,
             )
             if args.report_json:
                 write_report(args.report_json, report)
@@ -971,6 +1015,7 @@ def main(argv: list[str] | None = None) -> int:
                 basename=args.basename,
                 diff_threshold=args.diff_threshold,
                 write_diff_images=args.write_diff_images,
+                require_real_previews=args.require_real_previews,
             )
             if args.report_json:
                 write_report(args.report_json, report)
@@ -1111,6 +1156,7 @@ def main(argv: list[str] | None = None) -> int:
             preview_baseline_dir=args.preview_baseline_dir,
             preview_write_diff_images=args.preview_write_diff_images,
             preview_report_json=args.preview_report_json,
+            preview_require_real=args.preview_require_real,
         )
         if args.report_json:
             write_report(args.report_json, report)
