@@ -2,7 +2,7 @@
 
 Gerador reutilizável de apresentações `.pptx` a partir de JSON estruturado, com foco em um visual **Executive Premium Minimal**.
 
-> O playground de LLM continua existindo normalmente neste repositório. A documentação original do sandbox está em `README_hf_llm_playground.md`. Este `README.md` documenta o novo componente desacoplado `ppt_creator/`.
+> Este repositório agora representa o **app** `ppt_creator`: ele faz render/review/preview/validate e também pode atuar como **cliente HTTP** de um serviço local persistido de IA. O playground/runtime de modelos foi extraído para o diretório irmão `../hf_local_llm_service`.
 
 ---
 
@@ -62,13 +62,17 @@ Isso significa que:
 - ele não depende de nenhum modelo específico, incluindo PPTAgent
 - o coração dele continua sendo: **JSON estruturado -> `.pptx`**
 
-O repositório ainda contém scripts legados do playground geral de modelos, como `scripts/run_transformers.py`, mas esses arquivos **não fazem parte do núcleo do `ppt_creator`**.
-Por isso, os fluxos de qualidade da Fase 2 passaram a focar no escopo do subprojeto:
+Os fluxos de qualidade da Fase 2 passaram a focar no escopo do subprojeto:
 
 - `ppt_creator/`
 - `tests/`
 
-Existe agora também uma camada **opcional e separada** em `ppt_creator_ai/`, usada para transformar um briefing estruturado em JSON de apresentação. Ela não interfere no núcleo do renderizador.
+Existe agora também uma camada **opcional e separada** em `ppt_creator_ai/`, usada para transformar um briefing estruturado em JSON de apresentação. No app, essa camada ficou reduzida a:
+
+- `heuristic` para geração local sem LLM real
+- `local_service` para delegar a geração ao serviço persistido `hf_local_llm_service`
+
+Ela não interfere no núcleo do renderizador.
 
 Além do tema base, o projeto agora também expõe temas prontos adicionais:
 
@@ -451,21 +455,45 @@ python -m ppt_creator_ai.cli generate examples/briefing_sales.json outputs/brief
 
 Esse fluxo pertence à camada opcional `ppt_creator_ai/` e foi mantido separado do renderizador principal.
 
-Se você quiser também um relatório heurístico com:
+### Providers disponíveis no app
 
-- resumo executivo em bullets
-- sugestões de imagens/placeholders
-- sugestões de imagem mais granulares por slide
-- revisão de densidade dos slides gerados
+Hoje o app expõe apenas dois providers:
 
-rode:
+- `heuristic` → geração local sem LLM real, útil para desenvolvimento e fallback
+- `local_service` → cliente HTTP fino que chama o serviço persistido `hf_local_llm_service`
+
+Listar providers:
+
+```bash
+python -m ppt_creator_ai.cli providers
+```
+
+Usar explicitamente o provider heurístico:
 
 ```bash
 python -m ppt_creator_ai.cli generate examples/briefing_sales.json outputs/briefing_sales_deck.json \
-  --analysis-json outputs/briefing_sales_analysis.json
+  --provider heuristic
 ```
 
-E agora também já dá para fazer um primeiro loop mais integrado de **geração + review + render**:
+Usar o serviço local persistido:
+
+```bash
+export PPT_CREATOR_AI_SERVICE_URL=http://127.0.0.1:8788
+export PPT_CREATOR_AI_SERVICE_PROVIDER=ollama
+export PPT_CREATOR_AI_SERVICE_MODEL=llama3.1
+export PPT_CREATOR_AI_SERVICE_TIMEOUT_SECONDS=180
+
+python -m ppt_creator_ai.cli generate examples/briefing_sales.json outputs/briefing_sales_deck.json \
+  --provider local_service
+```
+
+Esse provider envia o briefing para o diretório irmão `../hf_local_llm_service`, que é o componente persistido responsável por:
+
+- hospedar modelos locais
+- manter `.hf/`, `models/` e runtimes
+- responder JSON compatível com `PresentationInput`
+
+### Fluxo integrado de geração + review + render
 
 ```bash
 python -m ppt_creator_ai.cli generate examples/briefing_sales.json outputs/briefing_sales_deck.json \
@@ -473,46 +501,23 @@ python -m ppt_creator_ai.cli generate examples/briefing_sales.json outputs/brief
   --render-pptx outputs/briefing_sales_deck.pptx
 ```
 
-Isso ajuda a aproximar o fluxo de:
-
-- briefing
-- geração de deck estruturado
-- QA heurístico do deck gerado
-- renderização final em `.pptx`
-
-Também já existe uma primeira camada de **refinamento automático heurístico**:
+Também existe uma camada de **refinamento automático heurístico**:
 
 ```bash
 python -m ppt_creator_ai.cli generate examples/briefing_sales.json outputs/briefing_sales_deck.json \
   --auto-refine --refine-passes 2 --report-json outputs/briefing_sales_generation_report.json
 ```
 
-Esse fluxo tenta:
-
-- gerar o deck inicial
-- rodar review heurístico
-- aplicar um pass de refinamento em slides mais densos
-- reavaliar o deck refinado
-
-Também já existe uma primeira camada de **regeneração automática baseada em feedback do review**:
+E uma camada de **regeneração automática baseada em feedback do review**:
 
 ```bash
 python -m ppt_creator_ai.cli generate examples/briefing_sales.json outputs/briefing_sales_deck.json \
   --auto-regenerate --regenerate-passes 2 --report-json outputs/briefing_sales_regeneration_report.json
 ```
 
-Esse fluxo tenta:
+Quando você também pede `--preview-dir`, o pipeline incorpora sinais visuais vindos do preview. Se o mesmo comando usa `--render-pptx`, ele passa a preferir o preview do `.pptx` final renderizado quando isso fizer sentido para o backend.
 
-- gerar um deck inicial com o provider escolhido
-- rodar review heurístico no deck gerado
-- transformar os principais riscos em mensagens de feedback
-- pedir uma nova geração ao provider com esse feedback
-
-Quando você também pede `--preview-dir`, essa regeneração heurística começa a incorporar sinais vindos do preview visual, como crowding perto do footer, intrusão em safe areas e empacotamento agressivo nas bordas.
-
-Quando o mesmo comando também usa `--render-pptx`, o pipeline opcional agora passa a **preferir automaticamente o preview do `.pptx` final renderizado** em vez do caminho baseado apenas no spec, sempre que isso fizer sentido para o backend escolhido.
-
-E agora você também pode acoplar **preview visual** diretamente nesse pipeline opcional:
+Exemplo com preview visual:
 
 ```bash
 python -m ppt_creator_ai.cli generate examples/briefing_sales.json outputs/briefing_sales_deck.json \
@@ -520,15 +525,7 @@ python -m ppt_creator_ai.cli generate examples/briefing_sales.json outputs/brief
   --preview-report-json outputs/briefing_sales_preview_report.json
 ```
 
-Isso aproxima ainda mais o ciclo de:
-
-- briefing
-- deck estruturado
-- review heurístico
-- preview visual
-- render final
-
-Se você quiser que esse preview venha do **`.pptx` final renderizado**, em vez do caminho baseado no JSON/spec, já existe um fluxo explícito para isso no pipeline opcional:
+E, se você quiser preview a partir do `.pptx` final:
 
 ```bash
 python -m ppt_creator_ai.cli generate examples/briefing_sales.json outputs/briefing_sales_deck.json \
@@ -536,111 +533,6 @@ python -m ppt_creator_ai.cli generate examples/briefing_sales.json outputs/brief
   --preview-dir outputs/briefing_sales_real_previews \
   --preview-from-rendered-pptx
 ```
-
-Você também pode listar os providers disponíveis da camada opcional:
-
-```bash
-python -m ppt_creator_ai.cli providers
-```
-
-E escolher explicitamente o provider usado no pipeline:
-
-```bash
-python -m ppt_creator_ai.cli generate examples/briefing_sales.json outputs/briefing_sales_deck.json \
-  --provider heuristic
-```
-
-Também existe agora um provider opcional para **Ollama local**:
-
-```bash
-python -m ppt_creator_ai.cli generate examples/briefing_sales.json outputs/briefing_sales_deck.json \
-  --provider ollama
-```
-
-Variáveis úteis:
-
-```bash
-export PPT_CREATOR_AI_OLLAMA_BASE_URL=http://127.0.0.1:11434
-export PPT_CREATOR_AI_OLLAMA_MODEL=llama3.1
-export PPT_CREATOR_AI_OLLAMA_CTX_SIZE=8192
-export PPT_CREATOR_AI_OLLAMA_TEMPERATURE=0.2
-export PPT_CREATOR_AI_OLLAMA_TIMEOUT_SECONDS=180
-export PPT_CREATOR_AI_OLLAMA_RAW_OUTPUT_PATH=outputs/ollama_raw_output.txt
-```
-
-Pré-requisito típico:
-
-```bash
-ollama serve
-ollama pull llama3.1
-```
-
-Também já existem providers remotos opcionais para **OpenAI** e **Anthropic**:
-
-```bash
-python -m ppt_creator_ai.cli generate examples/briefing_sales.json outputs/briefing_sales_deck.json \
-  --provider openai
-
-python -m ppt_creator_ai.cli generate examples/briefing_sales.json outputs/briefing_sales_deck.json \
-  --provider anthropic
-```
-
-Variáveis úteis do OpenAI:
-
-```bash
-export OPENAI_API_KEY=...
-export PPT_CREATOR_AI_OPENAI_MODEL=gpt-4o-mini
-export PPT_CREATOR_AI_OPENAI_TIMEOUT_SECONDS=180
-export PPT_CREATOR_AI_OPENAI_RAW_OUTPUT_PATH=outputs/openai_raw_output.txt
-```
-
-Variáveis úteis do Anthropic:
-
-```bash
-export ANTHROPIC_API_KEY=...
-export PPT_CREATOR_AI_ANTHROPIC_MODEL=claude-3-5-haiku-latest
-export PPT_CREATOR_AI_ANTHROPIC_TIMEOUT_SECONDS=180
-export PPT_CREATOR_AI_ANTHROPIC_RAW_OUTPUT_PATH=outputs/anthropic_raw_output.txt
-```
-
-Se você quiser usar o seu GGUF local com `llama.cpp`/`llama-cli`, já existe um provider preparado para isso:
-
-```bash
-python -m ppt_creator_ai.cli generate examples/briefing_sales.json outputs/briefing_sales_deck.json \
-  --provider pptagent_local
-```
-
-Por padrão ele tenta resolver um modelo contendo `PPTAgent` dentro de `models/`. Você pode controlar isso com variáveis de ambiente:
-
-```bash
-export PPT_CREATOR_AI_GGUF_MODEL=PPTAgent
-export PPT_CREATOR_AI_CTX_SIZE=8192
-export PPT_CREATOR_AI_MAX_TOKENS=1800
-export PPT_CREATOR_AI_GPU_LAYERS=-1
-export PPT_CREATOR_AI_TEMPERATURE=0.2
-export PPT_CREATOR_AI_TIMEOUT_SECONDS=180
-```
-
-Pré-requisito:
-
-```bash
-brew install llama.cpp
-```
-
-O provider local agora força modo **não conversacional** (`--no-conversation`) e `--simple-io` para evitar que o `llama-cli` fique preso esperando input interativo no final da geração. Se quiser guardar a saída bruta do modelo para debug:
-
-Ele também passa a **preferir `llama-completion`** quando esse binário estiver disponível, porque algumas instalações locais do `llama.cpp` aceitam melhor o fluxo one-shot nele do que no `llama-cli`.
-
-```bash
-export PPT_CREATOR_AI_RAW_OUTPUT_PATH=outputs/pptagent_raw_output.txt
-```
-
-Os comandos da CLI agora também emitem logs mais claros com prefixos como:
-
-- `[INFO]`
-- `[OK]`
-- `[WARN]`
-- `[ERROR]`
 
 Gerar previews PNG por slide e uma folha de thumbnails:
 
@@ -738,12 +630,15 @@ python -m ppt_creator.api --host 127.0.0.1 --port 8787 --asset-root examples
 Endpoints disponíveis:
 
 - `GET /health`
+- `GET /ai/providers`
 - `GET /templates`
 - `GET /profiles`
 - `GET /assets`
 - `GET /workflows`
 - `GET /artifact`
 - `POST /compare-pptx`
+- `POST /generate`
+- `POST /generate-and-render`
 - `POST /review`
 - `POST /preview`
 - `POST /validate`
@@ -752,6 +647,16 @@ Endpoints disponíveis:
 - `POST /workflow-template`
 
 O endpoint `POST /render` também pode receber `include_review: true` para devolver a revisão heurística junto com o resultado do render/dry-run.
+
+Os endpoints novos do app para geração funcionam assim:
+
+- `POST /generate` → recebe um briefing, usa o provider configurado e devolve o JSON estruturado
+- `POST /generate-and-render` → recebe um briefing, gera o JSON e já renderiza o `.pptx`
+
+Isso permite que o app atue ao mesmo tempo como:
+
+- **servidor stateless** para operações de deck
+- **cliente HTTP** do serviço local persistido de IA
 
 Também já existe um playground/editor local bem inicial servindo HTML em:
 
@@ -927,13 +832,7 @@ Essa camada tenta:
 
 Ela **não depende de LLM** nesta fase: é um gerador heurístico, útil como ponto de partida para pipelines futuros.
 
-Para preparar a futura entrada de LLM real, a camada opcional agora já possui uma interface de provider. Hoje existe apenas o provider `heuristic`, mas a arquitetura foi organizada para receber providers futuros sem acoplar o núcleo do `ppt_creator`.
-
-Ela agora já inclui tanto um provider local via GGUF/`llama.cpp` quanto um provider local via **Ollama**, permitindo experimentar modelos locais sem depender de APIs externas.
-
-Também já existem providers remotos opcionais para **OpenAI** e **Anthropic**, mantendo a mesma interface de provider da camada opcional.
-
-Além disso, a CLI dessa camada opcional já começa a suportar um primeiro fluxo mais próximo de pipeline completo, com geração, revisão e renderização em sequência.
+Para preparar a futura entrada de LLM real, a camada opcional do app ficou com uma interface de provider enxuta. O runtime/model serving real foi extraído para o serviço persistido `hf_local_llm_service`, mantendo o núcleo do `ppt_creator` desacoplado da infraestrutura de modelos.
 
 ## Evolução visual e QA
 
@@ -1038,7 +937,7 @@ Também já existe um caminho opcional para pedir ao provider uma **crítica sli
 
 ```bash
 python -m ppt_creator_ai.cli generate examples/briefing_sales.json outputs/briefing_sales_deck.json \
-  --provider openai \
+  --provider local_service \
   --llm-critique-json outputs/briefing_sales_llm_critiques.json
 ```
 

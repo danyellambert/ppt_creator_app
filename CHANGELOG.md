@@ -7,6 +7,8 @@ The format is inspired by Keep a Changelog, and the project aims to follow Seman
 ## [Unreleased]
 
 ### Added
+- strong split between app and model runtime responsibilities: the app now uses a thin `local_service` HTTP provider while a sibling `hf_local_llm_service/` directory hosts the persisted model-serving layer
+- app API generation endpoints (`GET /ai/providers`, `POST /generate`, `POST /generate-and-render`) so the app can act both as stateless deck server and as orchestrator/client for the persisted local AI service
 - constrained panel-grid rollout extended into `metrics`, `comparison`, `faq`, and `summary`, improving fixed/flexible region control in more executive layouts
 - constrained semantic layout primitives for fixed/flexible columns and rows, including `target_share`, `max_width`, and `max_height` support in the renderer core
 - stronger semantic balancing rollout in `title`, `section`, `chart`, and `timeline`, reducing rigid splits and letting narrative/chart/sidebar regions keep more stable proportions

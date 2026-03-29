@@ -1,4 +1,4 @@
-PYTHON ?= /Users/danyellambert/hf_llm_playground/.conda-env/bin/python
+PYTHON ?= $(CURDIR)/.conda-env/bin/python
 PIP := $(PYTHON) -m pip
 PYTEST := $(PYTHON) -m pytest
 RUFF := $(PYTHON) -m ruff

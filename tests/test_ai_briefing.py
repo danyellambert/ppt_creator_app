@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import json
+from urllib import error
+
 from ppt_creator.schema import PresentationInput
 from ppt_creator_ai.briefing import (
     BriefingInput,
@@ -123,27 +126,64 @@ def test_briefing_freeform_text_can_generate_valid_presentation() -> None:
     assert any(slide.type.value == "summary" for slide in spec.slides)
 
 
-def test_provider_registry_exposes_heuristic_provider() -> None:
-    assert list_provider_names() == ["anthropic", "heuristic", "ollama", "openai", "pptagent_local"]
-    provider = get_provider("heuristic")
-    assert provider.name == "heuristic"
+def test_provider_registry_exposes_heuristic_and_local_service() -> None:
+    assert list_provider_names() == ["heuristic", "local_service"]
+    assert get_provider("heuristic").name == "heuristic"
+    assert get_provider("local_service").name == "local_service"
+    assert get_provider("service").name == "local_service"
+    assert get_provider("hf_local_llm_service").name == "local_service"
 
 
-def test_provider_registry_exposes_anthropic_provider() -> None:
-    provider = get_provider("anthropic")
-    assert provider.name == "anthropic"
+def test_local_service_provider_surfaces_connection_error(monkeypatch) -> None:
+    provider = get_provider("local_service")
+
+    def _url_error(*args, **kwargs):
+        raise error.URLError("connection refused")
+
+    monkeypatch.setattr("urllib.request.urlopen", _url_error)
+
+    try:
+        provider.generate(BriefingInput.from_path("examples/briefing_sales.json"))
+    except RuntimeError as exc:
+        assert "hf_local_llm_service" in str(exc)
+    else:
+        raise AssertionError("Expected RuntimeError when hf_local_llm_service is unreachable")
 
 
-def test_provider_registry_exposes_ollama_provider() -> None:
-    provider = get_provider("ollama")
-    assert provider.name == "ollama"
+def test_local_service_provider_normalizes_mocked_payload(monkeypatch) -> None:
+    provider = get_provider("local_service")
+    briefing = BriefingInput.from_path("examples/briefing_sales.json")
 
+    response_payload = {
+        "provider_name": "ollama",
+        "payload": {
+            "presentation": {
+                "title": "AI copilots for sales teams",
+                "theme": "executive_premium_minimal",
+            },
+            "slides": [
+                {"type": "title", "title": "AI copilots for sales teams"},
+                {"type": "agenda", "title": "Agenda", "bullets": ["Context", "Decision"]},
+                {"type": "closing", "title": "Closing", "quote": "Done."},
+            ],
+        },
+        "analysis": {"provider": "ollama"},
+    }
 
-def test_provider_registry_exposes_openai_provider() -> None:
-    provider = get_provider("openai")
-    assert provider.name == "openai"
+    class _Response:
+        def __enter__(self):
+            return self
 
+        def __exit__(self, exc_type, exc, tb):
+            return False
 
-def test_provider_registry_exposes_local_pptagent_provider() -> None:
-    provider = get_provider("pptagent_local")
-    assert provider.name == "pptagent_local"
+        def read(self) -> bytes:
+            return json.dumps(response_payload).encode("utf-8")
+
+    monkeypatch.setattr("urllib.request.urlopen", lambda *args, **kwargs: _Response())
+
+    result = provider.generate(briefing)
+
+    spec = PresentationInput.model_validate(result.payload)
+    assert result.provider_name == "ollama"
+    assert spec.presentation.title == "AI copilots for sales teams"

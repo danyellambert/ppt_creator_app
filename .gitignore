@@ -1,12 +1,17 @@
 .DS_Store
 
 # Local sandbox environment
+.conda-env
 .conda-env/
+.hf
 .hf/
 
 # Downloaded models and runtime artifacts
+models
 models/*
 !models/.gitkeep
+tmp
+outputs
 outputs/*
 !outputs/.gitkeep
 tmp/*
