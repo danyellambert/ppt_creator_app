@@ -105,30 +105,30 @@ Esses são os itens de maior impacto percebido.
 - [x] salvar manifesto de preview por execução
 - [x] usar manifesto para ordenar/comparar previews
 - [x] exigir preview real via CLI/API quando necessário
-- [ ] tornar o preview derivado do `.pptx` real o caminho **padrão recomendado** em toda a documentação e nos fluxos de regressão mais críticos
-- [ ] adicionar workflow explícito de **promote baseline** / refresh de golden previews
-- [ ] adicionar modo de **falha por regressão** para CI/pipeline (`fail on diff`)
-- [ ] destacar melhor nos relatórios:
-  - [ ] slides adicionados/removidos
-  - [ ] top diffs por severidade
-  - [ ] mismatch de provenance com guidance acionável
-- [ ] permitir comparação entre conjuntos com labels / metadata mais legíveis para debugging
+- [x] tornar o preview derivado do `.pptx` real o caminho **padrão recomendado** em toda a documentação e nos fluxos de regressão mais críticos
+- [x] adicionar workflow explícito de **promote baseline** / refresh de golden previews
+- [x] adicionar modo de **falha por regressão** para CI/pipeline (`fail on diff`)
+- [x] destacar melhor nos relatórios:
+  - [x] slides adicionados/removidos
+  - [x] top diffs por severidade
+  - [x] mismatch de provenance com guidance acionável
+- [x] permitir comparação entre conjuntos com labels / metadata mais legíveis para debugging
 
 ### 3.2. Detectores visuais mais fortes
 
-- [ ] evoluir heurísticas para algo mais próximo de colisão/clipping real
-- [ ] detectar melhor:
-  - [ ] overflow em caixas compostas
-  - [ ] clipping perto de footer
-  - [ ] crowding em cantos e safe areas
-  - [ ] colisões entre blocos em layouts compostos
+- [x] evoluir heurísticas para algo mais próximo de colisão/clipping real
+- [x] detectar melhor:
+  - [x] overflow em caixas compostas
+  - [x] clipping perto de footer
+  - [x] crowding em cantos e safe areas
+  - [x] colisões entre blocos em layouts compostos
 - [ ] adicionar sinais mais fortes específicos para:
-  - [ ] `summary`
-  - [ ] `comparison`
-  - [ ] `two_column`
-  - [ ] `table`
-  - [ ] `faq`
-  - [ ] `metrics`
+  - [x] `summary`
+  - [x] `comparison`
+  - [x] `two_column`
+  - [x] `table`
+  - [x] `faq`
+  - [x] `metrics`
 
 ---
 
@@ -138,17 +138,17 @@ O motor já está forte, mas ainda falta acabamento sistemático.
 
 ### 4.1. Rebalance e auto-fit em layouts compostos
 
-- [ ] criar um renderer compartilhado para famílias parecidas (`comparison` / `two_column`) para reduzir drift visual
-- [ ] adicionar uma segunda passada de rebalance quando o shrink de texto ficar agressivo
-- [ ] expandir auto-fit real para caixas compostas e painéis complexos
-- [ ] balancear melhor alturas e colunas em:
-  - [ ] `comparison`
-  - [ ] `two_column`
-  - [ ] `summary`
-  - [ ] `table`
-  - [ ] `faq`
-  - [ ] `metrics`
-  - [ ] `closing`
+- [x] criar um renderer compartilhado para famílias parecidas (`comparison` / `two_column`) para reduzir drift visual
+- [x] adicionar uma segunda passada de rebalance quando o shrink de texto ficar agressivo
+- [x] expandir auto-fit real para caixas compostas e painéis complexos
+- [x] balancear melhor alturas e colunas em:
+  - [x] `comparison`
+  - [x] `two_column`
+  - [x] `summary`
+  - [x] `table`
+  - [x] `faq`
+  - [x] `metrics`
+  - [x] `closing`
 
 ### 4.2. Baselines e anchors semânticos
 
@@ -163,14 +163,14 @@ O motor já está forte, mas ainda falta acabamento sistemático.
 
 ### 4.3. Revisão visual slide a slide
 
-- [ ] revisar detalhadamente `title`
-- [ ] revisar detalhadamente `metrics`
-- [ ] revisar detalhadamente `comparison`
-- [ ] revisar detalhadamente `two_column`
-- [ ] revisar detalhadamente `table`
-- [ ] revisar detalhadamente `faq`
-- [ ] revisar detalhadamente `summary`
-- [ ] revisar detalhadamente `closing`
+- [x] revisar detalhadamente `title`
+- [x] revisar detalhadamente `metrics`
+- [x] revisar detalhadamente `comparison`
+- [x] revisar detalhadamente `two_column`
+- [x] revisar detalhadamente `table`
+- [x] revisar detalhadamente `faq`
+- [x] revisar detalhadamente `summary`
+- [x] revisar detalhadamente `closing`
 
 ---
 
@@ -186,18 +186,18 @@ O motor já está forte, mas ainda falta acabamento sistemático.
 ### 5.2. Placeholders mais premium
 
 - [x] primeira evolução do placeholder estruturado
-- [ ] criar placeholders contextuais por tipo de slide
-- [ ] diferenciar melhor placeholder de:
-  - [ ] foto
-  - [ ] screenshot
-  - [ ] diagrama
-  - [ ] gráfico/visual analítico
+- [x] criar placeholders contextuais por tipo de slide
+- [x] diferenciar melhor placeholder de:
+  - [x] foto
+  - [x] screenshot
+  - [x] diagrama
+  - [x] gráfico/visual analítico
 
 ### 5.3. Asset pipeline
 
 - [ ] brand packs reutilizáveis com logo/cor/footer/cover style
-- [ ] presets de assets visuais por domínio/workflow
-- [ ] sugestões mais contextuais de imagem por slide e narrativa
+- [x] presets de assets visuais por domínio/workflow
+- [x] sugestões mais contextuais de imagem por slide e narrativa
 
 ---
 
@@ -212,21 +212,21 @@ Hoje o app é poderoso, mas ainda muito centrado em JSON.
 - [x] persistência local de estado no navegador
 - [ ] live preview / live review sem tanta fricção
 - [ ] UX melhor de “editar -> revisar -> ajustar -> exportar”
-- [ ] cards visuais para artifacts/reports no playground
-- [ ] erros de validação com foco mais acionável por campo/bloco
-- [ ] abrir e comparar versões do deck mais facilmente no playground
+- [x] cards visuais para artifacts/reports no playground
+- [x] erros de validação com foco mais acionável por campo/bloco
+- [x] abrir e comparar versões do deck mais facilmente no playground
 
 ### 6.2. Editor visual leve
 
-- [ ] editor visual leve para os casos mais comuns
-- [ ] edição guiada de:
-  - [ ] title/subtitle/body
-  - [ ] bullets
-  - [ ] metrics
-  - [ ] comparison columns
-  - [ ] table rows
-  - [ ] FAQ items
-- [ ] sem substituir o JSON, mas reduzindo atrito para uso diário
+- [x] editor visual leve para os casos mais comuns
+- [x] edição guiada de:
+  - [x] title/subtitle/body
+  - [x] bullets
+  - [x] metrics
+  - [x] comparison columns
+  - [x] table rows
+  - [x] FAQ items
+- [x] sem substituir o JSON, mas reduzindo atrito para uso diário
 
 ---
 
@@ -235,34 +235,35 @@ Hoje o app é poderoso, mas ainda muito centrado em JSON.
 ### 7.1. Release e distribuição
 
 - [x] CI / lint / Makefile / changelog
-- [ ] pipeline de release formal
-- [ ] publicação consistente do pacote
-- [ ] estratégia de versionamento e releases mais operacional
+- [x] pipeline de release formal
+- [x] publicação consistente do pacote
+- [x] estratégia de versionamento e releases mais operacional
 
 ### 7.2. Documentação e prova visual
 
-- [ ] README com galeria visual real de decks gerados
-- [ ] screenshots / exemplos visuais por layout
-- [ ] docs específicas para:
-  - [ ] preview provenance
-  - [ ] visual regression
-  - [ ] compare-pptx
-  - [ ] review-pptx
-  - [ ] baseline management
-- [ ] mais exemplos end-to-end por workflow real:
-  - [ ] sales QBR
-  - [ ] board strategy review
-  - [ ] product operating review
-  - [ ] consulting steerco
+- [x] README com galeria visual real de decks gerados
+- [x] screenshots / exemplos visuais por layout
+- [x] docs específicas para:
+  - [x] preview provenance
+  - [x] visual regression
+  - [x] compare-pptx
+  - [x] review-pptx
+  - [x] baseline management
+- [x] docs específicas para a camada AI opcional e seu boundary com o app
+- [x] mais exemplos end-to-end por workflow real:
+  - [x] sales QBR
+  - [x] board strategy review
+  - [x] product operating review
+  - [x] consulting steerco
 
 ### 7.3. Posicionamento do produto
 
-- [ ] deixar mais explícito se o produto é:
-  - [ ] library
-  - [ ] CLI tool
-  - [ ] local service
-  - [ ] app com playground
-- [ ] documentar a arquitetura “core renderer vs AI service” de forma mais honesta e estável
+- [x] deixar mais explícito se o produto é:
+  - [x] library
+  - [x] CLI tool
+  - [x] local service
+  - [x] app com playground
+- [x] documentar a arquitetura “core renderer vs AI service” de forma mais honesta e estável
 
 ---
 
@@ -281,20 +282,93 @@ IA continua opcional. O core deve seguir desacoplado.
 ### 8.2. O que ainda falta
 
 - [ ] decidir e documentar melhor a fronteira do app:
-  - [ ] manter providers reais só atrás de `local_service`
+  - [x] manter providers reais só atrás de `local_service`
   - [ ] ou expor providers first-class no próprio app
-- [ ] hardening mais profundo de integrações reais
-- [ ] retries / timeout / structured errors melhores
+- [x] hardening mais profundo de integrações reais
+- [x] retries / timeout / structured errors melhores
 - [ ] reescrita executiva mais forte para slides fracos
-- [ ] loop iterativo com critério de parada mais claro:
-  - [ ] briefing
-  - [ ] geração
-  - [ ] render
-  - [ ] QA visual
-  - [ ] crítica
-  - [ ] revisão opcional
-  - [ ] nova iteração
-- [ ] exemplos e docs melhores da camada AI opcional
+- [x] loop iterativo com critério de parada mais claro:
+  - [x] briefing
+  - [x] geração
+  - [x] render
+  - [x] QA visual
+  - [x] crítica
+  - [x] revisão opcional
+  - [x] nova iteração
+- [x] exemplos e docs melhores da camada AI opcional
+
+### 8.3. Direção decidida para prompts livres e providers model-backed
+
+- [x] `ai_first` passa a ser o caminho principal para `intent_text` / prompt livre
+- [x] a heurística não deve ser o caminho padrão quando o objetivo for autoria por IA
+- [x] a heurística permanece como fallback de segurança, não como trajetória principal
+- [x] quando `provider_name` não for informado em prompt livre, o app deve preferir um provider model-backed (`local_service` no backend)
+- [x] no playground, providers model-backed devem aparecer como caminho preferencial de uso
+- [x] `ollama_local` passa a existir como provider first-class no app
+- [x] `ollama_local` precisa permitir listar modelos disponíveis e selecionar explicitamente um deles
+
+Evoluções que ainda valem depois desta decisão:
+
+- [ ] medir a taxa de fallback heurístico por provider/modelo
+- [ ] benchmark comparativo entre `ollama_local` e `local_service` para prompts livres
+- [ ] endurecer ainda mais o repair loop antes do fallback heurístico
+
+### 8.4. Hardening universal de qualidade AI sem overfitting por tipo de deck
+
+Direção decidida para não perder o raciocínio:
+
+- [x] priorizar **sinais universais de qualidade** em vez de hacks específicos para um único tipo de deck
+- [x] evitar overfitting de entrevista / board / sales como solução principal
+- [x] melhorar a qualidade por meio de **guardrails generalizáveis** de narrativa, evidência, consistência de idioma e anti-template leakage
+
+Princípios universais que valem para muitos decks:
+
+- [x] bloquear vazamento de scaffolding/template copy no output final
+  - [x] evitar textos default como `Executive lens`, `What matters`, `Key takeaways`, `Next actions`, `Candidate Name`
+  - [x] evitar labels técnicos/placeholder gritados no artefato final quando faltarem imagens
+- [x] reforçar **specificity over template feel**
+  - [x] títulos e bullets devem reutilizar o vocabulário do briefing
+  - [x] claims fortes devem vir acompanhados de alguma forma de evidência
+- [x] reforçar **evidence-bearing structures**
+  - [x] quando houver claims de impacto/capacidade/valor, preferir métricas, chart, tabela, comparison, timeline, case cards ou detalhe operacional concreto
+- [x] bloquear **pseudo-métricas qualitativas fracas**
+  - [x] exemplos: `Alta`, `Otimizada`, `Contínua`, `Strong`, `Optimized`, `Accelerated`
+- [x] manter consistência de idioma no output final
+  - [x] se o briefing está em PT-BR, evitar rótulos soltos em inglês sem necessidade
+- [x] pensar em arquétipos amplos de deck, não hacks estreitos
+  - [x] decision deck
+  - [x] review deck
+  - [x] strategy deck
+  - [x] profile/hiring deck
+  - [x] proposal deck
+  - [x] operating deck
+
+Backlog derivado desta linha:
+
+- [x] adicionar guardrails universais no contrato/prompt para anti-template leakage e consistência de idioma
+- [x] endurecer o quality gate para detectar scaffolding copy e métricas qualitativas fracas
+- [x] reduzir textos default do renderer que poluem o deck final
+- [x] medir “specificity score” mais explicitamente no quality gate
+- [x] medir “claim sem prova” de forma mais robusta
+- [x] transformar os domínios atuais em arquétipos narrativos mais amplos e reaproveitáveis
+
+Detalhamento do que entrou nesta iteração:
+
+- [x] `specificity score` v1 baseado em cobertura ponderada de vocabulário do briefing no payload final
+- [x] detecção v1 de `claim sem prova` considerando pressão de claims vs slides/strings com evidência
+- [x] introdução de arquétipos narrativos amplos reutilizáveis:
+  - [x] `decision`
+  - [x] `review`
+  - [x] `strategy`
+  - [x] `profile`
+  - [x] `proposal`
+  - [x] `operating`
+
+O que ainda pode evoluir depois disso:
+
+- [ ] calibrar thresholds do `specificity score` com benchmark maior por provider/modelo
+- [ ] sofisticar a detecção de `claim sem prova` para usar relações slide-a-slide e não só heurística textual/estrutural
+- [ ] usar arquétipos também no loop de refine/review para orientar regeneração e crítica
 
 ---
 
@@ -324,13 +398,13 @@ IA continua opcional. O core deve seguir desacoplado.
 
 Podemos considerar que o app atingiu esse nível quando:
 
-- [ ] o preview/regressão usa o artefato final com confiança alta
+- [x] o preview/regressão usa o artefato final com confiança alta
 - [ ] os principais layouts saem quase sem retoque manual
-- [ ] o review aponta primeiro os slides realmente arriscados
+- [x] o review aponta primeiro os slides realmente arriscados
 - [ ] o playground permite iteração rápida sem dor
-- [ ] novos decks podem ser gerados por template/workflow sem mexer em código
-- [ ] a documentação visual prova a qualidade do resultado
-- [ ] o app pode ser reutilizado como library, CLI ou service com pouco atrito
+- [x] novos decks podem ser gerados por template/workflow sem mexer em código
+- [x] a documentação visual prova a qualidade do resultado
+- [x] o app pode ser reutilizado como library, CLI ou service com pouco atrito
 
 ---
 
@@ -791,18 +865,18 @@ Resultado histórico esperado: o projeto passava a ter potencial de **copiloto d
 - [x] exportar preview PNG por slide
 - [x] gerar thumbnails automáticos do deck
 - [x] suportar gráficos simples gerados por dados
-- [ ] suportar tabelas executivas com estilo consistente
+- [x] suportar tabelas executivas com estilo consistente
 - [ ] biblioteca de componentes visuais reutilizáveis
 - [ ] marketplace interno de temas/layouts
 - [ ] integração com workflow de propostas/comercial
 - [x] modo API/serviço
-- [ ] editor visual futuro para montar JSON com menos fricção
+- [x] editor visual futuro para montar JSON com menos fricção
 
 #### Plano exaustivo de melhoria de máximo impacto preservado
 
 ##### Prioridade 1 — Fidelidade de preview e QA visual
 
-- [ ] preview gerado a partir do `.pptx`/PDF real
+- [x] preview gerado a partir do `.pptx`/PDF real
 - [x] thumbnail sheet mais forte para inspeção visual
 - [x] overlays de debug para analisar composição
 - [x] revisão heurística inicial de qualidade
@@ -824,7 +898,7 @@ Resultado histórico esperado: o projeto passava a ter potencial de **copiloto d
 - [ ] auto-fit real de texto por caixa
   - [x] primeira camada aplicada em caixas homogêneas críticas
   - [x] expansão inicial para layouts executivos com risco maior de densidade/overflow
-  - [ ] expansão para caixas compostas, grids e painéis complexos
+  - [x] expansão para caixas compostas, grids e painéis complexos
 - [ ] balanceamento automático de alturas e colunas
   - [x] primeira camada guiada por peso de conteúdo em layouts executivos chave
   - [ ] expandir para regras mais fortes e consistentes em todo o sistema
@@ -832,12 +906,12 @@ Resultado histórico esperado: o projeto passava a ter potencial de **copiloto d
 
 ##### Prioridade 3 — Polimento visual por layout
 
-- [ ] revisão detalhada de `title`
-- [ ] revisão detalhada de `metrics`
-- [ ] revisão detalhada de `comparison` e `two_column`
-- [ ] revisão detalhada de `table`
-- [ ] revisão detalhada de `faq`
-- [ ] revisão detalhada de `summary` e `closing`
+- [x] revisão detalhada de `title`
+- [x] revisão detalhada de `metrics`
+- [x] revisão detalhada de `comparison` e `two_column`
+- [x] revisão detalhada de `table`
+- [x] revisão detalhada de `faq`
+- [x] revisão detalhada de `summary` e `closing`
 
 ##### Prioridade 4 — Pipeline de imagens e placeholders
 
@@ -863,7 +937,7 @@ Resultado histórico esperado: o projeto passava a ter potencial de **copiloto d
 
 ##### Prioridade 6 — Produto / experiência de uso
 
-- [ ] editor visual leve
+- [x] editor visual leve
 - [x] playground local para gerar/editar/re-renderizar decks
 - [x] playground local mais robusto com bootstrap de template/perfil e controles operacionais básicos
 - [x] perfis de público (board, consulting, sales, product)

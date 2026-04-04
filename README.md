@@ -429,7 +429,23 @@ Também já existe uma primeira **biblioteca de collections de assets** e perfis
 
 ```bash
 python -m ppt_creator.cli profiles
+python -m ppt_creator.cli brand-packs
 python -m ppt_creator.cli assets
+```
+
+Os **brand packs** ajudam a productizar melhor o uso recorrente do app, combinando:
+
+- tema default
+- footer/client naming
+- cores primária/secundária
+- cover eyebrow/layout preference
+- coleções de assets recomendadas
+
+Aplicar um brand pack a um starter template:
+
+```bash
+python -m ppt_creator.cli template sales outputs/sales_board_template.json \
+  --brand-pack board_navy
 ```
 
 Agora também existe uma biblioteca inicial de **workflows operacionais/comerciais** para bootstrap mais rápido de decks recorrentes:
@@ -443,9 +459,31 @@ Esses workflows combinam:
 
 - domínio base do starter template
 - perfil de público recomendado
+- brand pack default quando fizer sentido
 - coleções de assets sugeridas
 - backend de preview preferido
 - caminhos padrão para `.pptx`, previews e reports
+
+Os packets de workflow agora também carregam uma **recomendação operacional explícita de preview/regressão**, incluindo:
+
+- backend sugerido
+- se o fluxo deve exigir preview real (`rendered_pptx`) por padrão
+- diretório baseline recomendado
+- sequência crítica sugerida (`render -> preview-pptx -> compare/review-pptx -> promote-baseline`)
+- guidance de provenance para evitar diffs ambíguos
+
+Também existe agora um **template packet** para fluxos de bootstrap por domínio, com:
+
+- `asset_collections` recomendadas por domínio/brand pack
+- `slide_asset_suggestions` por slide/tipo narrativo
+- sugestão inicial de `visual_type` (`photo`, `screenshot`, `diagram`, `analytical_visual`)
+
+Você também pode sobrescrever o brand pack do workflow no bootstrap:
+
+```bash
+python -m ppt_creator.cli workflow-template sales_qbr outputs/sales_qbr_template.json \
+  --brand-pack sales_pipeline
+```
 
 Gerar JSON inicial a partir de um briefing estruturado:
 
@@ -480,7 +518,7 @@ Usar o serviço local persistido:
 ```bash
 export PPT_CREATOR_AI_SERVICE_URL=http://127.0.0.1:8788
 export PPT_CREATOR_AI_SERVICE_PROVIDER=ollama
-export PPT_CREATOR_AI_SERVICE_MODEL=llama3.1
+export PPT_CREATOR_AI_SERVICE_MODEL=nemotron-3-nano:30b-cloud
 export PPT_CREATOR_AI_SERVICE_TIMEOUT_SECONDS=180
 
 python -m ppt_creator_ai.cli generate examples/briefing_sales.json outputs/briefing_sales_deck.json \
@@ -491,7 +529,31 @@ Esse provider envia o briefing para o diretório irmão `../hf_local_llm_service
 
 - hospedar modelos locais
 - manter `.hf/`, `models/` e runtimes
-- responder JSON compatível com `PresentationInput`
+- responder inferência genérica por `POST /v1/generate`
+
+O app agora envia para esse serviço um prompt estruturado + **generation contract** explícito, recebe texto/JSON bruto e faz o parsing/validação do deck no próprio app.
+
+Esse contract inclui:
+
+- tipos de slide suportados
+- variantes de layout conhecidas
+- regras de densidade executiva
+- exigência de `JSON-only` com `type` por slide
+
+Na prática isso reduz bastante o risco de o LLM devolver JSON incompleto ou fora do schema.
+
+Em teste direto contra o Ollama local com `nemotron-3-nano:30b-cloud`, a resposta crua em JSON tende a ainda omitir campos como `type` em slides. O caminho mais robusto agora é: **Ollama externo + `hf_local_llm_service` via `/v1/generate` + generation contract + validação Pydantic no app**.
+
+Também existe agora um benchmark automatizado para testar diversidade e robustez do fluxo prompt->deck:
+
+```bash
+python -m ppt_creator_ai.cli benchmark outputs/ai_benchmark \
+  --provider local_service \
+  --write-json-decks \
+  --report-json outputs/ai_benchmark/report.json
+```
+
+Isso é útil especialmente para validar o comportamento do modelo `nemotron-3-nano:30b-cloud` sem acoplar Ollama dentro do app.
 
 ### Fluxo integrado de geração + review + render
 
@@ -586,6 +648,39 @@ python -m ppt_creator.cli preview examples/ai_sales.json outputs/previews \
 
 Isso permite comparar os previews atuais contra um diretório baseline, gerar scores de diferença por slide e opcionalmente salvar imagens de diff para inspeção.
 
+Se você quiser transformar isso em um gate operacional, agora também existe um modo explícito para **falhar quando houver regressão**:
+
+```bash
+python -m ppt_creator.cli preview examples/ai_sales.json outputs/previews \
+  --baseline-dir outputs/golden-previews --fail-on-regression
+```
+
+O relatório de regressão agora também passou a destacar:
+
+- `added_slide_numbers`
+- `removed_slide_numbers`
+- `top_regressions`
+- `guidance`
+
+Isso ajuda a entender mais rapidamente se o problema foi:
+
+- diferença visual real
+- mudança no número de slides
+- baseline desatualizado
+- mismatch de provenance entre preview atual e baseline
+
+Também já existe um comando explícito para **promover um conjunto de previews para baseline**:
+
+```bash
+python -m ppt_creator.cli promote-baseline outputs/previews outputs/golden-previews
+```
+
+Por padrão ele limpa o baseline anterior e copia:
+
+- os PNGs de preview
+- a thumbnail sheet
+- o `preview-manifest.json`
+
 Também já existe um caminho explícito para gerar preview a partir de um **`.pptx` real**:
 
 ```bash
@@ -619,6 +714,37 @@ python -m ppt_creator.cli compare-pptx outputs/v1.pptx outputs/v2.pptx outputs/c
 
 Isso ajuda a transformar a regressão visual em algo mais operacional quando você quer comparar duas versões renderizadas do deck, não só um baseline manual de PNGs.
 
+Se quiser usar esse fluxo como verificação obrigatória:
+
+```bash
+python -m ppt_creator.cli compare-pptx outputs/v1.pptx outputs/v2.pptx outputs/compare_v1_v2 \
+  --fail-on-regression
+```
+
+### Fluxo recomendado para regressão crítica e baseline management
+
+Este agora deve ser tratado como o **caminho padrão recomendado** para checks críticos de qualidade visual e sign-off:
+
+Para checks mais confiáveis, a ordem recomendada agora é:
+
+1. renderizar o `.pptx` final
+2. gerar preview real com `preview-pptx` quando possível
+3. comparar versões renderizadas com `compare-pptx`
+4. revisar `guidance`, `top_regressions`, `added_slide_numbers` e `removed_slide_numbers`
+5. só então promover o conjunto aprovado com `promote-baseline`
+
+Exemplo completo:
+
+```bash
+python -m ppt_creator.cli render examples/ai_sales.json outputs/ai_sales.pptx
+python -m ppt_creator.cli preview-pptx outputs/ai_sales.pptx outputs/ai_sales_real_previews
+python -m ppt_creator.cli compare-pptx outputs/baseline.pptx outputs/ai_sales.pptx outputs/compare_ai_sales \
+  --write-diff-images --report-json outputs/compare_ai_sales_report.json
+python -m ppt_creator.cli promote-baseline outputs/ai_sales_real_previews outputs/golden-previews
+```
+
+Esse fluxo preserva melhor a provenance do preview e reduz ambiguidades na hora de depurar diferenças reais vs. baselines desatualizados.
+
 ## Modo API / serviço
 
 Também existe um modo HTTP simples para integrar o `ppt_creator` em outros fluxos:
@@ -632,6 +758,7 @@ Endpoints disponíveis:
 - `GET /health`
 - `GET /ai/providers`
 - `GET /templates`
+- `GET /brand-packs`
 - `GET /profiles`
 - `GET /assets`
 - `GET /workflows`
@@ -666,12 +793,115 @@ Ele agora permite:
 
 - colar/editar JSON diretamente
 - carregar starter templates por domínio/perfil
+- aplicar brand packs direto no bootstrap do template/workflow
 - carregar workflows operacionais prontos
 - persistir o estado local do playground no navegador
 - escolher backend/baseline de preview
+- exigir preview real e fail-on-regression direto da interface quando quiser transformar o review em gate operacional
 - abrir artefatos gerados e thumbnail sheets direto da interface
 - navegar por uma galeria simples dos previews gerados
+- mostrar cards com guidance/top regressions/slide set changes quando existe regressão visual
 - acionar validate/review/preview/render diretamente contra a API local
+- editar rapidamente slides comuns via **guided editor** sem mexer no JSON bruto para tudo
+- promover o preview atual para baseline direto da interface
+
+O guided editor já ajuda em casos comuns como:
+
+- `title` / `subtitle` / `eyebrow` / `body`
+- `bullets`
+- `metrics`
+- `comparison` / `two_column`
+- `table`
+- `faq`
+- `timeline`
+
+Isso já cobre os casos mais comuns de um **editor visual leve**, sem substituir o JSON bruto.
+
+## Documentação operacional rápida
+
+- `docs/preview-provenance.md`
+- `docs/visual-regression.md`
+- `docs/compare-pptx.md`
+- `docs/review-pptx.md`
+- `docs/baseline-management.md`
+- `docs/ai-layer.md`
+
+## Galeria visual real
+
+O repositório agora também consegue gerar automaticamente uma galeria visual real dos decks e layouts suportados:
+
+```bash
+make gallery
+```
+
+Miniaturas geradas:
+
+### AI sales
+
+![AI sales gallery](docs/gallery/ai_sales/ai_sales-thumbnails.png)
+
+### Sales QBR
+
+![Sales QBR gallery](docs/gallery/sales_qbr/sales_qbr-thumbnails.png)
+
+### Board strategy review
+
+![Board strategy review gallery](docs/gallery/board_strategy_review/board_strategy_review-thumbnails.png)
+
+### Product operating review
+
+![Product operating review gallery](docs/gallery/product_operating_review/product_operating_review-thumbnails.png)
+
+### Consulting steerco
+
+![Consulting steerco gallery](docs/gallery/consulting_steerco/consulting_steerco-thumbnails.png)
+
+### Layout showcase
+
+![Layout showcase gallery](docs/gallery/layout_showcase/layout_showcase-thumbnails.png)
+
+## Auditoria automatizada de layouts
+
+Para automatizar a revisão slide a slide dos layouts mais sensíveis, agora existe:
+
+```bash
+make layout-audit
+```
+
+Esse fluxo gera um report em:
+
+- `docs/layout_audit/report.json`
+- `docs/layout_audit/report.md`
+
+Ele audita automaticamente pelo menos:
+
+- `title`
+- `metrics`
+- `comparison`
+- `two_column`
+- `table`
+- `faq`
+- `summary`
+- `closing`
+
+## Release e distribuição
+
+O projeto agora também inclui entrypoints instaláveis e um pipeline formal de distribuição.
+
+Entry points:
+
+- `ppt-creator`
+- `ppt-creator-ai`
+
+Comandos úteis:
+
+```bash
+make build-dist
+make check-dist
+make release-smoke
+```
+
+Também existe um workflow de release em `.github/workflows/release.yml` para build, validação, smoke test e publicação via tag `v*`.
 
 Exemplo de validação por API:
 
@@ -704,6 +934,8 @@ Ou com helper:
 bash bin/render_ppt_creator_docker.sh examples/ai_sales.json outputs/ai_sales.pptx
 ```
 
+O container do app continua **enxuto**: ele inclui apenas `ppt_creator` e `ppt_creator_ai`, mas não empacota Ollama nem o `hf_local_llm_service`.
+
 ---
 
 ## Como gerar o deck de exemplo
@@ -722,12 +954,25 @@ Exemplos adicionais disponíveis:
 
 - `examples/product_strategy.json`
 - `examples/board_review.json`
+- `examples/sales_qbr.json`
+- `examples/board_strategy_review.json`
+- `examples/product_operating_review.json`
+- `examples/consulting_steerco.json`
+- `examples/layout_showcase.json`
 
 Você também pode renderizar todos com:
 
 ```bash
 make render-all-examples
 ```
+
+Esses exemplos adicionais cobrem fluxos mais reais de:
+
+- sales QBR
+- board strategy review
+- product operating review
+- consulting steerco
+- showcase visual de layouts suportados
 
 ---
 
