@@ -14,10 +14,16 @@ dependencies = [
   "pydantic>=2.6,<3.0",
 ]
 
+[project.scripts]
+ppt-creator = "ppt_creator.cli:main"
+ppt-creator-ai = "ppt_creator_ai.cli:main"
+
 [project.optional-dependencies]
 dev = [
+  "build>=1.2,<2.0",
   "pytest>=8.0,<9.0",
   "ruff>=0.12,<0.13",
+  "twine>=5.0,<6.0",
 ]
 
 [tool.setuptools.packages.find]

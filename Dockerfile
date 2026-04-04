@@ -4,7 +4,7 @@ WORKDIR /app
 
 COPY pyproject.toml README.md /app/
 COPY ppt_creator /app/ppt_creator
-COPY examples /app/examples
+COPY ppt_creator_ai /app/ppt_creator_ai
 
 RUN pip install --no-cache-dir .
 
