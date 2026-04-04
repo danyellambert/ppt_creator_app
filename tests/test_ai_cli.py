@@ -32,7 +32,29 @@ def test_ai_cli_lists_available_providers(tmp_path: Path, capsys) -> None:
 
     payload = json.loads(report.read_text(encoding="utf-8"))
     provider_names = [provider["name"] for provider in payload["providers"]]
-    assert provider_names == ["heuristic", "local_service"]
+    assert provider_names == ["heuristic", "local_service", "ollama_local"]
+
+
+def test_ai_cli_can_run_benchmark_and_emit_report(tmp_path: Path) -> None:
+    output_dir = tmp_path / "benchmark_outputs"
+    report = tmp_path / "benchmark_report.json"
+
+    result = main([
+        "benchmark",
+        str(output_dir),
+        "--provider",
+        "heuristic",
+        "--write-json-decks",
+        "--report-json",
+        str(report),
+    ])
+
+    assert result == 0
+    payload = json.loads(report.read_text(encoding="utf-8"))
+    assert payload["scenario_count"] >= 4
+    assert payload["successful_generations"] == payload["scenario_count"]
+    assert payload["unique_slide_type_count"] >= 8
+    assert (output_dir / "sales_qbr_prompt.json").exists()
 
 
 def test_ai_cli_can_write_analysis_report(tmp_path: Path) -> None:
@@ -160,6 +182,7 @@ def test_ai_cli_can_auto_regenerate_generated_deck(tmp_path: Path, monkeypatch) 
     output_payload = json.loads(output.read_text(encoding="utf-8"))
     report_payload = json.loads(report.read_text(encoding="utf-8"))
     assert report_payload["auto_regenerate_applied"] is True
+    assert report_payload["regenerate_passes_completed"] >= 1
     assert output_payload["slides"][1]["body"] == "Tighter intro for an executive audience."
 
 
@@ -214,6 +237,7 @@ def test_ai_cli_auto_regenerate_can_use_preview_feedback(tmp_path: Path, monkeyp
     assert any("safe" in message.lower() or "footer" in message.lower() or "corner" in message.lower() for message in seen_feedback_messages)
     report_payload = json.loads(report.read_text(encoding="utf-8"))
     assert report_payload["auto_regenerate_applied"] is True
+    _ = json.loads((tmp_path / "generated_preview_feedback_report.json").read_text(encoding="utf-8")) if (tmp_path / "generated_preview_feedback_report.json").exists() else {}
 
 
 def test_ai_cli_can_run_service_backed_review_after_qa(tmp_path: Path, monkeypatch) -> None:
@@ -256,7 +280,51 @@ def test_ai_cli_can_run_service_backed_review_after_qa(tmp_path: Path, monkeypat
     output_payload = json.loads(output.read_text(encoding="utf-8"))
     report_payload = json.loads(report.read_text(encoding="utf-8"))
     assert report_payload["auto_llm_review_applied"] is True
+    assert report_payload["llm_review_passes_completed"] >= 1
     assert output_payload["slides"][1]["body"] == "Sharper intro for the decision meeting."
+
+
+def test_ai_cli_analysis_report_includes_iteration_decisions(tmp_path: Path, monkeypatch) -> None:
+    output = tmp_path / "generated_iteration_deck.json"
+    analysis = tmp_path / "generated_iteration_analysis.json"
+    provider = get_provider("heuristic")
+
+    noisy_payload = {
+        "presentation": {"title": "AI copilots for sales teams", "theme": "executive_premium_minimal"},
+        "slides": [
+            {"type": "title", "title": "AI copilots for sales teams"},
+            {"type": "agenda", "title": "Agenda", "body": "Dense intro", "bullets": ["Too many words"] * 5},
+            {"type": "closing", "title": "Closing", "quote": "Done."},
+        ],
+    }
+    improved_payload = {
+        "presentation": {"title": "AI copilots for sales teams", "theme": "executive_premium_minimal"},
+        "slides": [
+            {"type": "title", "title": "AI copilots for sales teams"},
+            {"type": "agenda", "title": "Agenda", "body": "Sharper intro", "bullets": ["Context", "Pilot scope", "Decision", "Metrics"]},
+            {"type": "closing", "title": "Closing", "quote": "Done."},
+        ],
+    }
+
+    def _generate(briefing, theme_name=None, feedback_messages=None):
+        payload = improved_payload if feedback_messages else noisy_payload
+        return BriefingGenerationResult(provider_name="heuristic", payload=payload, analysis={"image_suggestions": ["sales leadership dashboard"], "density_review": {"status": "review", "warning_count": 1, "warnings": ["dense"], "slides": []}})
+
+    monkeypatch.setattr(provider, "generate", _generate)
+
+    result = main([
+        "generate",
+        "examples/briefing_sales.json",
+        str(output),
+        "--auto-regenerate",
+        "--analysis-json",
+        str(analysis),
+    ])
+
+    assert result == 0
+    analysis_payload = json.loads(analysis.read_text(encoding="utf-8"))
+    assert analysis_payload["regeneration_history"]
+    assert analysis_payload["regeneration_history"][0]["decision"]
 
 
 def test_ai_cli_can_emit_service_backed_slide_critiques(tmp_path: Path, monkeypatch) -> None:

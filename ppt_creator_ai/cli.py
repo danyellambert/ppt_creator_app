@@ -20,6 +20,7 @@ from ppt_creator_ai.briefing import (
     build_generation_feedback_from_review,
     build_slide_critiques_from_review,
 )
+from ppt_creator_ai.evals import run_generation_benchmark
 from ppt_creator_ai.providers import get_provider, list_provider_names
 from ppt_creator_ai.refine import refine_presentation_input
 
@@ -121,6 +122,25 @@ def build_parser() -> argparse.ArgumentParser:
     )
     generate_parser.add_argument("--report-json", help="Optional path to write a JSON generation report")
 
+    benchmark_parser = subparsers.add_parser(
+        "benchmark",
+        help="Run a prompt-to-deck benchmark across built-in briefing scenarios",
+    )
+    benchmark_parser.add_argument("output_dir", help="Directory to store optional generated deck JSON artifacts")
+    benchmark_parser.add_argument(
+        "--provider",
+        default="heuristic",
+        choices=list_provider_names(),
+        help="Provider used during the benchmark run",
+    )
+    benchmark_parser.add_argument("--theme", help="Optional theme override applied to every benchmark scenario")
+    benchmark_parser.add_argument(
+        "--write-json-decks",
+        action="store_true",
+        help="Persist each generated deck JSON in the benchmark output directory",
+    )
+    benchmark_parser.add_argument("--report-json", help="Optional path to write the benchmark report JSON")
+
     providers_parser = subparsers.add_parser("providers", help="List available briefing providers")
     providers_parser.add_argument("--report-json", help="Optional path to write a JSON provider report")
     return parser
@@ -182,6 +202,52 @@ def _preview_feedback_score(preview_result: dict[str, object] | None) -> float |
         + float(visual_regression.get("diff_count") or 0) * 4.0
         + float(quality_review.get("warning_count") or quality_review.get("issue_count") or 0) * 0.5
     )
+
+
+def _iteration_stop_reason(
+    *,
+    before_issue_count: int,
+    after_issue_count: int,
+    before_average_score: int,
+    after_average_score: int,
+    before_preview_score: float | None,
+    after_preview_score: float | None,
+    payload_changed: bool,
+) -> tuple[bool, str]:
+    if after_issue_count < before_issue_count:
+        return True, "issue_count_improved"
+    if after_average_score > before_average_score:
+        return True, "average_score_improved"
+    if (
+        before_preview_score is not None
+        and after_preview_score is not None
+        and after_preview_score < before_preview_score
+    ):
+        return True, "preview_score_improved"
+    if (
+        payload_changed
+        and after_issue_count <= before_issue_count
+        and after_average_score >= before_average_score
+        and (
+            before_preview_score is None
+            or after_preview_score is None
+            or after_preview_score <= before_preview_score
+        )
+    ):
+        return True, "payload_changed_without_regression"
+    if not payload_changed:
+        return False, "no_payload_change"
+    if after_issue_count > before_issue_count:
+        return False, "issue_count_regressed"
+    if after_average_score < before_average_score:
+        return False, "average_score_regressed"
+    if (
+        before_preview_score is not None
+        and after_preview_score is not None
+        and after_preview_score > before_preview_score
+    ):
+        return False, "preview_score_regressed"
+    return False, "no_material_improvement"
 
 
 def _build_preview_feedback_for_spec(
@@ -327,25 +393,16 @@ def generate_from_briefing(
                     "after_preview_score": candidate_preview_score,
                 }
             )
-            improved = (
-                candidate_review["issue_count"] < current_review["issue_count"]
-                or candidate_review["average_score"] > current_review["average_score"]
-                or (
-                    current_preview_score is not None
-                    and candidate_preview_score is not None
-                    and candidate_preview_score < current_preview_score
-                )
-                or (
-                    payload_changed
-                    and candidate_review["issue_count"] <= current_review["issue_count"]
-                    and candidate_review["average_score"] >= current_review["average_score"]
-                    and (
-                        current_preview_score is None
-                        or candidate_preview_score is None
-                        or candidate_preview_score <= current_preview_score
-                    )
-                )
+            improved, stop_reason = _iteration_stop_reason(
+                before_issue_count=current_review["issue_count"],
+                after_issue_count=candidate_review["issue_count"],
+                before_average_score=current_review["average_score"],
+                after_average_score=candidate_review["average_score"],
+                before_preview_score=current_preview_score,
+                after_preview_score=candidate_preview_score,
+                payload_changed=payload_changed,
             )
+            regeneration_history[-1]["decision"] = stop_reason
             if not improved:
                 break
             current_result = candidate_result
@@ -411,25 +468,16 @@ def generate_from_briefing(
                 }
             )
             payload_changed = candidate_spec.model_dump(mode="json") != current_spec.model_dump(mode="json")
-            improved = (
-                candidate_review["issue_count"] < current_review["issue_count"]
-                or candidate_review["average_score"] > current_review["average_score"]
-                or (
-                    current_preview_score is not None
-                    and candidate_preview_score is not None
-                    and candidate_preview_score < current_preview_score
-                )
-                or (
-                    payload_changed
-                    and candidate_review["issue_count"] <= current_review["issue_count"]
-                    and candidate_review["average_score"] >= current_review["average_score"]
-                    and (
-                        current_preview_score is None
-                        or candidate_preview_score is None
-                        or candidate_preview_score <= current_preview_score
-                    )
-                )
+            improved, stop_reason = _iteration_stop_reason(
+                before_issue_count=current_review["issue_count"],
+                after_issue_count=candidate_review["issue_count"],
+                before_average_score=current_review["average_score"],
+                after_average_score=candidate_review["average_score"],
+                before_preview_score=current_preview_score,
+                after_preview_score=candidate_preview_score,
+                payload_changed=payload_changed,
             )
+            refinement_history[-1]["decision"] = stop_reason
             if not improved:
                 break
             current_spec = candidate_spec
@@ -511,25 +559,16 @@ def generate_from_briefing(
                     "after_preview_score": candidate_preview_score,
                 }
             )
-            improved = (
-                candidate_review["issue_count"] < current_review["issue_count"]
-                or candidate_review["average_score"] > current_review["average_score"]
-                or (
-                    current_preview_score is not None
-                    and candidate_preview_score is not None
-                    and candidate_preview_score < current_preview_score
-                )
-                or (
-                    payload_changed
-                    and candidate_review["issue_count"] <= current_review["issue_count"]
-                    and candidate_review["average_score"] >= current_review["average_score"]
-                    and (
-                        current_preview_score is None
-                        or candidate_preview_score is None
-                        or candidate_preview_score <= current_preview_score
-                    )
-                )
+            improved, stop_reason = _iteration_stop_reason(
+                before_issue_count=current_review["issue_count"],
+                after_issue_count=candidate_review["issue_count"],
+                before_average_score=current_review["average_score"],
+                after_average_score=candidate_review["average_score"],
+                before_preview_score=current_preview_score,
+                after_preview_score=candidate_preview_score,
+                payload_changed=payload_changed,
             )
+            llm_review_history[-1]["decision"] = stop_reason
             if not improved:
                 break
 
@@ -698,6 +737,21 @@ def main(argv: list[str] | None = None) -> int:
             result = list_providers()
             if args.report_json:
                 write_json(args.report_json, result)
+            return 0
+
+        if args.command == "benchmark":
+            result = run_generation_benchmark(
+                args.output_dir,
+                provider_name=args.provider,
+                theme_name=args.theme,
+                write_json_decks=args.write_json_decks,
+            )
+            if args.report_json:
+                write_json(args.report_json, result)
+            print(
+                f"[OK] Benchmark finished: {result['successful_generations']}/{result['scenario_count']} scenarios valid; "
+                f"{result['unique_slide_type_count']} unique slide types covered"
+            )
             return 0
 
         result = generate_from_briefing(
