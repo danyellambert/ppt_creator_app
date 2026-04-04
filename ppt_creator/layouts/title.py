@@ -62,6 +62,7 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
 
     logo_asset = renderer.resolve_brand_logo(meta)
     cover_asset = renderer.resolve_asset(slide_spec.image_path)
+    focal_x, focal_y = renderer.resolve_image_focal_point(slide_spec)
 
     if variant == "hero_cover":
         renderer.add_accent_bar(slide, g.content_left, 0.78, g.content_width, 0.08, color=colors.accent)
@@ -133,8 +134,8 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
                 top=1.6,
                 width=panel_width,
                 height=3.7,
-                focal_x=slide_spec.image_focal_x,
-                focal_y=slide_spec.image_focal_y,
+                focal_x=focal_x,
+                focal_y=focal_y,
             )
             renderer.add_panel(
                 slide,
@@ -266,8 +267,8 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
             top=1.05,
             width=panel_width,
             height=4.65,
-            focal_x=slide_spec.image_focal_x,
-            focal_y=slide_spec.image_focal_y,
+            focal_x=focal_x,
+            focal_y=focal_y,
         )
         renderer.add_panel(
             slide,

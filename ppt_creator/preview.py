@@ -11,7 +11,7 @@ from PIL import Image, ImageChops, ImageDraw, ImageFont, ImageOps, ImageStat
 from pptx import Presentation
 
 from ppt_creator.qa import review_presentation, review_preview_artifacts
-from ppt_creator.renderer import PresentationRenderer
+from ppt_creator.renderer import PresentationRenderer, infer_contextual_image_focal_point
 from ppt_creator.schema import PresentationInput, PresentationMeta, Slide, SlideType
 from ppt_creator.theme import get_theme
 
@@ -1212,6 +1212,7 @@ class PreviewRenderer:
         colors = self.theme.colors
         variant = slide_spec.layout_variant or "split_panel"
         asset = self.resolve_asset(slide_spec.image_path)
+        focal_x, focal_y = infer_contextual_image_focal_point(slide_spec)
         if variant == "hero_cover":
             draw.rectangle((92, 72, 1188, 82), fill=_rgb_tuple(colors.accent))
             top = self._render_heading(draw, slide_spec, eyebrow_default=meta.client_name or meta.subtitle)
@@ -1225,10 +1226,7 @@ class PreviewRenderer:
                     loaded,
                     (288, 310),
                     method=resampling,
-                    centering=(
-                        slide_spec.image_focal_x if slide_spec.image_focal_x is not None else 0.5,
-                        slide_spec.image_focal_y if slide_spec.image_focal_y is not None else 0.5,
-                    ),
+                    centering=(focal_x, focal_y),
                 )
                 image.paste(fitted, (900, 150))
                 self._draw_panel(draw, (916, 352, 1172, 452))
@@ -1261,10 +1259,7 @@ class PreviewRenderer:
                 loaded,
                 (310, 350),
                 method=resampling,
-                centering=(
-                    slide_spec.image_focal_x if slide_spec.image_focal_x is not None else 0.5,
-                    slide_spec.image_focal_y if slide_spec.image_focal_y is not None else 0.5,
-                ),
+                centering=(focal_x, focal_y),
             )
             image.paste(fitted, (860, 120))
             self._draw_panel(draw, (880, 356, 1150, 456))
@@ -1455,6 +1450,7 @@ class PreviewRenderer:
 
         box = (760, 220, 1188, 520)
         asset = self.resolve_asset(slide_spec.image_path)
+        focal_x, focal_y = infer_contextual_image_focal_point(slide_spec)
         if asset:
             loaded = Image.open(asset).convert("RGB")
             resampling = getattr(getattr(Image, "Resampling", Image), "LANCZOS")
@@ -1462,10 +1458,7 @@ class PreviewRenderer:
                 loaded,
                 (box[2] - box[0], box[3] - box[1]),
                 method=resampling,
-                centering=(
-                    slide_spec.image_focal_x if slide_spec.image_focal_x is not None else 0.5,
-                    slide_spec.image_focal_y if slide_spec.image_focal_y is not None else 0.5,
-                ),
+                centering=(focal_x, focal_y),
             )
             image.paste(fitted, (box[0], box[1]))
         else:
@@ -1557,19 +1550,51 @@ class PreviewRenderer:
 
     def _render_summary(self, draw: ImageDraw.ImageDraw, image: Image.Image, slide_spec: Slide, meta: PresentationMeta) -> None:
         top = self._render_heading(draw, slide_spec, eyebrow_default="Executive summary") + 20
+        asset = self.resolve_asset(slide_spec.image_path)
+        focal_x, focal_y = infer_contextual_image_focal_point(slide_spec)
+
+        body_box = (92, top, 700, top + 120)
+        bullet_panel = (820, 220, 1188, 520)
+        if asset:
+            loaded = Image.open(asset).convert("RGB")
+            resampling = getattr(getattr(Image, "Resampling", Image), "LANCZOS")
+            fitted = ImageOps.fit(
+                loaded,
+                (292, 320),
+                method=resampling,
+                centering=(focal_x, focal_y),
+            )
+            image.paste(fitted, (896, 188))
+            body_box = (92, top, 820, top + 140)
+            bullet_panel = (616, 246, 864, 520)
+
         if slide_spec.body:
-            self._draw_text_block(draw, slide_spec.body, (92, top, 700, top + 120), font=_load_font(20), fill=_rgb_tuple(self.theme.colors.text))
-        panel = (820, 220, 1188, 520)
-        self._draw_panel(draw, panel)
-        draw.text((848, 246), "Key takeaways", fill=_rgb_tuple(self.theme.colors.muted), font=_load_font(16, bold=True))
-        y = 290
-        for bullet in slide_spec.bullets:
-            draw.text((848, y), f"• {bullet}", fill=_rgb_tuple(self.theme.colors.text), font=_load_font(18))
-            y += 34
+            self._draw_text_block(draw, slide_spec.body, body_box, font=_load_font(20), fill=_rgb_tuple(self.theme.colors.text))
+        if slide_spec.bullets:
+            self._draw_panel(draw, bullet_panel)
+            draw.text((bullet_panel[0] + 28, bullet_panel[1] + 26), slide_spec.eyebrow or "Key takeaways", fill=_rgb_tuple(self.theme.colors.muted), font=_load_font(16, bold=True))
+            y = bullet_panel[1] + 70
+            for bullet in slide_spec.bullets:
+                draw.text((bullet_panel[0] + 28, y), f"• {bullet}", fill=_rgb_tuple(self.theme.colors.text), font=_load_font(18))
+                y += 34
 
     def _render_closing(self, draw: ImageDraw.ImageDraw, image: Image.Image, slide_spec: Slide, meta: PresentationMeta) -> None:
         quote = slide_spec.quote or slide_spec.title or ""
-        self._draw_text_block(draw, quote, (160, 220, 1120, 420), font=_load_font(34, bold=True), fill=_rgb_tuple(self.theme.colors.navy), line_gap=14)
+        asset = self.resolve_asset(slide_spec.image_path)
+        focal_x, focal_y = infer_contextual_image_focal_point(slide_spec)
+        quote_box = (160, 220, 1120, 420)
+        if asset:
+            loaded = Image.open(asset).convert("RGB")
+            resampling = getattr(getattr(Image, "Resampling", Image), "LANCZOS")
+            fitted = ImageOps.fit(
+                loaded,
+                (328, 344),
+                method=resampling,
+                centering=(focal_x, focal_y),
+            )
+            image.paste(fitted, (844, 168))
+            quote_box = (140, 220, 790, 430)
+        self._draw_text_block(draw, quote, quote_box, font=_load_font(34, bold=True), fill=_rgb_tuple(self.theme.colors.navy), line_gap=14)
         if slide_spec.attribution:
             draw.text((160, 450), slide_spec.attribution, fill=_rgb_tuple(self.theme.colors.muted), font=_load_font(20))
 

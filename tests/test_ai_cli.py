@@ -54,6 +54,8 @@ def test_ai_cli_can_run_benchmark_and_emit_report(tmp_path: Path) -> None:
     assert payload["scenario_count"] >= 4
     assert payload["successful_generations"] == payload["scenario_count"]
     assert payload["unique_slide_type_count"] >= 8
+    assert payload["fallback_rate"] >= 0.0
+    assert payload["fallback_used_count"] >= 0
     assert (output_dir / "sales_qbr_prompt.json").exists()
 
 

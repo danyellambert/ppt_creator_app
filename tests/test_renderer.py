@@ -18,7 +18,7 @@ from ppt_creator.preview import (
     render_previews,
     visual_regression_has_failures,
 )
-from ppt_creator.renderer import PresentationRenderer
+from ppt_creator.renderer import PresentationRenderer, infer_contextual_image_focal_point
 from ppt_creator.schema import PresentationInput
 
 
@@ -160,6 +160,35 @@ def test_describe_visual_placeholder_differentiates_screenshot_and_diagram() -> 
 
     assert screenshot_copy["kind"] == "screenshot"
     assert diagram_copy["kind"] == "diagram"
+
+
+def test_contextual_image_focal_point_uses_slide_type_defaults_and_respects_explicit_override() -> None:
+    spec = PresentationInput.model_validate(
+        {
+            "presentation": {"title": "Deck", "theme": "executive_premium_minimal"},
+            "slides": [
+                {
+                    "type": "summary",
+                    "title": "Executive summary",
+                    "body": "Body",
+                    "bullets": ["A", "B"],
+                },
+                {
+                    "type": "image_text",
+                    "title": "Workflow diagram",
+                    "body": "Process architecture",
+                    "image_focal_x": 0.2,
+                },
+            ],
+        }
+    )
+
+    summary_focal = infer_contextual_image_focal_point(spec.slides[0])
+    diagram_focal = infer_contextual_image_focal_point(spec.slides[1])
+
+    assert summary_focal[1] < 0.4
+    assert diagram_focal[0] == 0.2
+    assert 0.0 <= diagram_focal[1] <= 1.0
 
 
 def test_stack_vertical_regions_distributes_flexible_space() -> None:
@@ -786,6 +815,55 @@ def test_preview_chart_supports_negative_values_without_crashing() -> None:
     )
 
     renderer = PreviewRenderer(asset_root="examples")
+    rendered = renderer.render_slide(spec.presentation, spec.slides[0], 1, 1)
+
+    assert rendered.size == (PREVIEW_WIDTH, PREVIEW_HEIGHT)
+
+
+def test_preview_summary_with_image_renders_without_crashing(tmp_path: Path) -> None:
+    asset_path = tmp_path / "summary_focus.png"
+    Image.new("RGB", (1600, 900), (15, 90, 140)).save(asset_path)
+
+    spec = PresentationInput.model_validate(
+        {
+            "presentation": {"title": "Summary image", "theme": "executive_premium_minimal"},
+            "slides": [
+                {
+                    "type": "summary",
+                    "title": "Decision synthesis",
+                    "body": "Sharper summary with a supporting visual.",
+                    "bullets": ["Focus the rollout", "Track proof", "Scale deliberately"],
+                    "image_path": str(asset_path),
+                }
+            ],
+        }
+    )
+
+    renderer = PreviewRenderer(asset_root=tmp_path)
+    rendered = renderer.render_slide(spec.presentation, spec.slides[0], 1, 1)
+
+    assert rendered.size == (PREVIEW_WIDTH, PREVIEW_HEIGHT)
+
+
+def test_preview_closing_with_image_renders_without_crashing(tmp_path: Path) -> None:
+    asset_path = tmp_path / "closing_focus.png"
+    Image.new("RGB", (1400, 1000), (80, 30, 120)).save(asset_path)
+
+    spec = PresentationInput.model_validate(
+        {
+            "presentation": {"title": "Closing image", "theme": "executive_premium_minimal"},
+            "slides": [
+                {
+                    "type": "closing",
+                    "title": "Closing",
+                    "quote": "One focused move creates better execution.",
+                    "image_path": str(asset_path),
+                }
+            ],
+        }
+    )
+
+    renderer = PreviewRenderer(asset_root=tmp_path)
     rendered = renderer.render_slide(spec.presentation, spec.slides[0], 1, 1)
 
     assert rendered.size == (PREVIEW_WIDTH, PREVIEW_HEIGHT)

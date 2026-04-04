@@ -10,12 +10,79 @@ from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
 from pptx.util import Inches, Pt
 
 from ppt_creator.layouts import LAYOUT_RENDERERS
-from ppt_creator.schema import PresentationInput, PresentationMeta, Slide
+from ppt_creator.schema import PresentationInput, PresentationMeta, Slide, SlideType
 from ppt_creator.theme import get_theme, rgb
 
 if TYPE_CHECKING:
     from pptx.slide import Slide as PptxSlide
     from pptx.text.text import Font, TextFrame
+
+
+def infer_visual_placeholder_kind(
+    *,
+    slide_type: str,
+    title: str | None = None,
+    body: str | None = None,
+    caption: str | None = None,
+    image_path: str | None = None,
+) -> str:
+    text = " ".join(part for part in [title, body, caption, image_path] if part).lower()
+    if any(keyword in text for keyword in ["screenshot", "screen", "ui", "dashboard", "mockup", "product"]):
+        return "screenshot"
+    if any(keyword in text for keyword in ["diagram", "workflow", "process", "architecture", "roadmap", "timeline"]):
+        return "diagram"
+    if any(keyword in text for keyword in ["chart", "metric", "kpi", "trend", "table", "analytics", "analysis"]):
+        return "analytical_visual"
+    if slide_type in {"title", "closing", "summary"}:
+        return "photo"
+    return "photo"
+
+
+def infer_contextual_image_focal_point(slide_spec: Slide) -> tuple[float, float]:
+    kind = infer_visual_placeholder_kind(
+        slide_type=slide_spec.type.value,
+        title=slide_spec.title,
+        body=slide_spec.body,
+        caption=slide_spec.image_caption,
+        image_path=slide_spec.image_path,
+    )
+    fallback_by_kind = {
+        "photo": (0.52, 0.38),
+        "screenshot": (0.50, 0.46),
+        "diagram": (0.50, 0.42),
+        "analytical_visual": (0.50, 0.44),
+    }
+    type_defaults = {
+        SlideType.TITLE: {
+            "photo": (0.52, 0.32 if slide_spec.layout_variant == "hero_cover" else 0.38),
+            "screenshot": (0.50, 0.40),
+            "diagram": (0.50, 0.36),
+            "analytical_visual": (0.50, 0.40),
+        },
+        SlideType.IMAGE_TEXT: {
+            "photo": (0.52, 0.40),
+            "screenshot": (0.50, 0.46),
+            "diagram": (0.50, 0.42),
+            "analytical_visual": (0.50, 0.45),
+        },
+        SlideType.SUMMARY: {
+            "photo": (0.54, 0.34),
+            "screenshot": (0.50, 0.42),
+            "diagram": (0.50, 0.38),
+            "analytical_visual": (0.50, 0.41),
+        },
+        SlideType.CLOSING: {
+            "photo": (0.55, 0.34),
+            "screenshot": (0.50, 0.42),
+            "diagram": (0.50, 0.38),
+            "analytical_visual": (0.50, 0.40),
+        },
+    }
+    default_x, default_y = type_defaults.get(slide_spec.type, {}).get(kind, fallback_by_kind[kind])
+    return (
+        slide_spec.image_focal_x if slide_spec.image_focal_x is not None else default_x,
+        slide_spec.image_focal_y if slide_spec.image_focal_y is not None else default_y,
+    )
 
 
 class PresentationRenderer:
@@ -1097,16 +1164,16 @@ class PresentationRenderer:
         caption: str | None = None,
         image_path: str | None = None,
     ) -> str:
-        text = " ".join(part for part in [title, body, caption, image_path] if part).lower()
-        if any(keyword in text for keyword in ["screenshot", "screen", "ui", "dashboard", "mockup", "product"]):
-            return "screenshot"
-        if any(keyword in text for keyword in ["diagram", "workflow", "process", "architecture", "roadmap", "timeline"]):
-            return "diagram"
-        if any(keyword in text for keyword in ["chart", "metric", "kpi", "trend", "table", "analytics", "analysis"]):
-            return "analytical_visual"
-        if slide_type in {"title", "closing", "summary"}:
-            return "photo"
-        return "photo"
+        return infer_visual_placeholder_kind(
+            slide_type=slide_type,
+            title=title,
+            body=body,
+            caption=caption,
+            image_path=image_path,
+        )
+
+    def resolve_image_focal_point(self, slide_spec: Slide) -> tuple[float, float]:
+        return infer_contextual_image_focal_point(slide_spec)
 
     def describe_visual_placeholder(
         self,

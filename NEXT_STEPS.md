@@ -122,7 +122,7 @@ Esses são os itens de maior impacto percebido.
   - [x] clipping perto de footer
   - [x] crowding em cantos e safe areas
   - [x] colisões entre blocos em layouts compostos
-- [ ] adicionar sinais mais fortes específicos para:
+- [x] adicionar sinais mais fortes específicos para:
   - [x] `summary`
   - [x] `comparison`
   - [x] `two_column`
@@ -180,8 +180,8 @@ O motor já está forte, mas ainda falta acabamento sistemático.
 
 - [x] cover-fit/focal point inicial em `image_text`
 - [x] expansão inicial para `title.hero_cover`
-- [ ] expandir crop/focal point para mais layouts com imagem
-- [ ] adicionar regras contextuais por tipo de slide para decidir melhor framing/crop
+- [x] expandir crop/focal point para mais layouts com imagem
+- [x] adicionar regras contextuais por tipo de slide para decidir melhor framing/crop
 
 ### 5.2. Placeholders mais premium
 
@@ -309,7 +309,7 @@ IA continua opcional. O core deve seguir desacoplado.
 
 Evoluções que ainda valem depois desta decisão:
 
-- [ ] medir a taxa de fallback heurístico por provider/modelo
+- [x] medir a taxa de fallback heurístico por provider/modelo
 - [ ] benchmark comparativo entre `ollama_local` e `local_service` para prompts livres
 - [ ] endurecer ainda mais o repair loop antes do fallback heurístico
 

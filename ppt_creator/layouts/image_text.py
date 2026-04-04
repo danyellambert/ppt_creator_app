@@ -31,6 +31,7 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
     text_left = c.margin_x if variant == "image_right" else 7.1
     text_width = 5.4 if variant == "image_right" else 5.15
     asset = renderer.resolve_asset(slide_spec.image_path)
+    focal_x, focal_y = renderer.resolve_image_focal_point(slide_spec)
     placeholder_copy = renderer.describe_visual_placeholder(slide_spec)
     if asset:
         renderer.add_image_cover(
@@ -40,8 +41,8 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
             top=image_top,
             width=image_width,
             height=image_height,
-            focal_x=slide_spec.image_focal_x,
-            focal_y=slide_spec.image_focal_y,
+            focal_x=focal_x,
+            focal_y=focal_y,
         )
     else:
         panel = renderer.add_panel(slide, image_left, image_top, image_width, image_height, fill_color=colors.surface, line_color=colors.line)

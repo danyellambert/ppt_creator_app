@@ -145,6 +145,8 @@ def run_generation_benchmark(
     unique_slide_types: set[str] = set()
     coverage: dict[str, int] = {}
     successful_generations = 0
+    fallback_used_count = 0
+    resolved_models: set[str] = set()
 
     for scenario in BENCHMARK_SCENARIOS:
         scenario_name = str(scenario["name"])
@@ -153,6 +155,13 @@ def run_generation_benchmark(
             generation = provider.generate(briefing, theme_name=theme_name)
             spec = PresentationInput.model_validate(generation.payload)
             review = review_presentation(spec, asset_root=asset_root, theme_name=spec.presentation.theme)
+            analysis = generation.analysis if isinstance(generation.analysis, dict) else {}
+            fallback_used = bool(analysis.get("fallback_used", False))
+            if fallback_used:
+                fallback_used_count += 1
+            resolved_model = str(analysis.get("resolved_model") or analysis.get("backend_provider") or "").strip()
+            if resolved_model:
+                resolved_models.add(resolved_model)
             slide_types = sorted({slide.type.value for slide in spec.slides})
             for slide_type in slide_types:
                 unique_slide_types.add(slide_type)
@@ -175,6 +184,9 @@ def run_generation_benchmark(
                     "review_status": review["status"],
                     "issue_count": review["issue_count"],
                     "average_score": review["average_score"],
+                    "fallback_used": fallback_used,
+                    "fallback_reason": analysis.get("fallback_reason"),
+                    "resolved_model": resolved_model or None,
                     "slide_types": slide_types,
                     "output_json": str(deck_path) if deck_path else None,
                 }
@@ -187,18 +199,23 @@ def run_generation_benchmark(
                     "provider": provider.name,
                     "valid": False,
                     "error": str(exc),
+                    "fallback_used": None,
                 }
             )
 
+    scenario_count = len(BENCHMARK_SCENARIOS)
     return {
         "mode": "briefing-benchmark",
         "provider": provider.name,
-        "scenario_count": len(BENCHMARK_SCENARIOS),
+        "scenario_count": scenario_count,
         "successful_generations": successful_generations,
-        "failed_generations": len(BENCHMARK_SCENARIOS) - successful_generations,
+        "failed_generations": scenario_count - successful_generations,
         "unique_slide_type_count": len(unique_slide_types),
         "unique_slide_types": sorted(unique_slide_types),
         "slide_type_coverage": dict(sorted(coverage.items())),
+        "fallback_used_count": fallback_used_count,
+        "fallback_rate": round((fallback_used_count / scenario_count) * 100, 1) if scenario_count else 0.0,
+        "resolved_models": sorted(resolved_models),
         "write_json_decks": write_json_decks,
         "generation_contract": build_llm_generation_contract(),
         "scenarios": results,
