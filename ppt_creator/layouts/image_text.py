@@ -31,6 +31,7 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
     text_left = c.margin_x if variant == "image_right" else 7.1
     text_width = 5.4 if variant == "image_right" else 5.15
     asset = renderer.resolve_asset(slide_spec.image_path)
+    placeholder_copy = renderer.describe_visual_placeholder(slide_spec)
     if asset:
         renderer.add_image_cover(
             slide,
@@ -91,7 +92,7 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
         label_box = renderer.textbox(slide, image_left + 0.55, image_top + 0.35, 2.1, 0.26)
         renderer.write_paragraph(
             label_box.text_frame,
-            "VISUAL PLACEHOLDER",
+            placeholder_copy["label"],
             size=t.small_size,
             color=colors.accent,
             bold=True,
@@ -101,7 +102,7 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
         heading_box = renderer.textbox(slide, image_left + 0.55, image_top + 2.36, image_width - 1.1, 0.35)
         renderer.write_paragraph(
             heading_box.text_frame,
-            "Image unavailable" if slide_spec.image_path else "Image placeholder",
+            placeholder_copy["headline"],
             size=t.body_size,
             color=colors.muted,
             bold=True,
@@ -112,7 +113,7 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
         renderer.write_paragraph(
             caption_box.text_frame,
             slide_spec.image_caption
-            or "Use a premium contextual image, screenshot, or diagram to reinforce the narrative once the final asset is available.",
+            or placeholder_copy["guidance"],
             size=t.small_size + 1,
             color=colors.text,
         )

@@ -1,6 +1,14 @@
 from __future__ import annotations
 
 
+def _summary_char_count(slide_spec) -> int:
+    return sum(
+        len(text)
+        for text in [slide_spec.title, slide_spec.subtitle, slide_spec.body, *slide_spec.bullets]
+        if text
+    )
+
+
 def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
     g = renderer.theme.grid
     t = renderer.theme.typography
@@ -8,16 +16,24 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
 
     has_body = bool(slide_spec.body)
     has_bullets = bool(slide_spec.bullets)
+    narrative_weight = renderer.estimate_content_weight(title=slide_spec.title, body=slide_spec.body)
+    takeaway_weight = renderer.estimate_content_weight(bullets=slide_spec.bullets)
+    combined_density = _summary_char_count(slide_spec) / max(1.0, g.content_width * 3.2)
+    dense_summary = bool(
+        (has_body and has_bullets and (narrative_weight + takeaway_weight) >= 5.1)
+        or combined_density >= 12.5
+        or any(len(bullet) > 80 for bullet in slide_spec.bullets)
+    )
 
     renderer.add_heading(
         slide,
         title=slide_spec.title or "",
         subtitle=slide_spec.subtitle,
-        eyebrow=slide_spec.eyebrow or "Executive summary",
+        eyebrow=slide_spec.eyebrow,
         left=g.content_left,
         top=g.title_top,
-        width=8.0,
-        subtitle_width=7.0,
+        width=7.85 if has_body and has_bullets else 8.2,
+        subtitle_width=6.8 if has_body and has_bullets else 7.1,
     )
 
     if has_body and has_bullets:
@@ -27,32 +43,36 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
             regions=[
                 {
                     "kind": "narrative",
-                    "min_width": 5.9,
-                    "target_share": renderer.estimate_content_weight(title=slide_spec.title, body=slide_spec.body),
+                    "min_width": 5.95,
+                    "target_share": narrative_weight,
                 },
                 {
                     "kind": "panel",
-                    "min_width": 3.4,
-                    "max_width": 4.15,
-                    "target_share": renderer.estimate_content_weight(bullets=slide_spec.bullets),
+                    "min_width": 3.45,
+                    "max_width": 4.6,
+                    "target_share": takeaway_weight,
                 },
             ],
-            gap=0.35,
+            gap=0.32 if dense_summary else 0.35,
         )
         narrative_left, narrative_width = split_regions[0]
         panel_left, panel_width = split_regions[1]
 
-        body_box = renderer.textbox(slide, narrative_left, 2.35, narrative_width, 1.55)
+        body_box = renderer.textbox(slide, narrative_left, 2.24, narrative_width, 2.12 if dense_summary else 1.98)
         renderer.write_paragraph(
             body_box.text_frame,
             slide_spec.body or "",
-            size=t.body_size,
+            size=t.body_size - (1 if dense_summary else 0),
             color=colors.text,
         )
-        renderer.fit_text_frame(body_box.text_frame, max_size=t.body_size)
+        renderer.fit_text_frame(
+            body_box.text_frame,
+            max_size=t.body_size - (1 if dense_summary else 0),
+            min_size=t.small_size + 1,
+        )
 
-        panel_top = 2.1
-        panel_height = 3.2
+        panel_top = 2.04
+        panel_height = 3.42 if dense_summary else 3.28
         renderer.add_panel(slide, panel_left, panel_top, panel_width, panel_height, fill_color=colors.surface, line_color=colors.line)
         renderer.add_accent_bar(
             slide,
@@ -71,34 +91,49 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
                 {"kind": "heading", "height": 0.28},
                 {
                     "kind": "bullets",
-                    "min_height": 2.18,
-                    "target_share": renderer.estimate_content_weight(bullets=slide_spec.bullets),
+                    "min_height": 2.34 if dense_summary else 2.22,
+                    "target_share": takeaway_weight,
                 },
             ],
             gap=0.08,
-            padding=0.26,
+            padding=0.24 if dense_summary else 0.26,
         )
         heading_left, heading_top, heading_width, heading_height = panel_regions[0][1]
         heading_box = renderer.textbox(slide, heading_left, heading_top, heading_width, heading_height)
-        renderer.write_paragraph(heading_box.text_frame, "Key takeaways", size=t.eyebrow_size, color=colors.muted, bold=True)
-        renderer.fit_text_frame(heading_box.text_frame, max_size=t.eyebrow_size, bold=True)
+        if slide_spec.eyebrow:
+            renderer.write_paragraph(heading_box.text_frame, slide_spec.eyebrow, size=t.eyebrow_size, color=colors.muted, bold=True)
+            renderer.fit_text_frame(heading_box.text_frame, max_size=t.eyebrow_size, bold=True)
         bullets_left, bullets_top, bullets_width, bullets_height = panel_regions[1][1]
         bullets_box = renderer.textbox(slide, bullets_left, bullets_top, bullets_width, bullets_height)
         tf = bullets_box.text_frame
         for bullet in slide_spec.bullets:
-            renderer.write_paragraph(tf, f"• {bullet}", size=t.small_size + 1, color=colors.text, space_after=6)
-        renderer.fit_text_frame(tf, max_size=t.small_size + 1)
+            renderer.write_paragraph(
+                tf,
+                f"• {bullet}",
+                size=t.small_size + (0 if dense_summary else 1),
+                color=colors.text,
+                space_after=4 if dense_summary else 6,
+            )
+        renderer.fit_text_frame(
+            tf,
+            max_size=t.small_size + (0 if dense_summary else 1),
+            min_size=t.small_size - 1,
+        )
         return
 
     if has_body:
-        summary_box = renderer.textbox(slide, g.content_left, 2.35, g.content_width, 1.9)
+        summary_box = renderer.textbox(slide, g.content_left, 2.24, g.content_width, 2.18)
         renderer.write_paragraph(
             summary_box.text_frame,
             slide_spec.body or "",
-            size=t.body_size,
+            size=t.body_size - (1 if dense_summary else 0),
             color=colors.text,
         )
-        renderer.fit_text_frame(summary_box.text_frame, max_size=t.body_size)
+        renderer.fit_text_frame(
+            summary_box.text_frame,
+            max_size=t.body_size - (1 if dense_summary else 0),
+            min_size=t.small_size + 1,
+        )
         return
 
     renderer.add_panel(
@@ -106,7 +141,7 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
         g.content_left,
         2.2,
         g.content_width,
-        3.0,
+        3.24,
         fill_color=colors.surface,
         line_color=colors.line,
     )
@@ -122,25 +157,36 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
         left=g.content_left,
         top=2.2,
         width=g.content_width,
-        height=3.0,
+        height=3.24,
         regions=[
             {"kind": "heading", "height": 0.28},
             {
                 "kind": "bullets",
-                "min_height": 1.9,
-                "target_share": renderer.estimate_content_weight(bullets=slide_spec.bullets),
+                "min_height": 2.08,
+                "target_share": takeaway_weight,
             },
         ],
         gap=0.1,
-        padding=0.28,
+        padding=0.26,
     )
     heading_left, heading_top, heading_width, heading_height = content_regions[0][1]
     heading_box = renderer.textbox(slide, heading_left, heading_top, heading_width, heading_height)
-    renderer.write_paragraph(heading_box.text_frame, "Key takeaways", size=t.eyebrow_size, color=colors.muted, bold=True)
-    renderer.fit_text_frame(heading_box.text_frame, max_size=t.eyebrow_size, bold=True)
+    if slide_spec.eyebrow:
+        renderer.write_paragraph(heading_box.text_frame, slide_spec.eyebrow, size=t.eyebrow_size, color=colors.muted, bold=True)
+        renderer.fit_text_frame(heading_box.text_frame, max_size=t.eyebrow_size, bold=True)
     bullets_left, bullets_top, bullets_width, bullets_height = content_regions[1][1]
     bullets_box = renderer.textbox(slide, bullets_left, bullets_top, bullets_width, bullets_height)
     tf = bullets_box.text_frame
     for bullet in slide_spec.bullets:
-        renderer.write_paragraph(tf, f"• {bullet}", size=t.body_size - 1, color=colors.text, space_after=8)
-    renderer.fit_text_frame(tf, max_size=t.body_size - 1)
+        renderer.write_paragraph(
+            tf,
+            f"• {bullet}",
+            size=t.body_size - (2 if dense_summary else 1),
+            color=colors.text,
+            space_after=6 if dense_summary else 8,
+        )
+    renderer.fit_text_frame(
+        tf,
+        max_size=t.body_size - (2 if dense_summary else 1),
+        min_size=t.small_size,
+    )

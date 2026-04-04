@@ -40,13 +40,27 @@ def test_theme_overrides_apply_custom_brand_colors() -> None:
 
 def test_domain_templates_are_exposed() -> None:
     assert ppt_creator.list_template_domains() == ["consulting", "product", "sales", "strategy"]
+    assert ppt_creator.list_brand_packs() == ["board_navy", "consulting_signature", "product_signal", "sales_pipeline"]
 
     payload = ppt_creator.build_domain_template("sales")
     assert payload["presentation"]["theme"] == "dark_boardroom"
     assert len(payload["slides"]) >= 4
 
+    packet = ppt_creator.build_template_packet("sales", brand_pack="sales_pipeline")
+    assert packet["asset_collections"]
+    assert packet["asset_strategy"]["placeholder_style"] == "analytical_visual"
+    assert packet["slide_asset_suggestions"]
+
+    workflow_packet = ppt_creator.build_workflow_packet("sales_qbr")
+    assert workflow_packet["slide_asset_suggestions"]
+    assert workflow_packet["asset_strategy"]["workflow_name"] == "sales_qbr"
+
     profiled_payload = ppt_creator.build_domain_template("sales", audience_profile="board")
     assert profiled_payload["presentation"]["footer_text"] == "Board profile"
+
+    branded_payload = ppt_creator.build_domain_template("sales", brand_pack="sales_pipeline")
+    assert branded_payload["presentation"]["footer_text"] == "Sales pipeline brand pack"
+    assert branded_payload["slides"][0]["eyebrow"] == "Revenue review"
 
 
 def test_api_helpers_are_exposed() -> None:

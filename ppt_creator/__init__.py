@@ -11,6 +11,7 @@ from ppt_creator.api import (
     validate_spec_payload,
 )
 from ppt_creator.assets import get_asset_collection, list_asset_collections
+from ppt_creator.brand_packs import apply_brand_pack, get_brand_pack, list_brand_packs
 from ppt_creator.preview import (
     PreviewRenderer,
     compare_pptx_artifacts,
@@ -30,7 +31,11 @@ from ppt_creator.schema import (
     SlideType,
     TimelineItem,
 )
-from ppt_creator.templates import build_domain_template, list_template_domains
+from ppt_creator.templates import (
+    build_domain_template,
+    build_template_packet,
+    list_template_domains,
+)
 from ppt_creator.theme import (
     CONSULTING_CLEAN,
     DARK_BOARDROOM,
@@ -77,13 +82,17 @@ __all__ = [
     "compare_pptx_payload",
     "generate_briefing_payload",
     "build_domain_template",
+    "build_template_packet",
     "build_workflow_packet",
+    "apply_brand_pack",
     "get_asset_collection",
+    "get_brand_pack",
     "get_audience_profile",
     "get_theme",
     "get_workflow_preset",
     "list_asset_collections",
     "list_audience_profiles",
+    "list_brand_packs",
     "list_template_domains",
     "list_workflow_presets",
     "PreviewRenderer",

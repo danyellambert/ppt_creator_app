@@ -2,7 +2,16 @@ from __future__ import annotations
 
 import json
 
+from ppt_creator.assets import get_asset_collection
+from ppt_creator.brand_packs import apply_brand_pack, get_brand_pack
 from ppt_creator.profiles import get_audience_profile
+
+DOMAIN_ASSET_COLLECTIONS: dict[str, list[str]] = {
+    "sales": ["sales_dashboards", "forecast_reviews"],
+    "consulting": ["strategy_workshops", "team_alignment_sessions"],
+    "strategy": ["boardroom_backdrops", "strategy_workshops"],
+    "product": ["product_mockups", "roadmap_workshops"],
+}
 
 DOMAIN_TEMPLATES: dict[str, dict[str, object]] = {
     "sales": {
@@ -209,6 +218,7 @@ def build_domain_template(
     *,
     theme_name: str | None = None,
     audience_profile: str | None = None,
+    brand_pack: str | None = None,
 ) -> dict[str, object]:
     normalized = domain.strip().lower().replace("-", "_")
     if normalized not in DOMAIN_TEMPLATES:
@@ -222,6 +232,130 @@ def build_domain_template(
             payload["slides"][0]["eyebrow"] = str(profile["cover_eyebrow"])
         if not theme_name:
             payload["presentation"]["theme"] = str(profile["default_theme"])
+    if brand_pack:
+        payload = apply_brand_pack(payload, brand_pack)
     if theme_name:
         payload["presentation"]["theme"] = theme_name
     return payload
+
+
+def _infer_slide_visual_type(slide_payload: dict[str, object]) -> str:
+    text = " ".join(
+        str(slide_payload.get(key) or "")
+        for key in ["title", "subtitle", "body", "image_caption"]
+    ).lower()
+    slide_type = str(slide_payload.get("type") or "")
+    if any(keyword in text for keyword in ["screenshot", "screen", "dashboard", "ui", "mockup"]):
+        return "screenshot"
+    if any(keyword in text for keyword in ["diagram", "workflow", "process", "architecture", "roadmap", "timeline"]):
+        return "diagram"
+    if slide_type in {"metrics", "chart", "table"} or any(
+        keyword in text for keyword in ["metric", "kpi", "trend", "analysis", "analytics", "table"]
+    ):
+        return "analytical_visual"
+    return "photo"
+
+
+def _build_slide_asset_suggestions(
+    template: dict[str, object],
+    asset_collections: list[dict[str, object]],
+    *,
+    brand_pack_payload: dict[str, object] | None = None,
+    workflow_name: str | None = None,
+) -> list[dict[str, object]]:
+    slide_asset_suggestions: list[dict[str, object]] = []
+    cover_asset_collection = None
+    if brand_pack_payload and brand_pack_payload.get("cover_asset_collection"):
+        cover_asset_collection = get_asset_collection(str(brand_pack_payload["cover_asset_collection"]))
+
+    for index, slide_payload in enumerate(template.get("slides", []), start=1):
+        slide_type = str(slide_payload.get("type") or "slide")
+        visual_type = _infer_slide_visual_type(slide_payload)
+        matching_collections = [
+            collection
+            for collection in asset_collections
+            if slide_type in list(collection.get("preferred_layouts", []))
+        ] or list(asset_collections)
+        if slide_type == "title" and cover_asset_collection is not None:
+            matching_collections = [cover_asset_collection, *[c for c in matching_collections if c.get("name") != cover_asset_collection.get("name")]]
+
+        recommended_queries: list[str] = []
+        for collection in matching_collections:
+            for query in list(collection.get("queries", [])):
+                if query not in recommended_queries:
+                    recommended_queries.append(str(query))
+
+        primary_collection = matching_collections[0] if matching_collections else None
+        suggestion: dict[str, object] = {
+            "slide_number": index,
+            "slide_type": slide_type,
+            "title": slide_payload.get("title"),
+            "visual_type": visual_type,
+            "recommended_asset_collections": [collection["name"] for collection in matching_collections],
+            "recommended_queries": recommended_queries[:4],
+        }
+        if primary_collection:
+            if primary_collection.get("visual_style"):
+                suggestion["asset_style"] = primary_collection["visual_style"]
+            if primary_collection.get("composition_notes"):
+                suggestion["composition_notes"] = primary_collection["composition_notes"]
+            if primary_collection.get("preferred_focal_point"):
+                suggestion["recommended_focal_point"] = dict(primary_collection["preferred_focal_point"])
+        if brand_pack_payload:
+            suggestion["brand_pack"] = brand_pack_payload["name"]
+            if brand_pack_payload.get("visual_language"):
+                suggestion["brand_visual_language"] = brand_pack_payload["visual_language"]
+        if workflow_name:
+            suggestion["workflow_name"] = workflow_name
+        slide_asset_suggestions.append(suggestion)
+
+    return slide_asset_suggestions
+
+
+def build_template_packet(
+    domain: str,
+    *,
+    theme_name: str | None = None,
+    audience_profile: str | None = None,
+    brand_pack: str | None = None,
+) -> dict[str, object]:
+    template = build_domain_template(
+        domain,
+        theme_name=theme_name,
+        audience_profile=audience_profile,
+        brand_pack=brand_pack,
+    )
+    normalized = domain.strip().lower().replace("-", "_")
+    audience_profile_payload = get_audience_profile(audience_profile) if audience_profile else None
+    brand_pack_payload = get_brand_pack(brand_pack) if brand_pack else None
+
+    collection_names: list[str] = []
+    for collection_name in DOMAIN_ASSET_COLLECTIONS.get(normalized, []):
+        if collection_name not in collection_names:
+            collection_names.append(collection_name)
+    for collection_name in (brand_pack_payload or {}).get("recommended_asset_collections", []):
+        if collection_name not in collection_names:
+            collection_names.append(str(collection_name))
+
+    asset_collections = [get_asset_collection(collection_name) for collection_name in collection_names]
+    slide_asset_suggestions = _build_slide_asset_suggestions(
+        template,
+        asset_collections,
+        brand_pack_payload=brand_pack_payload,
+    )
+
+    return {
+        "domain": normalized,
+        "template": template,
+        "audience_profile": audience_profile_payload,
+        "brand_pack": brand_pack_payload,
+        "asset_collections": asset_collections,
+        "asset_strategy": {
+            "domain_asset_collections": DOMAIN_ASSET_COLLECTIONS.get(normalized, []),
+            "brand_pack_asset_collections": list((brand_pack_payload or {}).get("recommended_asset_collections", [])),
+            "visual_language": (brand_pack_payload or {}).get("visual_language"),
+            "cover_asset_collection": (brand_pack_payload or {}).get("cover_asset_collection"),
+            "placeholder_style": (brand_pack_payload or {}).get("placeholder_style"),
+        },
+        "slide_asset_suggestions": slide_asset_suggestions,
+    }

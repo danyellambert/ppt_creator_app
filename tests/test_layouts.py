@@ -156,9 +156,31 @@ def test_missing_image_uses_placeholder_text(tmp_path: Path) -> None:
     texts = [shape.text for shape in image_slide.shapes if hasattr(shape, "text")]
     joined = "\n".join(texts)
 
-    assert "VISUAL PLACEHOLDER" in joined
-    assert "Image unavailable" in joined
+    assert any(label in joined for label in ["VISUAL", "PRODUCT VISUAL", "WORKFLOW VISUAL", "ANALYTICAL VISUAL"])
+    assert any(text in joined for text in ["Editorial visual pending", "Product screenshot pending", "Workflow visual pending", "Analytical visual pending"])
     assert "Missing asset: missing-image.png" in joined
+
+
+def test_layouts_do_not_inject_generic_scaffolding_copy(tmp_path: Path) -> None:
+    spec = build_layout_smoke_spec()
+    output = tmp_path / "layouts-no-scaffolding.pptx"
+
+    renderer = PresentationRenderer(asset_root="examples")
+    rendered = renderer.render(spec, output)
+    presentation = Presentation(str(rendered))
+
+    title_text = "\n".join(shape.text for shape in presentation.slides[0].shapes if hasattr(shape, "text"))
+    bullets_text = "\n".join(shape.text for shape in presentation.slides[3].shapes if hasattr(shape, "text"))
+    summary_text = "\n".join(shape.text for shape in presentation.slides[13].shapes if hasattr(shape, "text"))
+    closing_text = "\n".join(shape.text for shape in presentation.slides[14].shapes if hasattr(shape, "text"))
+
+    assert "DECK" not in title_text
+    assert "Theme" not in title_text
+    assert "Context" not in title_text
+    assert "Executive lens" not in bullets_text
+    assert "What matters" not in bullets_text
+    assert "Key takeaways" not in summary_text
+    assert "Next actions" not in closing_text
 
 
 def test_layout_variants_render_without_crashing(tmp_path: Path) -> None:

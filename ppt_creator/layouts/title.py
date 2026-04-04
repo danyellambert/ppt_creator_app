@@ -178,29 +178,21 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
             width=content_width,
             height=content_height,
             blocks=[
-                {"value": "Context", "size": t.eyebrow_size, "color": colors.muted, "bold": True, "min_height": 0.22},
                 *(
-                    [{"value": meta.client_name, "size": t.body_size, "color": colors.navy, "bold": True, "min_height": 0.34}]
+                    [{"label": "Client", "value": meta.client_name, "min_height": 0.34}]
                     if meta.client_name
                     else []
                 ),
                 *(
-                    [{"value": meta.author, "size": t.small_size + 1, "color": colors.text, "min_height": 0.28}]
+                    [{"label": "Author", "value": meta.author, "min_height": 0.28}]
                     if meta.author
                     else []
                 ),
                 *(
-                    [{"value": meta.date, "size": t.small_size + 1, "color": colors.muted, "min_height": 0.28}]
+                    [{"label": "Date", "value": meta.date, "min_height": 0.28}]
                     if meta.date
                     else []
                 ),
-                {
-                    "value": theme_display_name(renderer.theme.name),
-                    "size": t.small_size + 1,
-                    "color": colors.accent,
-                    "bold": True,
-                    "min_height": 0.28,
-                },
             ],
             typography=t,
             colors=colors,
@@ -319,8 +311,6 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
         width=content_width,
         height=content_height,
         blocks=[
-            {"value": "DECK", "size": t.eyebrow_size, "color": colors.accent, "bold": True, "min_height": 0.22},
-            {"value": meta.title, "size": t.body_size + 1, "color": colors.navy, "bold": True, "min_height": 0.46},
             *(
                 [{"label": "Client", "value": meta.client_name, "min_height": 0.52}]
                 if meta.client_name
@@ -336,11 +326,6 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
                 if meta.date
                 else []
             ),
-            {
-                "label": "Theme",
-                "value": theme_display_name(renderer.theme.name),
-                "min_height": 0.52,
-            },
         ],
         typography=t,
         colors=colors,

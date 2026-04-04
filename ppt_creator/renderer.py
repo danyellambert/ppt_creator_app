@@ -181,9 +181,11 @@ class PresentationRenderer:
         text_frame: "TextFrame",
         *,
         max_size: int,
+        min_size: int = 9,
         bold: bool = False,
         italic: bool = False,
     ) -> None:
+        text_frame.word_wrap = True
         try:
             text_frame.fit_text(
                 font_family=self.theme.typography.font_name,
@@ -192,7 +194,118 @@ class PresentationRenderer:
                 italic=italic,
             )
         except Exception:
-            return
+            pass
+
+        self._apply_manual_text_frame_fit(
+            text_frame,
+            max_size=max_size,
+            min_size=min_size,
+            bold=bold,
+            italic=italic,
+        )
+
+    def _apply_manual_text_frame_fit(
+        self,
+        text_frame: "TextFrame",
+        *,
+        max_size: int,
+        min_size: int,
+        bold: bool = False,
+        italic: bool = False,
+    ) -> None:
+        stats = self._estimate_text_frame_pressure(text_frame)
+        recommended_size = self._recommended_font_size(
+            max_size=max_size,
+            min_size=min_size,
+            char_count=stats["char_count"],
+            paragraph_count=stats["paragraph_count"],
+            area=stats["area"],
+            longest_line=stats["longest_line"],
+        )
+
+        for paragraph in text_frame.paragraphs:
+            if paragraph.level > 0 and recommended_size <= max_size:
+                paragraph.space_after = Pt(min(4, max(1, recommended_size // 4)))
+            elif paragraph.level == 0 and stats["paragraph_count"] > 1:
+                paragraph.space_after = Pt(min(6, max(2, recommended_size // 3)))
+
+            if stats["paragraph_count"] > 2:
+                paragraph.line_spacing = 1.0
+
+            for run in paragraph.runs:
+                font = run.font
+                if font.name is None:
+                    font.name = self.theme.typography.font_name
+                if font.size is None or font.size.pt > recommended_size:
+                    font.size = Pt(recommended_size)
+                if bold:
+                    font.bold = True
+                if italic:
+                    font.italic = True
+
+    def _estimate_text_frame_pressure(self, text_frame: "TextFrame") -> dict[str, float | int]:
+        shape = getattr(text_frame, "_parent", None)
+        width_emu = getattr(shape, "width", 0) or 0
+        height_emu = getattr(shape, "height", 0) or 0
+        width_inches = float(width_emu) / 914400 if width_emu else 4.0
+        height_inches = float(height_emu) / 914400 if height_emu else 1.0
+        area = max(0.6, width_inches * height_inches)
+
+        paragraph_count = 0
+        char_count = 0
+        longest_line = 0
+        for paragraph in text_frame.paragraphs:
+            line = "".join(run.text for run in paragraph.runs).strip()
+            if not line:
+                continue
+            paragraph_count += 1
+            char_count += len(line)
+            longest_line = max(longest_line, len(line))
+
+        if char_count == 0 and getattr(text_frame, "text", ""):
+            text = text_frame.text.strip()
+            char_count = len(text)
+            paragraph_count = max(1, len([segment for segment in text.splitlines() if segment.strip()]))
+            longest_line = max((len(segment.strip()) for segment in text.splitlines() if segment.strip()), default=0)
+
+        return {
+            "width_inches": width_inches,
+            "height_inches": height_inches,
+            "area": area,
+            "paragraph_count": paragraph_count,
+            "char_count": char_count,
+            "longest_line": longest_line,
+        }
+
+    def _recommended_font_size(
+        self,
+        *,
+        max_size: int,
+        min_size: int,
+        char_count: int,
+        paragraph_count: int,
+        area: float,
+        longest_line: int,
+    ) -> int:
+        density = char_count / area if area else float(char_count)
+        reduction = 0
+        if density > 30:
+            reduction += 1
+        if density > 42:
+            reduction += 1
+        if density > 56:
+            reduction += 1
+        if density > 74:
+            reduction += 2
+        if paragraph_count >= 3:
+            reduction += 1
+        if paragraph_count >= 5:
+            reduction += 1
+        if longest_line >= 70:
+            reduction += 1
+        if longest_line >= 110:
+            reduction += 1
+        return max(min_size, max_size - reduction)
 
     def panel_content_box(
         self,
@@ -964,10 +1077,71 @@ class PresentationRenderer:
             for index in flexible_indices
         ]
         flexes = self.normalize_content_flexes(weights, min_flex=min_flex, max_flex=max_flex)
+        if weights and max(weights) / max(0.1, min(weights)) >= 1.85:
+            flexes = self.normalize_content_flexes(
+                weights,
+                min_flex=max(0.82, min_flex - 0.04),
+                max_flex=min(1.65, max_flex + 0.16),
+            )
         for index, flex in zip(flexible_indices, flexes, strict=True):
             balanced_regions[index]["flex"] = flex
             balanced_regions[index].pop("content_weight", None)
         return balanced_regions
+
+    def infer_visual_placeholder_kind(
+        self,
+        *,
+        slide_type: str,
+        title: str | None = None,
+        body: str | None = None,
+        caption: str | None = None,
+        image_path: str | None = None,
+    ) -> str:
+        text = " ".join(part for part in [title, body, caption, image_path] if part).lower()
+        if any(keyword in text for keyword in ["screenshot", "screen", "ui", "dashboard", "mockup", "product"]):
+            return "screenshot"
+        if any(keyword in text for keyword in ["diagram", "workflow", "process", "architecture", "roadmap", "timeline"]):
+            return "diagram"
+        if any(keyword in text for keyword in ["chart", "metric", "kpi", "trend", "table", "analytics", "analysis"]):
+            return "analytical_visual"
+        if slide_type in {"title", "closing", "summary"}:
+            return "photo"
+        return "photo"
+
+    def describe_visual_placeholder(
+        self,
+        slide_spec: Slide,
+    ) -> dict[str, str]:
+        kind = self.infer_visual_placeholder_kind(
+            slide_type=slide_spec.type.value,
+            title=slide_spec.title,
+            body=slide_spec.body,
+            caption=slide_spec.image_caption,
+            image_path=slide_spec.image_path,
+        )
+        mapping = {
+            "photo": {
+                "label": "VISUAL",
+                "headline": "Editorial visual pending" if slide_spec.image_path else "Editorial visual suggested",
+                "guidance": "Use a premium contextual photo with negative space to reinforce the narrative once the final asset is available.",
+            },
+            "screenshot": {
+                "label": "PRODUCT VISUAL",
+                "headline": "Product screenshot pending" if slide_spec.image_path else "Product visual suggested",
+                "guidance": "Use a crisp product screenshot, dashboard capture, or UI mockup that supports the point being made on this slide.",
+            },
+            "diagram": {
+                "label": "WORKFLOW VISUAL",
+                "headline": "Workflow visual pending" if slide_spec.image_path else "Workflow visual suggested",
+                "guidance": "Use a structured workflow, architecture, or process visual that makes the sequence and relationships easier to scan.",
+            },
+            "analytical_visual": {
+                "label": "ANALYTICAL VISUAL",
+                "headline": "Analytical visual pending" if slide_spec.image_path else "Analytical visual suggested",
+                "guidance": "Use a chart, scorecard, dashboard, or other analytical visual that makes the evidence easier to read at a glance.",
+            },
+        }
+        return {"kind": kind, **mapping[kind]}
 
     def build_content_stack(
         self,
