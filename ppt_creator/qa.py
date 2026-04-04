@@ -76,6 +76,21 @@ def _region_density(
     )
 
 
+def _region_text_chars(
+    *,
+    title: str | None = None,
+    body: str | None = None,
+    bullets: list[str] | None = None,
+    footer: str | None = None,
+    tag: str | None = None,
+) -> int:
+    return sum(
+        len(text)
+        for text in [title, body, footer, tag, *(bullets or [])]
+        if text
+    )
+
+
 def _build_layout_pressure_signals(renderer: PresentationRenderer, slide: Slide) -> list[dict[str, object]]:
     g = renderer.theme.grid
     signals: list[dict[str, object]] = []
@@ -226,15 +241,105 @@ def _build_layout_pressure_signals(renderer: PresentationRenderer, slide: Slide)
                     message="bullet list region is dense enough to risk crowding or overlap",
                 )
 
+    elif slide.type.value == "metrics" and slide.metrics:
+        metric_weights = [
+            renderer.estimate_content_weight(title=metric.label, body=metric.detail, footer=metric.trend, tag=metric.value)
+            for metric in slide.metrics
+        ]
+        metric_flexes = renderer.normalize_content_flexes(metric_weights, min_flex=0.9, max_flex=1.25)
+        metric_bounds = renderer.build_panel_row_bounds(
+            left=g.content_left,
+            top=2.45,
+            width=g.content_width,
+            height=2.25,
+            gap=0.28,
+            min_width=2.0,
+            regions=[
+                {"kind": f"metric_{index + 1}", "min_width": 2.0, "flex": flex}
+                for index, flex in enumerate(metric_flexes)
+            ],
+        )
+        for index, (metric, (left, panel_top, panel_width, panel_height)) in enumerate(
+            zip(slide.metrics, metric_bounds, strict=True),
+            start=1,
+        ):
+            content_left, content_top, content_width, content_height = renderer.panel_inner_bounds(
+                left=left,
+                top=panel_top,
+                width=panel_width,
+                height=panel_height,
+                padding=0.24,
+            )
+            density = _region_density(
+                width=content_width,
+                height=content_height,
+                title=metric.label,
+                body=metric.detail,
+                footer=metric.trend,
+                tag=metric.value,
+            )
+            add_signal(
+                region=f"metrics:card_{index}",
+                density=density,
+                threshold=3.9,
+                message=f"metric card {index} is dense enough to risk clipping or cramped KPI composition",
+            )
+            label_density = _region_density(
+                width=content_width,
+                height=max(0.34, content_height * 0.24),
+                title=metric.label,
+                tag=metric.value,
+            )
+            add_signal(
+                region=f"metrics:label_{index}",
+                density=label_density,
+                threshold=4.7,
+                message=f"metric card {index} label stack is dense enough to wrap awkwardly",
+            )
+            if metric.detail:
+                detail_density = _region_density(
+                    width=content_width,
+                    height=max(0.42, content_height * 0.38),
+                    body=metric.detail,
+                    footer=metric.trend,
+                )
+                add_signal(
+                    region=f"metrics:detail_{index}",
+                    density=detail_density,
+                    threshold=4.6,
+                    message=f"metric card {index} detail region is dense enough to feel cramped",
+                )
+                compact_stack_density = _region_density(
+                    width=content_width,
+                    height=max(0.56, content_height * 0.34),
+                    title=metric.label,
+                    body=metric.detail,
+                    footer=metric.trend,
+                )
+                add_signal(
+                    region=f"metrics:stack_{index}",
+                    density=compact_stack_density,
+                    threshold=5.15,
+                    message=f"metric card {index} combines too much text for its available stack height",
+                )
+
+        width_ratio = _balance_ratio([panel_width for _, _, panel_width, _ in metric_bounds])
+        imbalance_score = round(_balance_ratio(metric_weights) / max(1.0, width_ratio), 3)
+        add_signal(
+            region="metrics:row_imbalance",
+            density=imbalance_score,
+            threshold=1.28,
+            message="metric cards are materially imbalanced and may look visually uneven",
+        )
+
     elif slide.type.value == "summary":
         has_body = bool(slide.body)
         has_bullets = bool(slide.bullets)
         if has_body and has_bullets:
+            narrative_weight = renderer.estimate_content_weight(title=slide.title, body=slide.body)
+            takeaway_weight = renderer.estimate_content_weight(bullets=slide.bullets)
             split_flexes = renderer.normalize_content_flexes(
-                [
-                    renderer.estimate_content_weight(title=slide.title, body=slide.body),
-                    renderer.estimate_content_weight(bullets=slide.bullets),
-                ],
+                [narrative_weight, takeaway_weight],
                 min_flex=0.9,
                 max_flex=1.4,
             )
@@ -255,6 +360,14 @@ def _build_layout_pressure_signals(renderer: PresentationRenderer, slide: Slide)
                 density=density,
                 threshold=4.2,
                 message="summary narrative region is dense enough to risk crowding",
+            )
+            width_ratio = _balance_ratio([narrative_width, panel_width])
+            imbalance_score = round(_balance_ratio([narrative_weight, takeaway_weight]) / max(1.0, width_ratio), 3)
+            add_signal(
+                region="summary:split_imbalance",
+                density=imbalance_score,
+                threshold=0.9,
+                message="summary narrative and takeaway panel are imbalanced enough to compete for space",
             )
 
             content_left, content_top, content_width, content_height = renderer.panel_inner_bounds(
@@ -281,6 +394,40 @@ def _build_layout_pressure_signals(renderer: PresentationRenderer, slide: Slide)
                 threshold=3.8,
                 message="summary takeaways panel is dense enough to risk clipping",
             )
+            compact_takeaway_density = _region_density(
+                width=content_width,
+                height=max(0.72, bullet_height * 0.55),
+                bullets=slide.bullets,
+            )
+            add_signal(
+                region="summary:panel_width_pressure",
+                density=compact_takeaway_density,
+                threshold=4.2,
+                message="summary takeaways are dense enough to overwhelm the side panel width",
+            )
+            bullet_weights = [renderer.estimate_content_weight(body=bullet) for bullet in slide.bullets]
+            bullet_rows = renderer.build_weighted_rows(
+                top=0.0,
+                height=bullet_height,
+                gap=0.08,
+                weights=bullet_weights,
+                min_height=0.24,
+                min_flex=0.9,
+                max_flex=1.15,
+                kind_prefix="summary_takeaway",
+            )
+            for index, (bullet, (_, row_height)) in enumerate(zip(slide.bullets, bullet_rows, strict=True), start=1):
+                row_density = _region_density(
+                    width=content_width,
+                    height=max(0.2, row_height - 0.06),
+                    body=bullet,
+                )
+                add_signal(
+                    region=f"summary:takeaway_{index}",
+                    density=row_density,
+                    threshold=4.5,
+                    message=f"summary takeaway row {index} is dense enough to risk clipping inside the panel",
+                )
         elif has_body:
             density = _region_density(width=g.content_width, height=1.9, body=slide.body)
             add_signal(
@@ -298,8 +445,8 @@ def _build_layout_pressure_signals(renderer: PresentationRenderer, slide: Slide)
                 message="summary bullet panel is dense enough to risk crowding",
             )
 
-    elif slide.type.value in {"comparison", "two_column"}:
-        columns = slide.comparison_columns or slide.two_column_columns
+    elif slide.type.value == "comparison":
+        columns = slide.comparison_columns
         weights = [
             renderer.estimate_content_weight(
                 title=column.title,
@@ -310,6 +457,7 @@ def _build_layout_pressure_signals(renderer: PresentationRenderer, slide: Slide)
             )
             for column in columns
         ]
+        flexes = renderer.normalize_content_flexes(weights, min_flex=0.95, max_flex=1.2)
         panel_bounds = renderer.build_panel_row_bounds(
             left=g.content_left,
             top=2.45,
@@ -319,9 +467,7 @@ def _build_layout_pressure_signals(renderer: PresentationRenderer, slide: Slide)
             min_width=3.6,
             regions=[
                 {"kind": f"comparison_{index + 1}", "min_width": 3.6, "flex": flex}
-                for index, flex in enumerate(
-                    renderer.normalize_content_flexes(weights, min_flex=0.95, max_flex=1.2)
-                )
+                for index, flex in enumerate(flexes)
             ],
         )
         for index, (column, (left, panel_top, panel_width, panel_height)) in enumerate(zip(columns, panel_bounds, strict=True), start=1):
@@ -347,6 +493,396 @@ def _build_layout_pressure_signals(renderer: PresentationRenderer, slide: Slide)
                 threshold=3.7,
                 message=f"column '{column.title}' is dense enough to risk internal collisions",
             )
+            header_density = _region_density(
+                width=content_width,
+                height=0.42,
+                title=column.title,
+                tag=column.tag,
+            )
+            add_signal(
+                region=f"comparison:column_{index}:header",
+                density=header_density,
+                threshold=4.95,
+                message=f"comparison column {index} heading stack is dense enough to wrap awkwardly",
+            )
+            stack_regions: list[dict[str, float | str]] = [{"kind": "title", "height": 0.36}]
+            if column.body:
+                stack_regions.append(
+                    {
+                        "kind": "body",
+                        "min_height": 0.7,
+                        "flex": 1.0,
+                        "content_weight": renderer.estimate_content_weight(body=column.body),
+                    }
+                )
+            if column.bullets:
+                stack_regions.append(
+                    {
+                        "kind": "bullets",
+                        "min_height": 0.9,
+                        "flex": 1.0,
+                        "content_weight": renderer.estimate_content_weight(bullets=column.bullets),
+                    }
+                )
+            if len(stack_regions) > 1:
+                for region, (_, region_height) in renderer.build_content_stack(
+                    top=content_top,
+                    height=content_height,
+                    regions=stack_regions,
+                    gap=0.08,
+                    min_flex=0.9,
+                    max_flex=1.15,
+                ):
+                    if region["kind"] == "body" and column.body:
+                        body_density = _region_density(width=content_width, height=region_height, body=column.body)
+                        add_signal(
+                            region=f"comparison:column_{index}:body",
+                            density=body_density,
+                            threshold=4.2,
+                            message=f"comparison column {index} body is dense enough to crowd the panel",
+                        )
+                    elif region["kind"] == "bullets" and column.bullets:
+                        bullet_density = _region_density(width=content_width, height=region_height, bullets=column.bullets)
+                        add_signal(
+                            region=f"comparison:column_{index}:bullets",
+                            density=bullet_density,
+                            threshold=4.0,
+                            message=f"comparison column {index} bullets are dense enough to collide vertically",
+                        )
+                        bullet_weights = [renderer.estimate_content_weight(body=bullet) for bullet in column.bullets]
+                        bullet_rows = renderer.build_weighted_rows(
+                            top=0.0,
+                            height=region_height,
+                            gap=0.06,
+                            weights=bullet_weights,
+                            min_height=0.22,
+                            min_flex=0.9,
+                            max_flex=1.12,
+                            kind_prefix=f"comparison_{index}_bullet",
+                        )
+                        for bullet_index, (bullet, (_, row_height)) in enumerate(
+                            zip(column.bullets, bullet_rows, strict=True),
+                            start=1,
+                        ):
+                            row_density = _region_density(
+                                width=content_width,
+                                height=max(0.18, row_height - 0.04),
+                                body=bullet,
+                            )
+                            add_signal(
+                                region=f"comparison:column_{index}:bullet_{bullet_index}",
+                                density=row_density,
+                                threshold=4.65,
+                                message=f"comparison column {index} bullet row {bullet_index} is dense enough to clip inside the panel",
+                            )
+
+        width_ratio = _balance_ratio([panel_width for _, _, panel_width, _ in panel_bounds])
+        imbalance_score = round(_balance_ratio(weights) / max(1.0, width_ratio), 3)
+        add_signal(
+            region="comparison:split_imbalance",
+            density=imbalance_score,
+            threshold=1.28,
+            message="comparison columns are materially imbalanced and may compete for panel space",
+        )
+
+    elif slide.type.value == "two_column":
+        columns = slide.two_column_columns
+        weights = [
+            renderer.estimate_content_weight(
+                title=column.title,
+                body=column.body,
+                bullets=column.bullets,
+                footer=column.footer,
+                tag=column.tag,
+            )
+            for column in columns
+        ]
+        flexes = renderer.normalize_content_flexes(weights, min_flex=0.95, max_flex=1.25)
+        panel_bounds = renderer.build_panel_row_bounds(
+            left=g.content_left,
+            top=2.45,
+            width=g.content_width,
+            height=3.25,
+            gap=0.42,
+            min_width=3.6,
+            regions=[
+                {"kind": f"two_column_{index + 1}", "min_width": 3.6, "flex": flex}
+                for index, flex in enumerate(flexes)
+            ],
+        )
+        for index, (column, (left, panel_top, panel_width, panel_height)) in enumerate(zip(columns, panel_bounds, strict=True), start=1):
+            content_left, content_top, content_width, content_height = renderer.panel_inner_bounds(
+                left=left,
+                top=panel_top,
+                width=panel_width,
+                height=panel_height,
+                padding=0.28,
+            )
+            total_density = _region_density(
+                width=content_width,
+                height=content_height,
+                title=column.title,
+                body=column.body,
+                bullets=column.bullets,
+                footer=column.footer,
+                tag=column.tag,
+            )
+            add_signal(
+                region=f"two_column:column_{index}",
+                density=total_density,
+                threshold=3.9,
+                message=f"two-column panel {index} is dense enough to risk internal crowding",
+            )
+            header_density = _region_density(
+                width=content_width,
+                height=0.42,
+                title=column.title,
+                tag=column.tag,
+            )
+            add_signal(
+                region=f"two_column:column_{index}:header",
+                density=header_density,
+                threshold=4.95,
+                message=f"two-column panel {index} heading stack is dense enough to wrap awkwardly",
+            )
+            stack_regions: list[dict[str, float | str]] = [{"kind": "title", "height": 0.36}]
+            if column.body:
+                stack_regions.append(
+                    {
+                        "kind": "body",
+                        "min_height": 0.82,
+                        "flex": 1.0,
+                        "content_weight": renderer.estimate_content_weight(body=column.body),
+                    }
+                )
+            if column.bullets:
+                stack_regions.append(
+                    {
+                        "kind": "bullets",
+                        "min_height": 0.8,
+                        "flex": 1.0,
+                        "content_weight": renderer.estimate_content_weight(bullets=column.bullets),
+                    }
+                )
+            if len(stack_regions) > 1:
+                for region, (_, region_height) in renderer.build_content_stack(
+                    top=content_top,
+                    height=content_height,
+                    regions=stack_regions,
+                    gap=0.08,
+                    min_flex=0.9,
+                    max_flex=1.2,
+                ):
+                    if region["kind"] == "body" and column.body:
+                        body_density = _region_density(width=content_width, height=region_height, body=column.body)
+                        add_signal(
+                            region=f"two_column:column_{index}:body",
+                            density=body_density,
+                            threshold=4.25,
+                            message=f"two-column panel {index} body is dense enough to crowd the narrative region",
+                        )
+                    elif region["kind"] == "bullets" and column.bullets:
+                        bullet_density = _region_density(width=content_width, height=region_height, bullets=column.bullets)
+                        add_signal(
+                            region=f"two_column:column_{index}:bullets",
+                            density=bullet_density,
+                            threshold=4.1,
+                            message=f"two-column panel {index} bullets are dense enough to collide vertically",
+                        )
+                        bullet_weights = [renderer.estimate_content_weight(body=bullet) for bullet in column.bullets]
+                        bullet_rows = renderer.build_weighted_rows(
+                            top=0.0,
+                            height=region_height,
+                            gap=0.06,
+                            weights=bullet_weights,
+                            min_height=0.22,
+                            min_flex=0.9,
+                            max_flex=1.12,
+                            kind_prefix=f"two_column_{index}_bullet",
+                        )
+                        for bullet_index, (bullet, (_, row_height)) in enumerate(
+                            zip(column.bullets, bullet_rows, strict=True),
+                            start=1,
+                        ):
+                            row_density = _region_density(
+                                width=content_width,
+                                height=max(0.18, row_height - 0.04),
+                                body=bullet,
+                            )
+                            add_signal(
+                                region=f"two_column:column_{index}:bullet_{bullet_index}",
+                                density=row_density,
+                                threshold=4.7,
+                                message=f"two-column panel {index} bullet row {bullet_index} is dense enough to clip inside the panel",
+                            )
+
+        width_ratio = _balance_ratio([panel_width for _, _, panel_width, _ in panel_bounds])
+        imbalance_score = round(_balance_ratio(weights) / max(1.0, width_ratio), 3)
+        add_signal(
+            region="two_column:split_imbalance",
+            density=imbalance_score,
+            threshold=1.32,
+            message="two-column panels are materially imbalanced and may compete for space",
+        )
+
+    elif slide.type.value == "faq" and slide.faq_items:
+        item_weights = [renderer.estimate_content_weight(title=item.title, body=item.body) for item in slide.faq_items]
+        column_count = 2 if len(slide.faq_items) > 1 else 1
+        row_count = 2 if len(slide.faq_items) > 2 else 1
+        dense_faq = len(slide.faq_items) >= 4 or any(len(item.title) > 28 or len(item.body) > 115 for item in slide.faq_items)
+        grid = renderer.build_constrained_panel_grid_content_bounds(
+            left=g.content_left,
+            top=2.2,
+            width=g.content_width,
+            height=3.28 if row_count > 1 else (1.72 if dense_faq else 1.58),
+            column_gap=0.3 if dense_faq else 0.35,
+            row_gap=0.18 if dense_faq else 0.24,
+            column_regions=[
+                {
+                    "kind": f"faq_column_{column_index + 1}",
+                    "min_width": 3.1,
+                    "target_share": max(item_weights[column_index::column_count]),
+                    "max_width": 5.15 if column_count > 1 else g.content_width,
+                }
+                for column_index in range(column_count)
+            ],
+            row_regions=[
+                {
+                    "kind": f"faq_row_{row_index + 1}",
+                    "min_height": 1.18 if dense_faq else 1.12,
+                    "target_share": max(
+                        item_weights[row_index * column_count : (row_index + 1) * column_count]
+                    ),
+                    "max_height": 1.95 if row_count > 1 else (3.28 if dense_faq else 1.72),
+                }
+                for row_index in range(row_count)
+            ],
+            padding=0.2 if dense_faq else 0.22,
+        )
+        for index, item in enumerate(slide.faq_items, start=1):
+            row = (index - 1) // column_count
+            col = (index - 1) % column_count
+            _, (content_left, content_top, content_width, content_height) = grid[row][col]
+            density = _region_density(
+                width=max(0.8, content_width),
+                height=max(0.52, content_height),
+                title=item.title,
+                body=item.body,
+            )
+            add_signal(
+                region=f"faq:item_{index}",
+                density=density,
+                threshold=3.4,
+                message=f"FAQ item {index} is dense enough to risk cramped panel composition",
+            )
+            title_density = _region_density(
+                width=max(0.8, content_width),
+                height=max(0.26, content_height * 0.28),
+                title=item.title,
+            )
+            add_signal(
+                region=f"faq:item_{index}:header",
+                density=title_density,
+                threshold=4.45,
+                message=f"FAQ item {index} heading is dense enough to wrap awkwardly",
+            )
+            body_density = _region_density(
+                width=max(0.8, content_width),
+                height=max(0.46, content_height * 0.68),
+                body=item.body,
+            )
+            add_signal(
+                region=f"faq:item_{index}:body",
+                density=body_density,
+                threshold=3.6,
+                message=f"FAQ item {index} answer is dense enough to crowd the panel body",
+            )
+        add_signal(
+            region="faq:grid_imbalance",
+            density=_balance_ratio(item_weights),
+            threshold=1.3,
+            message="FAQ items are materially imbalanced and may create uneven panels",
+        )
+
+    elif slide.type.value == "closing":
+        quote_text = slide.quote or slide.body or ""
+        next_body = "Approve the narrative, connect your content pipeline, and reuse the same renderer across future decks."
+        quote_weight = renderer.estimate_content_weight(
+            title=slide.title,
+            body=quote_text,
+            footer=slide.attribution,
+        )
+        next_weight = renderer.estimate_content_weight(title="Next actions", body=next_body)
+        columns = renderer.build_constrained_columns(
+            left=g.content_left + 0.43,
+            width=g.content_right - (g.content_left + 0.43),
+            gap=0.34,
+            regions=[
+                {
+                    "kind": "quote",
+                    "min_width": 5.3,
+                    "target_share": quote_weight,
+                    "max_width": 7.35,
+                },
+                {
+                    "kind": "panel",
+                    "min_width": 2.8,
+                    "target_share": next_weight,
+                    "max_width": 4.0,
+                },
+            ],
+        )
+        quote_width = columns[0][1]
+        panel_width = columns[1][1]
+        dense_quote = bool(quote_weight >= 4.0 or len(quote_text) > 190)
+        quote_density = _region_density(
+            width=quote_width,
+            height=1.98 if dense_quote else 1.72,
+            title=slide.title,
+            body=quote_text,
+            footer=slide.attribution,
+        )
+        add_signal(
+            region="closing:quote",
+            density=quote_density,
+            threshold=3.7,
+            message="closing quote block is dense enough to lose impact or clip visually",
+        )
+        next_density = _region_density(
+            width=max(1.8, panel_width - 0.6),
+            height=2.1,
+            title="Next actions",
+            body=next_body,
+        )
+        add_signal(
+            region="closing:panel",
+            density=next_density,
+            threshold=3.45,
+            message="closing action panel is dense enough to feel cramped",
+        )
+        imbalance_score = round(
+            _balance_ratio([quote_weight, next_weight]) / max(1.0, _balance_ratio([quote_width, panel_width])),
+            3,
+        )
+        add_signal(
+            region="closing:split_imbalance",
+            density=imbalance_score,
+            threshold=1.1,
+            message="closing quote and action panel are imbalanced enough to compete for space",
+        )
+        if slide.attribution:
+            attribution_density = _region_density(
+                width=min(quote_width, 4.2),
+                height=0.35,
+                body=slide.attribution,
+            )
+            add_signal(
+                region="closing:attribution",
+                density=attribution_density,
+                threshold=5.2,
+                message="closing attribution is dense enough to wrap awkwardly below the quote",
+            )
+
 
     elif slide.type.value == "table" and slide.table_rows and slide.table_columns:
         column_flexes = renderer.normalize_content_flexes(
@@ -370,7 +906,45 @@ def _build_layout_pressure_signals(renderer: PresentationRenderer, slide: Slide)
                 for index, flex in enumerate(column_flexes)
             ],
         )
+        estimated_table_height = 0.42 + (0.46 * len(slide.table_rows))
+        for col_index, (column_name, (_, column_width)) in enumerate(zip(slide.table_columns, column_bounds, strict=True), start=1):
+            column_body = " ".join(row[col_index - 1] for row in slide.table_rows if col_index - 1 < len(row))
+            column_density = _region_density(
+                width=max(0.4, column_width - 0.12),
+                height=max(0.52, estimated_table_height - 0.16),
+                title=column_name,
+                body=column_body,
+            )
+            add_signal(
+                region=f"table:column_{col_index}",
+                density=column_density,
+                threshold=2.8,
+                message=f"table column {col_index} is dense enough to risk cramped cells across multiple rows",
+            )
+            header_density = _region_density(
+                width=max(0.4, column_width - 0.12),
+                height=0.42,
+                title=column_name,
+            )
+            header_threshold = 1.9 if len(column_name) > 22 else 2.45
+            add_signal(
+                region=f"table:header_{col_index}",
+                density=header_density,
+                threshold=header_threshold,
+                message=f"table header {col_index} is dense enough to wrap awkwardly or steal row space",
+            )
         for row_index, row in enumerate(slide.table_rows, start=1):
+            row_density = _region_density(
+                width=g.content_width,
+                height=max(0.34, (estimated_table_height / max(1, len(slide.table_rows))) - 0.06),
+                body=" ".join(row),
+            )
+            add_signal(
+                region=f"table:row_{row_index}",
+                density=row_density,
+                threshold=7.1,
+                message=f"table row {row_index} is dense enough to compress vertically",
+            )
             for col_index, (cell, (_, column_width)) in enumerate(zip(row, column_bounds, strict=True), start=1):
                 density = _region_density(width=max(0.4, column_width - 0.12), height=0.32, body=cell)
                 add_signal(
@@ -379,6 +953,13 @@ def _build_layout_pressure_signals(renderer: PresentationRenderer, slide: Slide)
                     threshold=8.0,
                     message=f"table cell r{row_index}c{col_index} is dense enough to risk clipping",
                 )
+        row_weights = [renderer.estimate_content_weight(body=" ".join(row)) for row in slide.table_rows]
+        add_signal(
+            region="table:row_imbalance",
+            density=_balance_ratio(row_weights),
+            threshold=1.05,
+            message="table rows vary significantly in density and may create visual imbalance",
+        )
 
     return signals
 

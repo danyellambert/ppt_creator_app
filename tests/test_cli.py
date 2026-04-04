@@ -293,30 +293,53 @@ def test_cli_template_accepts_audience_profile(tmp_path: Path) -> None:
 
 def test_cli_profiles_and_assets_commands_emit_reports(tmp_path: Path) -> None:
     profiles_report = tmp_path / "profiles.json"
+    brand_packs_report = tmp_path / "brand_packs.json"
     assets_report = tmp_path / "assets.json"
 
     assert main(["profiles", "--report-json", str(profiles_report)]) == 0
+    assert main(["brand-packs", "--report-json", str(brand_packs_report)]) == 0
     assert main(["assets", "--report-json", str(assets_report)]) == 0
 
     profiles_payload = json.loads(profiles_report.read_text(encoding="utf-8"))
+    brand_packs_payload = json.loads(brand_packs_report.read_text(encoding="utf-8"))
     assets_payload = json.loads(assets_report.read_text(encoding="utf-8"))
     assert profiles_payload["profiles"]
+    assert brand_packs_payload["brand_packs"]
     assert assets_payload["collections"]
 
 
 def test_cli_workflows_and_workflow_template_commands_emit_reports(tmp_path: Path) -> None:
     workflows_report = tmp_path / "workflows.json"
+    workflow_detail_report = tmp_path / "workflow_detail.json"
     workflow_template_output = tmp_path / "sales_qbr_template.json"
 
     assert main(["workflows", "--report-json", str(workflows_report)]) == 0
+    assert main(["workflows", "board_strategy", "--report-json", str(workflow_detail_report)]) == 0
     assert main(["workflow-template", "sales_qbr", str(workflow_template_output)]) == 0
 
     workflows_payload = json.loads(workflows_report.read_text(encoding="utf-8"))
+    workflow_detail_payload = json.loads(workflow_detail_report.read_text(encoding="utf-8"))
     assert workflows_payload["workflows"]
+    assert workflow_detail_payload["packet"]["preview_recommendation"]["recommended_source"] == "rendered_pptx"
+    assert workflow_detail_payload["packet"]["preview_recommendation"]["require_real_previews"] is True
 
     spec = PresentationInput.from_path(workflow_template_output)
-    assert spec.presentation.footer_text == "Sales profile"
+    assert spec.presentation.footer_text == "Sales pipeline brand pack"
     assert spec.presentation.title == "Sales operating review"
+
+
+def test_cli_template_and_workflow_template_accept_brand_pack(tmp_path: Path) -> None:
+    template_output = tmp_path / "sales_brand_pack_template.json"
+    workflow_output = tmp_path / "sales_brand_pack_workflow.json"
+
+    assert main(["template", "sales", str(template_output), "--brand-pack", "board_navy"]) == 0
+    assert main(["workflow-template", "sales_qbr", str(workflow_output), "--brand-pack", "sales_pipeline"]) == 0
+
+    template_spec = PresentationInput.from_path(template_output)
+    workflow_spec = PresentationInput.from_path(workflow_output)
+    assert template_spec.presentation.footer_text == "Board brand pack"
+    assert template_spec.slides[0].eyebrow == "Board review"
+    assert workflow_spec.presentation.footer_text == "Sales pipeline brand pack"
 
 
 def test_cli_preview_generates_pngs_and_thumbnail_sheet(tmp_path: Path, capsys) -> None:
@@ -429,6 +452,53 @@ def test_cli_preview_supports_visual_regression_against_baseline(tmp_path: Path)
     assert payload["visual_regression"]["current_manifest"]
     assert payload["visual_regression"]["baseline_manifest"]
     assert payload["visual_regression"]["source_mismatch"] is False
+
+
+def test_cli_preview_fail_on_regression_returns_error_when_diff_is_detected(tmp_path: Path) -> None:
+    baseline_dir = tmp_path / "baseline_fail_preview"
+    current_dir = tmp_path / "current_fail_preview"
+
+    assert main(["preview", "examples/ai_sales.json", str(baseline_dir), "--basename", "baseline-fail-preview"]) == 0
+
+    result = main(
+        [
+            "preview",
+            "examples/product_strategy.json",
+            str(current_dir),
+            "--basename",
+            "current-fail-preview",
+            "--baseline-dir",
+            str(baseline_dir),
+            "--fail-on-regression",
+        ]
+    )
+
+    assert result == 2
+
+
+def test_cli_promote_baseline_copies_preview_set_and_manifest(tmp_path: Path) -> None:
+    source_dir = tmp_path / "preview_source"
+    baseline_dir = tmp_path / "preview_baseline"
+    report_path = tmp_path / "promote_baseline_report.json"
+
+    assert main(["preview", "examples/ai_sales.json", str(source_dir), "--basename", "source-preview"]) == 0
+
+    result = main(
+        [
+            "promote-baseline",
+            str(source_dir),
+            str(baseline_dir),
+            "--report-json",
+            str(report_path),
+        ]
+    )
+
+    assert result == 0
+    payload = json.loads(report_path.read_text(encoding="utf-8"))
+    assert payload["mode"] == "promote-baseline"
+    assert payload["preview_count"] == 10
+    assert Path(payload["preview_manifest"]).exists()
+    assert payload["copied_thumbnail_sheets"]
 
 
 def test_cli_preview_require_real_fails_without_office_runtime(tmp_path: Path, monkeypatch) -> None:

@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import json
+import re
+import shutil
+import subprocess
 from pathlib import Path
 from threading import Thread
 from urllib import request
@@ -8,7 +11,7 @@ from urllib import request
 from PIL import Image
 from pptx import Presentation as PptxPresentation
 
-from ppt_creator.api import build_api_server
+from ppt_creator.api import _build_playground_html, build_api_server
 from ppt_creator.renderer import PresentationRenderer
 from ppt_creator.schema import PresentationInput
 
@@ -21,7 +24,10 @@ def _request_json(url: str, payload: dict[str, object] | None = None, *, method:
         return response.status, json.loads(response.read().decode("utf-8"))
 
 
-def test_api_health_and_templates_endpoints() -> None:
+def test_api_health_and_templates_endpoints(monkeypatch) -> None:
+    monkeypatch.delenv("PPT_CREATOR_AI_SERVICE_PROVIDER", raising=False)
+    monkeypatch.delenv("PPT_CREATOR_AI_SERVICE_MODEL", raising=False)
+
     server = build_api_server("127.0.0.1", 0, asset_root="examples")
     thread = Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -44,23 +50,162 @@ def test_api_health_and_templates_endpoints() -> None:
         assert status == 200
         assert assets_payload["collections"]
 
+        status, brand_packs_payload = _request_json(f"{base_url}/brand-packs")
+        assert status == 200
+        assert brand_packs_payload["brand_packs"]
+
         status, workflows_payload = _request_json(f"{base_url}/workflows")
         assert status == 200
         assert workflows_payload["workflows"]
 
         status, providers_payload = _request_json(f"{base_url}/ai/providers")
         assert status == 200
-        assert providers_payload["providers"] == ["heuristic", "local_service"]
+        assert providers_payload["providers"] == ["heuristic", "local_service", "ollama_local"]
+        ollama_provider = next(
+            item for item in providers_payload["provider_details"] if item["name"] == "ollama_local"
+        )
+        assert ollama_provider["supports_model_listing"] is True
+
+        status, ai_status_payload = _request_json(f"{base_url}/ai/status")
+        assert status == 200
+        assert ai_status_payload["result"]["mode"] == "ai-status"
+        assert ai_status_payload["result"]["selected_provider"] == "local_service"
+        assert ai_status_payload["result"]["provider_status"]["service_url"]
+        assert ai_status_payload["result"]["provider_status"]["provider_name"] == "ollama"
+        assert ai_status_payload["result"]["provider_status"]["provider_source"] == "app_default"
+        assert ai_status_payload["result"]["provider_status"]["model_name"] == "nemotron-3-nano:30b-cloud"
+        assert ai_status_payload["result"]["provider_status"]["model_source"] == "app_default"
 
         req = request.Request(f"{base_url}/playground", method="GET")
         with request.urlopen(req, timeout=5) as response:
             html = response.read().decode("utf-8")
         assert "PPT Creator Playground" in html
         assert "workflowPreset" in html
+        assert "brandPack" in html
+        assert "autoValidate" in html
+        assert "autoReview" in html
+        assert "compareBeforePptx" in html
+        assert "Compare PPTX" in html
+        assert "Review rendered PPTX" in html
+        assert "slideSelector" in html
+        assert "Apply guided edits" in html
+        assert "Promote baseline" in html
+        assert "requireRealPreviews" in html
+        assert "failOnRegression" in html
+        assert "aiProvider" in html
+        assert "aiAuthoringMode" in html
+        assert "briefingInput" in html
+        assert "intentInput" in html
+        assert "aiUseIntentMode" in html
+        assert "Generate from AI briefing" in html
+        assert "Generate + Render with AI" in html
+        assert "/ai/providers" in html
+        assert "/ai/models" in html
+        assert "/ai/status" in html
+        assert "Refresh AI status" in html
+        assert "aiRuntimeStatus" in html
+        assert "aiActionStatus" in html
+        assert "aiModelOptions" in html
+        assert "aiAutoPreview" in html
+        assert "aiAutoRender" in html
+        assert "themeToggleButton" in html
+        assert "toggleTheme()" in html
+        assert "themeStorageKey" in html
+        assert "Deck studio + AI copilot" in html
+        assert "Default trusted workflow" in html
+        assert "Request provider:" in html
+        assert "Request model:" in html
+        assert "Describe the deck you want" in html
+        assert "AI-first (send raw prompt to the AI author)" in html
+        assert "AI request / response" in html
+        assert "Prompt sent to AI" in html
+        assert "Raw AI response" in html
     finally:
         server.shutdown()
         server.server_close()
         thread.join(timeout=5)
+
+
+def test_api_exposes_ollama_model_listing(monkeypatch) -> None:
+    from ppt_creator_ai.providers import get_provider
+
+    provider = get_provider("ollama_local")
+    monkeypatch.setattr(
+        provider,
+        "list_models",
+        lambda: {
+            "provider": "ollama_local",
+            "service_url": "http://127.0.0.1:11434",
+            "model_count": 2,
+            "models": [
+                {"name": "qwen2.5:7b", "size": 123},
+                {"name": "llama3.2:3b", "size": 456},
+            ],
+        },
+    )
+    monkeypatch.setattr(
+        provider,
+        "status_payload",
+        lambda: {
+            "service_url": "http://127.0.0.1:11434",
+            "provider_name": "ollama",
+            "provider_source": "app_default",
+            "model_name": "qwen2.5:7b",
+            "model_source": "auto_discovered",
+            "health_status": "ok",
+            "model_count": 2,
+            "models": [{"name": "qwen2.5:7b"}, {"name": "llama3.2:3b"}],
+            "supports_model_listing": True,
+        },
+    )
+
+    server = build_api_server("127.0.0.1", 0, asset_root="examples")
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    try:
+        base_url = f"http://127.0.0.1:{server.server_address[1]}"
+        status, models_payload = _request_json(f"{base_url}/ai/models?provider_name=ollama_local")
+        assert status == 200
+        assert models_payload["result"]["provider"] == "ollama_local"
+        assert [item["name"] for item in models_payload["result"]["models"]] == ["qwen2.5:7b", "llama3.2:3b"]
+
+        status, ai_status_payload = _request_json(f"{base_url}/ai/status?provider_name=ollama_local")
+        assert status == 200
+        assert ai_status_payload["result"]["selected_provider"] == "ollama_local"
+        assert ai_status_payload["result"]["provider_status"]["supports_model_listing"] is True
+        assert ai_status_payload["result"]["provider_status"]["model_count"] == 2
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
+def test_playground_html_embedded_script_remains_valid(tmp_path: Path) -> None:
+    html = _build_playground_html()
+    assert "join('\\n')" in html
+    assert "split(/\\n+/)" in html
+    assert "attachGenerationContextToActionData" in html
+    assert "await runAction('/review', { generationResult: result });" in html
+    assert "await runAction('/render', { generationResult: result });" in html
+    assert "const merged = attachGenerationContextToActionData(response.data, options.generationResult);" in html
+
+    match = re.search(r"<script>(.*?)</script>", html, re.S)
+    assert match is not None
+
+    node_binary = shutil.which("node")
+    if node_binary is None:
+        return
+
+    script_path = tmp_path / "playground.js"
+    script_path.write_text(match.group(1), encoding="utf-8")
+    result = subprocess.run(
+        [node_binary, "--check", str(script_path)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
 
 
 def test_api_generate_and_generate_and_render_endpoints(tmp_path: Path) -> None:
@@ -80,7 +225,40 @@ def test_api_generate_and_generate_and_render_endpoints(tmp_path: Path) -> None:
         assert status == 200
         assert generate_payload["result"]["mode"] == "generate"
         assert generate_payload["result"]["provider"] == "heuristic"
+        assert generate_payload["result"]["transport_provider"] == "heuristic"
         assert generate_payload["result"]["slide_count"] >= 4
+
+        status, intent_generate_payload = _request_json(
+            f"{base_url}/generate",
+            {
+                "intent_text": "Quero um deck para o board explicando por que um copiloto de vendas deve ser lançado agora, com três benefícios, métricas, comparação de opções e fechamento forte.",
+                "provider_name": "heuristic",
+            },
+            method="POST",
+        )
+        assert status == 200
+        assert intent_generate_payload["result"]["mode"] == "generate"
+        assert intent_generate_payload["result"]["slide_count"] >= 5
+
+        preview_dir = tmp_path / "generated_from_intent_previews"
+        output_path_from_intent = tmp_path / "generated_from_intent.pptx"
+        status, intent_generate_render_payload = _request_json(
+            f"{base_url}/generate-and-render",
+            {
+                "intent_text": "Monte uma apresentação de product operating review mostrando onde o roadmap está diluído, quais decisões precisam ser tomadas, métricas, riscos, trade-offs e a sequência recomendada para o próximo trimestre.",
+                "provider_name": "heuristic",
+                "output_path": str(output_path_from_intent),
+                "include_review": True,
+                "preview_output_dir": str(preview_dir),
+                "preview_backend": "synthetic",
+            },
+            method="POST",
+        )
+        assert status == 200
+        assert intent_generate_render_payload["result"]["generation"]["mode"] == "generate"
+        assert intent_generate_render_payload["result"]["render"]["rendered"] is True
+        assert intent_generate_render_payload["result"]["render"]["preview_result"]["preview_count"] >= 1
+        assert Path(intent_generate_render_payload["result"]["render"]["preview_result"]["thumbnail_sheet"]).exists()
 
         output_path = tmp_path / "generated_from_api.pptx"
         status, generate_render_payload = _request_json(
@@ -100,6 +278,79 @@ def test_api_generate_and_generate_and_render_endpoints(tmp_path: Path) -> None:
         server.shutdown()
         server.server_close()
         thread.join(timeout=5)
+
+
+def test_api_generate_intent_with_local_service_defaults_to_ai_first_authoring(monkeypatch) -> None:
+    from ppt_creator.api import generate_briefing_payload
+    from ppt_creator_ai.providers import get_provider
+    from ppt_creator_ai.providers.base import BriefingGenerationResult
+
+    provider = get_provider("local_service")
+    captured: dict[str, object] = {}
+
+    def _fake_generate(briefing, *, theme_name=None, feedback_messages=None):
+        captured["briefing"] = briefing.model_dump(mode="json")
+        return BriefingGenerationResult(
+            provider_name="local_service",
+            payload={
+                "presentation": {"title": briefing.title, "theme": "executive_premium_minimal"},
+                "slides": [
+                    {"type": "title", "title": briefing.title},
+                    {"type": "closing", "title": "Closing", "quote": "Done."},
+                ],
+            },
+            analysis={"provider": "local_service"},
+        )
+
+    monkeypatch.setattr(provider, "generate", _fake_generate)
+
+    result = generate_briefing_payload(
+        provider_name="local_service",
+        intent_text="Quero uma apresentação para entrevista de AI Engineer mostrando minha trajetória, stack e projetos em IA.",
+    )
+
+    assert result["provider"] == "local_service"
+    assert result["transport_provider"] == "local_service"
+    assert result["authoring_mode"] == "ai_first"
+    assert captured["briefing"]["outline"] == []
+    assert captured["briefing"]["recommendations"] == []
+    assert captured["briefing"]["briefing_text"]
+
+
+def test_api_generate_intent_without_provider_defaults_to_model_backed_ai_first(monkeypatch) -> None:
+    from ppt_creator.api import generate_briefing_payload
+    from ppt_creator_ai.providers import get_provider
+    from ppt_creator_ai.providers.base import BriefingGenerationResult
+
+    provider = get_provider("local_service")
+    captured: dict[str, object] = {}
+
+    def _fake_generate(briefing, *, theme_name=None, feedback_messages=None):
+        captured["briefing"] = briefing.model_dump(mode="json")
+        return BriefingGenerationResult(
+            provider_name="local_service",
+            payload={
+                "presentation": {"title": briefing.title, "theme": "executive_premium_minimal"},
+                "slides": [
+                    {"type": "title", "title": briefing.title},
+                    {"type": "closing", "title": "Closing", "quote": "Done."},
+                ],
+            },
+            analysis={"provider": "local_service"},
+        )
+
+    monkeypatch.setattr(provider, "generate", _fake_generate)
+
+    result = generate_briefing_payload(
+        intent_text="Quero uma apresentação para entrevista de AI Engineer mostrando minha trajetória, stack e projetos em IA.",
+    )
+
+    assert result["provider"] == "local_service"
+    assert result["transport_provider"] == "local_service"
+    assert result["authoring_mode"] == "ai_first"
+    assert captured["briefing"]["outline"] == []
+    assert captured["briefing"]["recommendations"] == []
+    assert captured["briefing"]["briefing_text"]
 
 
 def test_api_validate_render_and_template_endpoints(tmp_path: Path) -> None:
@@ -156,21 +407,29 @@ def test_api_validate_render_and_template_endpoints(tmp_path: Path) -> None:
 
         status, template_payload = _request_json(
             f"{base_url}/template",
-            {"domain": "sales", "theme_name": "consulting_clean", "audience_profile": "board"},
+            {"domain": "sales", "theme_name": "consulting_clean", "audience_profile": "board", "brand_pack": "board_navy"},
             method="POST",
         )
         assert status == 200
         assert template_payload["template"]["presentation"]["theme"] == "consulting_clean"
-        assert template_payload["template"]["presentation"]["footer_text"] == "Board profile"
+        assert template_payload["template"]["presentation"]["footer_text"] == "Board brand pack"
+        assert template_payload["packet"]["asset_collections"]
+        assert template_payload["packet"]["asset_strategy"]["cover_asset_collection"] == "boardroom_backdrops"
+        assert template_payload["packet"]["slide_asset_suggestions"]
 
         status, workflow_template_payload = _request_json(
             f"{base_url}/workflow-template",
-            {"workflow_name": "sales_qbr"},
+            {"workflow_name": "sales_qbr", "brand_pack": "sales_pipeline"},
             method="POST",
         )
         assert status == 200
         assert workflow_template_payload["packet"]["workflow"]["name"] == "sales_qbr"
-        assert workflow_template_payload["packet"]["template"]["presentation"]["footer_text"] == "Sales profile"
+        assert workflow_template_payload["packet"]["template"]["presentation"]["footer_text"] == "Sales pipeline brand pack"
+        assert workflow_template_payload["packet"]["preview_recommendation"]["recommended_source"] == "rendered_pptx"
+        assert workflow_template_payload["packet"]["preview_recommendation"]["require_real_previews"] is True
+        assert str(workflow_template_payload["packet"]["preview_recommendation"]["baseline_dir"]).endswith("sales_qbr_baseline")
+        assert workflow_template_payload["packet"]["asset_strategy"]["placeholder_style"] == "analytical_visual"
+        assert workflow_template_payload["packet"]["slide_asset_suggestions"]
 
         preview_module.find_office_runtime = lambda: None
         preview_dir = tmp_path / "api_previews"
@@ -234,6 +493,7 @@ def test_api_validate_render_and_template_endpoints(tmp_path: Path) -> None:
         assert regression_preview_payload["result"]["visual_regression"]["current_manifest"]
         assert regression_preview_payload["result"]["visual_regression"]["baseline_manifest"]
         assert regression_preview_payload["result"]["visual_regression"]["source_mismatch"] is False
+        assert regression_preview_payload["result"]["visual_regression"]["guidance"] == []
 
         pptx_path = tmp_path / "api_preview_source.pptx"
         PresentationRenderer(asset_root="examples").render(PresentationInput.model_validate(spec_payload), pptx_path)
@@ -508,6 +768,89 @@ def test_api_preview_can_require_real_previews(tmp_path: Path) -> None:
             assert False, "request should fail when real previews are required without office runtime"
         except Exception as exc:  # noqa: BLE001
             assert "HTTP Error 500" in str(exc)
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
+def test_api_preview_fail_on_regression_returns_conflict(tmp_path: Path) -> None:
+    server = build_api_server("127.0.0.1", 0, asset_root="examples")
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    try:
+        base_url = f"http://127.0.0.1:{server.server_address[1]}"
+        spec_payload = PresentationInput.from_path("examples/ai_sales.json").model_dump(mode="json")
+        baseline_dir = tmp_path / "api_fail_baseline"
+
+        status, _ = _request_json(
+            f"{base_url}/preview",
+            {
+                "spec": spec_payload,
+                "output_dir": str(baseline_dir),
+                "basename": "api-fail-baseline",
+            },
+            method="POST",
+        )
+        assert status == 200
+
+        try:
+            _request_json(
+                f"{base_url}/preview",
+                {
+                    "spec": spec_payload,
+                    "output_dir": str(tmp_path / "api_fail_current"),
+                    "basename": "api-fail-current",
+                    "theme_name": "dark_boardroom",
+                    "baseline_dir": str(baseline_dir),
+                    "fail_on_regression": True,
+                },
+                method="POST",
+            )
+            assert False, "preview should fail when fail_on_regression is enabled and diffs exist"
+        except Exception as exc:  # noqa: BLE001
+            assert "HTTP Error 409" in str(exc)
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
+def test_api_promote_baseline_endpoint_copies_preview_set(tmp_path: Path) -> None:
+    server = build_api_server("127.0.0.1", 0, asset_root="examples")
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    try:
+        base_url = f"http://127.0.0.1:{server.server_address[1]}"
+        spec_payload = PresentationInput.from_path("examples/ai_sales.json").model_dump(mode="json")
+        source_dir = tmp_path / "api_promote_source"
+        baseline_dir = tmp_path / "api_promote_target"
+
+        status, preview_payload = _request_json(
+            f"{base_url}/preview",
+            {
+                "spec": spec_payload,
+                "output_dir": str(source_dir),
+                "basename": "api-promote-source",
+            },
+            method="POST",
+        )
+        assert status == 200
+
+        status, promote_payload = _request_json(
+            f"{base_url}/promote-baseline",
+            {
+                "source_dir": str(source_dir),
+                "baseline_dir": str(baseline_dir),
+            },
+            method="POST",
+        )
+        assert status == 200
+        assert promote_payload["result"]["mode"] == "promote-baseline"
+        assert promote_payload["result"]["preview_count"] == preview_payload["result"]["preview_count"]
+        assert Path(promote_payload["result"]["preview_manifest"]).exists()
     finally:
         server.shutdown()
         server.server_close()

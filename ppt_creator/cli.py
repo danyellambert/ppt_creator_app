@@ -9,12 +9,16 @@ from tempfile import TemporaryDirectory
 from pydantic import ValidationError
 
 from ppt_creator.assets import get_asset_collection, list_asset_collections
+from ppt_creator.brand_packs import get_brand_pack, list_brand_packs
 from ppt_creator.preview import (
     compare_pptx_artifacts,
+    format_visual_regression_failure,
+    promote_preview_baseline,
     render_previews,
     render_previews_for_rendered_artifact,
     render_previews_from_pptx,
     review_pptx_artifact,
+    visual_regression_has_failures,
 )
 from ppt_creator.profiles import get_audience_profile, list_audience_profiles
 from ppt_creator.qa import augment_review_with_preview_artifacts, review_presentation
@@ -79,6 +83,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Fail preview/regression during render when a real PPTX-based preview cannot be used",
     )
     render_parser.add_argument(
+        "--preview-fail-on-regression",
+        action="store_true",
+        help="Fail render when preview regression against a baseline reports diffs or baseline mismatches",
+    )
+    render_parser.add_argument(
         "--preview-report-json",
         help="Optional path to write a JSON preview report when --preview-dir is used",
     )
@@ -130,6 +139,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Fail when a real PPTX-based preview set is required but only synthetic preview is available",
     )
+    preview_parser.add_argument(
+        "--fail-on-regression",
+        action="store_true",
+        help="Fail when preview regression against a baseline reports diffs or baseline mismatches",
+    )
     preview_parser.add_argument("--report-json", help="Optional path to write a JSON preview report")
 
     preview_pptx_parser = subparsers.add_parser(
@@ -156,6 +170,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--require-real-previews",
         action="store_true",
         help="Require real PPTX-based preview provenance for regression checks",
+    )
+    preview_pptx_parser.add_argument(
+        "--fail-on-regression",
+        action="store_true",
+        help="Fail when PPTX preview regression against a baseline reports diffs or baseline mismatches",
     )
     preview_pptx_parser.add_argument("--report-json", help="Optional path to write a JSON PPTX preview report")
 
@@ -184,6 +203,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Require real PPTX-based preview provenance for regression checks in review-pptx",
     )
+    review_pptx_parser.add_argument(
+        "--fail-on-regression",
+        action="store_true",
+        help="Fail when review-pptx regression against a baseline reports diffs or baseline mismatches",
+    )
     review_pptx_parser.add_argument("--report-json", help="Optional path to write a JSON PPTX review report")
 
     compare_pptx_parser = subparsers.add_parser(
@@ -211,11 +235,38 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Require real PPTX-based preview provenance for comparison inputs and baseline pairing",
     )
+    compare_pptx_parser.add_argument(
+        "--fail-on-regression",
+        action="store_true",
+        help="Fail when compare-pptx detects diffs or preview provenance mismatches",
+    )
     compare_pptx_parser.add_argument("--report-json", help="Optional path to write a JSON comparison report")
+
+    promote_baseline_parser = subparsers.add_parser(
+        "promote-baseline",
+        help="Copy a generated preview set into a baseline directory for future regression comparisons",
+    )
+    promote_baseline_parser.add_argument("source_dir", help="Directory containing the preview set to promote")
+    promote_baseline_parser.add_argument("baseline_dir", help="Target baseline directory to refresh")
+    promote_baseline_parser.add_argument(
+        "--keep-existing",
+        action="store_true",
+        help="Do not delete the existing baseline directory before copying the new preview set",
+    )
+    promote_baseline_parser.add_argument(
+        "--skip-thumbnail-sheet",
+        action="store_true",
+        help="Skip copying thumbnail sheet images while promoting the baseline",
+    )
+    promote_baseline_parser.add_argument("--report-json", help="Optional path to write a JSON baseline promotion report")
 
     profiles_parser = subparsers.add_parser("profiles", help="List built-in audience profiles")
     profiles_parser.add_argument("profile_name", nargs="?", help="Optional specific profile to inspect")
     profiles_parser.add_argument("--report-json", help="Optional path to write a JSON profiles report")
+
+    brand_packs_parser = subparsers.add_parser("brand-packs", help="List built-in brand packs")
+    brand_packs_parser.add_argument("brand_pack_name", nargs="?", help="Optional specific brand pack to inspect")
+    brand_packs_parser.add_argument("--report-json", help="Optional path to write a JSON brand-pack report")
 
     assets_parser = subparsers.add_parser("assets", help="List built-in asset collections")
     assets_parser.add_argument("collection_name", nargs="?", help="Optional specific collection to inspect")
@@ -232,6 +283,7 @@ def build_parser() -> argparse.ArgumentParser:
     workflow_template_parser.add_argument("workflow_name", choices=list_workflow_presets(), help="Workflow preset to generate")
     workflow_template_parser.add_argument("output_json", help="Destination .json path")
     workflow_template_parser.add_argument("--theme", help="Optional theme override for the generated workflow template")
+    workflow_template_parser.add_argument("--brand-pack", choices=list_brand_packs(), help="Optional brand pack override for the workflow starter deck")
 
     validate_parser = subparsers.add_parser("validate", help="Validate JSON without rendering")
     validate_parser.add_argument("input_json", help="Path to the structured JSON input")
@@ -274,6 +326,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Fail preview/regression during review when a real PPTX-based preview cannot be used",
     )
+    review_parser.add_argument(
+        "--preview-fail-on-regression",
+        action="store_true",
+        help="Fail review when preview regression against a baseline reports diffs or baseline mismatches",
+    )
     review_parser.add_argument("--report-json", help="Optional path to write a JSON review report")
 
     template_parser = subparsers.add_parser(
@@ -284,6 +341,7 @@ def build_parser() -> argparse.ArgumentParser:
     template_parser.add_argument("output_json", help="Destination .json path")
     template_parser.add_argument("--theme", help="Override the default theme used by the template")
     template_parser.add_argument("--audience-profile", help="Optional audience profile to adapt the starter deck")
+    template_parser.add_argument("--brand-pack", choices=list_brand_packs(), help="Optional brand pack to apply to the starter deck")
 
     batch_parser = subparsers.add_parser(
         "render-batch",
@@ -358,6 +416,16 @@ def write_json_payload(path: str | Path, payload: dict[str, object]) -> None:
     output_path = Path(path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+
+def maybe_raise_for_visual_regression(
+    visual_regression: dict[str, object] | None,
+    *,
+    enabled: bool,
+    context: str,
+) -> None:
+    if enabled and visual_regression_has_failures(visual_regression):
+        raise ValueError(format_visual_regression_failure(visual_regression, context=context))
 
 
 def validate_json_output_path(output_json: str | Path) -> Path:
@@ -467,6 +535,7 @@ def review_one(
     preview_baseline_dir: str | Path | None = None,
     preview_write_diff_images: bool = False,
     preview_require_real: bool = False,
+    preview_fail_on_regression: bool = False,
 ) -> dict[str, object]:
     input_path = Path(input_json)
     print_info(f"Loading input: {input_path}")
@@ -529,6 +598,11 @@ def review_one(
             f"source={preview_source}, backend={preview_result.get('backend_used')}, "
             f"artifact_status={preview_result.get('preview_artifact_review', {}).get('status')}"
         )
+        maybe_raise_for_visual_regression(
+            preview_result.get("visual_regression"),
+            enabled=preview_fail_on_regression,
+            context="review preview regression",
+        )
 
     return {
         "input_path": str(input_path),
@@ -556,6 +630,7 @@ def render_one(
     preview_write_diff_images: bool = False,
     preview_report_json: str | Path | None = None,
     preview_require_real: bool = False,
+    preview_fail_on_regression: bool = False,
 ) -> dict[str, object]:
     input_path = Path(input_json)
     print_info(f"Loading input: {input_path}")
@@ -611,6 +686,11 @@ def render_one(
             )
             if preview_report_json:
                 write_report(preview_report_json, preview_result)
+            maybe_raise_for_visual_regression(
+                preview_result.get("visual_regression"),
+                enabled=preview_fail_on_regression,
+                context="render dry-run preview regression",
+            )
 
         print(f"[OK] Dry run: {input_path} -> {output_path} ({len(spec.slides)} slides)")
         return build_report(
@@ -646,6 +726,11 @@ def render_one(
         )
         if preview_report_json:
             write_report(preview_report_json, preview_result)
+        maybe_raise_for_visual_regression(
+            preview_result.get("visual_regression"),
+            enabled=preview_fail_on_regression,
+            context="render preview regression",
+        )
 
     print(f"[OK] Generated deck: {rendered_output} ({len(spec.slides)} slides)")
     return build_report(
@@ -680,6 +765,7 @@ def preview_one(
     diff_threshold: float = 0.01,
     write_diff_images: bool = False,
     require_real_previews: bool = False,
+    fail_on_regression: bool = False,
 ) -> dict[str, object]:
     input_path = Path(input_json)
     print_info(f"Loading input: {input_path}")
@@ -726,6 +812,11 @@ def preview_one(
         )
         if result["visual_regression"].get("source_mismatch"):
             print_warning("Preview regression paired preview sets with different provenance; inspect manifest metadata")
+    maybe_raise_for_visual_regression(
+        result.get("visual_regression"),
+        enabled=fail_on_regression,
+        context="preview regression",
+    )
 
     return build_preview_report(
         input_path=input_path,
@@ -746,6 +837,7 @@ def preview_pptx_one(
     diff_threshold: float = 0.01,
     write_diff_images: bool = False,
     require_real_previews: bool = False,
+    fail_on_regression: bool = False,
 ) -> dict[str, object]:
     input_path = Path(input_pptx)
     output_path = Path(output_dir)
@@ -774,6 +866,11 @@ def preview_pptx_one(
             f"{result['visual_regression']['diff_count']} diff(s), "
             f"{result['visual_regression']['missing_baseline_count']} missing baseline(s)"
         )
+    maybe_raise_for_visual_regression(
+        result.get("visual_regression"),
+        enabled=fail_on_regression,
+        context="preview-pptx regression",
+    )
     return result
 
 
@@ -787,6 +884,7 @@ def compare_pptx_one(
     diff_threshold: float = 0.01,
     write_diff_images: bool = False,
     require_real_previews: bool = False,
+    fail_on_regression: bool = False,
 ) -> dict[str, object]:
     before_path = Path(before_pptx)
     after_path = Path(after_pptx)
@@ -808,6 +906,11 @@ def compare_pptx_one(
         f"{result['comparison']['diff_count']} diff(s), "
         f"{result['comparison']['missing_baseline_count']} missing baseline(s)"
     )
+    maybe_raise_for_visual_regression(
+        result.get("comparison"),
+        enabled=fail_on_regression,
+        context="compare-pptx",
+    )
     return result
 
 
@@ -821,6 +924,7 @@ def review_pptx_one(
     diff_threshold: float = 0.01,
     write_diff_images: bool = False,
     require_real_previews: bool = False,
+    fail_on_regression: bool = False,
 ) -> dict[str, object]:
     input_path = Path(input_pptx)
     output_path = Path(output_dir)
@@ -837,6 +941,31 @@ def review_pptx_one(
         require_real_previews=require_real_previews,
     )
     print(f"[OK] PPTX review completed: {result['issue_count']} issue(s), average score {result['average_score']}")
+    maybe_raise_for_visual_regression(
+        (result.get("preview_result") or {}).get("visual_regression") if isinstance(result, dict) else None,
+        enabled=fail_on_regression,
+        context="review-pptx regression",
+    )
+    return result
+
+
+def promote_baseline_one(
+    source_dir: str | Path,
+    baseline_dir: str | Path,
+    *,
+    keep_existing: bool = False,
+    skip_thumbnail_sheet: bool = False,
+) -> dict[str, object]:
+    print_info(f"Promoting preview baseline: {source_dir} -> {baseline_dir}")
+    result = promote_preview_baseline(
+        source_dir,
+        baseline_dir,
+        clean=not keep_existing,
+        include_thumbnail_sheet=not skip_thumbnail_sheet,
+    )
+    print(
+        f"[OK] Promoted baseline: {result['preview_count']} preview(s) copied to {result['baseline_dir']}"
+    )
     return result
 
 
@@ -859,10 +988,16 @@ def generate_template(
     *,
     theme_name: str | None = None,
     audience_profile: str | None = None,
+    brand_pack: str | None = None,
 ) -> dict[str, object]:
     output_path = validate_json_output_path(output_json)
     print_info(f"Generating template for domain: {domain}")
-    payload = build_domain_template(domain, theme_name=theme_name, audience_profile=audience_profile)
+    payload = build_domain_template(
+        domain,
+        theme_name=theme_name,
+        audience_profile=audience_profile,
+        brand_pack=brand_pack,
+    )
     write_json_payload(output_path, payload)
     print(f"[OK] Generated template: {output_path} ({len(payload['slides'])} slides)")
     return {
@@ -871,6 +1006,7 @@ def generate_template(
         "output_path": str(output_path),
         "theme": payload["presentation"]["theme"],
         "audience_profile": audience_profile,
+        "brand_pack": brand_pack,
         "slide_count": len(payload["slides"]),
     }
 
@@ -883,6 +1019,16 @@ def list_profiles(profile_name: str | None = None) -> dict[str, object]:
     names = list_audience_profiles()
     print_info(f"Available audience profiles: {', '.join(names)}")
     return {"mode": "profiles", "profiles": [get_audience_profile(name) for name in names]}
+
+
+def list_brand_pack_reports(brand_pack_name: str | None = None) -> dict[str, object]:
+    if brand_pack_name:
+        brand_pack = get_brand_pack(brand_pack_name)
+        print_info(f"Brand pack: {brand_pack_name}")
+        return {"mode": "brand-packs", "brand_pack": brand_pack}
+    names = list_brand_packs()
+    print_info(f"Available brand packs: {', '.join(names)}")
+    return {"mode": "brand-packs", "brand_packs": [get_brand_pack(name) for name in names]}
 
 
 def list_assets(collection_name: str | None = None) -> dict[str, object]:
@@ -911,9 +1057,10 @@ def generate_workflow_template(
     output_json: str | Path,
     *,
     theme_name: str | None = None,
+    brand_pack: str | None = None,
 ) -> dict[str, object]:
     output_path = validate_json_output_path(output_json)
-    packet = build_workflow_packet(workflow_name, theme_name=theme_name)
+    packet = build_workflow_packet(workflow_name, theme_name=theme_name, brand_pack=brand_pack)
     write_json_payload(output_path, packet["template"])
     print(f"[OK] Generated workflow template: {output_path} ({len(packet['template']['slides'])} slides)")
     return {
@@ -921,6 +1068,7 @@ def generate_workflow_template(
         "workflow_name": workflow_name,
         "output_path": str(output_path),
         "theme": packet["template"]["presentation"]["theme"],
+        "brand_pack": packet.get("brand_pack"),
         "workflow": packet["workflow"],
     }
 
@@ -950,6 +1098,7 @@ def main(argv: list[str] | None = None) -> int:
                 preview_baseline_dir=args.preview_baseline_dir,
                 preview_write_diff_images=args.preview_write_diff_images,
                 preview_require_real=args.preview_require_real,
+                preview_fail_on_regression=args.preview_fail_on_regression,
             )
             if args.report_json:
                 write_report(args.report_json, report)
@@ -971,6 +1120,7 @@ def main(argv: list[str] | None = None) -> int:
                 diff_threshold=args.diff_threshold,
                 write_diff_images=args.write_diff_images,
                 require_real_previews=args.require_real_previews,
+                fail_on_regression=args.fail_on_regression,
             )
             if args.report_json:
                 write_report(args.report_json, report)
@@ -986,6 +1136,7 @@ def main(argv: list[str] | None = None) -> int:
                 diff_threshold=args.diff_threshold,
                 write_diff_images=args.write_diff_images,
                 require_real_previews=args.require_real_previews,
+                fail_on_regression=args.fail_on_regression,
             )
             if args.report_json:
                 write_report(args.report_json, report)
@@ -1001,6 +1152,7 @@ def main(argv: list[str] | None = None) -> int:
                 diff_threshold=args.diff_threshold,
                 write_diff_images=args.write_diff_images,
                 require_real_previews=args.require_real_previews,
+                fail_on_regression=args.fail_on_regression,
             )
             if args.report_json:
                 write_report(args.report_json, report)
@@ -1016,6 +1168,18 @@ def main(argv: list[str] | None = None) -> int:
                 diff_threshold=args.diff_threshold,
                 write_diff_images=args.write_diff_images,
                 require_real_previews=args.require_real_previews,
+                fail_on_regression=args.fail_on_regression,
+            )
+            if args.report_json:
+                write_report(args.report_json, report)
+            return 0
+
+        if args.command == "promote-baseline":
+            report = promote_baseline_one(
+                args.source_dir,
+                args.baseline_dir,
+                keep_existing=args.keep_existing,
+                skip_thumbnail_sheet=args.skip_thumbnail_sheet,
             )
             if args.report_json:
                 write_report(args.report_json, report)
@@ -1027,11 +1191,18 @@ def main(argv: list[str] | None = None) -> int:
                 args.output_json,
                 theme_name=args.theme,
                 audience_profile=args.audience_profile,
+                brand_pack=args.brand_pack,
             )
             return 0
 
         if args.command == "profiles":
             report = list_profiles(args.profile_name)
+            if args.report_json:
+                write_report(args.report_json, report)
+            return 0
+
+        if args.command == "brand-packs":
+            report = list_brand_pack_reports(args.brand_pack_name)
             if args.report_json:
                 write_report(args.report_json, report)
             return 0
@@ -1053,6 +1224,7 @@ def main(argv: list[str] | None = None) -> int:
                 args.workflow_name,
                 args.output_json,
                 theme_name=args.theme,
+                brand_pack=args.brand_pack,
             )
             return 0
 
@@ -1157,6 +1329,7 @@ def main(argv: list[str] | None = None) -> int:
             preview_write_diff_images=args.preview_write_diff_images,
             preview_report_json=args.preview_report_json,
             preview_require_real=args.preview_require_real,
+            preview_fail_on_regression=args.preview_fail_on_regression,
         )
         if args.report_json:
             write_report(args.report_json, report)

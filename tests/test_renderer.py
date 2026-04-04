@@ -13,7 +13,10 @@ from ppt_creator.preview import (
     PREVIEW_WIDTH,
     PreviewRenderer,
     compare_preview_directories,
+    format_visual_regression_failure,
+    promote_preview_baseline,
     render_previews,
+    visual_regression_has_failures,
 )
 from ppt_creator.renderer import PresentationRenderer
 from ppt_creator.schema import PresentationInput
@@ -108,6 +111,55 @@ def test_fit_text_frame_reduces_font_size_for_tight_box() -> None:
     run = shape.text_frame.paragraphs[0].runs[0]
     assert run.font.size is not None
     assert run.font.size.pt <= 28
+
+
+def test_rebalance_flexible_regions_applies_stronger_second_pass_for_heavy_imbalance() -> None:
+    renderer = PresentationRenderer(asset_root="examples")
+
+    regions = renderer.rebalance_flexible_regions(
+        [
+            {"kind": "light", "min_height": 0.6, "flex": 1.0, "content_weight": 1.0},
+            {"kind": "heavy", "min_height": 0.6, "flex": 1.0, "content_weight": 6.0},
+        ],
+        min_flex=0.9,
+        max_flex=1.35,
+    )
+
+    assert float(regions[1]["flex"]) > 1.35
+
+
+def test_describe_visual_placeholder_differentiates_screenshot_and_diagram() -> None:
+    renderer = PresentationRenderer(asset_root="examples")
+    screenshot_spec = PresentationInput.model_validate(
+        {
+            "presentation": {"title": "Deck", "theme": "executive_premium_minimal"},
+            "slides": [
+                {
+                    "type": "image_text",
+                    "title": "Product dashboard screenshot",
+                    "body": "UI walkthrough",
+                }
+            ],
+        }
+    ).slides[0]
+    diagram_spec = PresentationInput.model_validate(
+        {
+            "presentation": {"title": "Deck", "theme": "executive_premium_minimal"},
+            "slides": [
+                {
+                    "type": "image_text",
+                    "title": "Workflow diagram",
+                    "body": "Process architecture",
+                }
+            ],
+        }
+    ).slides[0]
+
+    screenshot_copy = renderer.describe_visual_placeholder(screenshot_spec)
+    diagram_copy = renderer.describe_visual_placeholder(diagram_spec)
+
+    assert screenshot_copy["kind"] == "screenshot"
+    assert diagram_copy["kind"] == "diagram"
 
 
 def test_stack_vertical_regions_distributes_flexible_space() -> None:
@@ -609,6 +661,54 @@ def test_preview_require_real_previews_fails_without_office_runtime(monkeypatch,
         )
 
 
+def test_preview_regression_report_includes_guidance_and_top_regressions(tmp_path: Path) -> None:
+    spec = PresentationInput.model_validate(
+        {
+            "presentation": {"title": "Regression deck", "theme": "executive_premium_minimal"},
+            "slides": [{"type": "title", "title": "Original slide"}],
+        }
+    )
+    baseline_dir = tmp_path / "baseline-guidance"
+    current_dir = tmp_path / "current-guidance"
+    report_dir = tmp_path / "report-guidance"
+
+    render_previews(spec, baseline_dir, basename="baseline-guidance")
+    current_result = render_previews(spec, current_dir, basename="current-guidance")
+    changed_preview = Path(current_result["previews"][0])
+    Image.new("RGB", (1280, 720), (0, 0, 0)).save(changed_preview)
+
+    comparison = compare_preview_directories(current_dir, baseline_dir, report_dir, write_diff_images=True)
+    regression = comparison["comparison"]
+
+    assert regression["status"] == "review"
+    assert regression["diff_count"] == 1
+    assert regression["top_regressions"]
+    assert regression["top_regressions"][0]["slide_number"] == 1
+    assert regression["guidance"]
+    assert visual_regression_has_failures(regression) is True
+    assert "failed visual regression" in format_visual_regression_failure(regression, context="preview regression")
+
+
+def test_promote_preview_baseline_copies_manifest_and_preview_files(tmp_path: Path) -> None:
+    spec = PresentationInput.model_validate(
+        {
+            "presentation": {"title": "Promote deck", "theme": "executive_premium_minimal"},
+            "slides": [{"type": "title", "title": "Only slide"}],
+        }
+    )
+    source_dir = tmp_path / "source-baseline"
+    baseline_dir = tmp_path / "promoted-baseline"
+
+    source_result = render_previews(spec, source_dir, basename="promote-source")
+    promotion = promote_preview_baseline(source_dir, baseline_dir)
+
+    assert promotion["mode"] == "promote-baseline"
+    assert promotion["preview_count"] == len(source_result["previews"])
+    assert Path(promotion["preview_manifest"]).exists()
+    assert len(list(baseline_dir.glob("*.png"))) >= len(source_result["previews"])
+    assert promotion["copied_thumbnail_sheets"]
+
+
 def test_preview_image_text_respects_focal_point_when_cover_cropping(tmp_path: Path) -> None:
     asset_path = tmp_path / "focus.png"
     image = Image.new("RGB", (400, 200), (0, 0, 255))
@@ -665,6 +765,30 @@ def test_preview_title_hero_cover_respects_focal_point_when_image_present(tmp_pa
 
     sampled = rendered.getpixel((960, 230))
     assert sampled[0] > sampled[2]
+
+
+def test_preview_chart_supports_negative_values_without_crashing() -> None:
+    spec = PresentationInput.model_validate(
+        {
+            "presentation": {"title": "Negative chart", "theme": "executive_premium_minimal"},
+            "slides": [
+                {
+                    "type": "chart",
+                    "title": "Signal comparison",
+                    "layout_variant": "bar",
+                    "chart_categories": ["A", "B", "C"],
+                    "chart_series": [
+                        {"name": "Signal", "values": [25.0, -30.0, 20.0]},
+                    ],
+                }
+            ],
+        }
+    )
+
+    renderer = PreviewRenderer(asset_root="examples")
+    rendered = renderer.render_slide(spec.presentation, spec.slides[0], 1, 1)
+
+    assert rendered.size == (PREVIEW_WIDTH, PREVIEW_HEIGHT)
 
 
 def test_title_layout_with_cover_image_renders_without_crashing(tmp_path: Path) -> None:

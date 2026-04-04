@@ -169,6 +169,72 @@ def _write_preview_manifest(
     return manifest_path
 
 
+def _build_visual_regression_guidance(
+    *,
+    diff_count: int,
+    missing_baseline_count: int,
+    extra_baseline_count: int,
+    source_mismatch: bool,
+    current_source: str | None,
+    baseline_source: str | None,
+) -> list[str]:
+    guidance: list[str] = []
+    if diff_count:
+        guidance.append(
+            f"{diff_count} slide(s) differ from the baseline; inspect top_regressions and any generated diff images."
+        )
+    if missing_baseline_count:
+        guidance.append(
+            f"{missing_baseline_count} current slide(s) have no matching baseline slide; promote a refreshed baseline if this change is intentional."
+        )
+    if extra_baseline_count:
+        guidance.append(
+            f"The baseline contains {extra_baseline_count} extra slide(s); refresh the golden set so the comparison uses the same slide count."
+        )
+    if source_mismatch:
+        guidance.append(
+            "Current and baseline previews were generated from different provenance "
+            f"({current_source or 'unknown'} vs {baseline_source or 'unknown'}); regenerate both from the same source before trusting the diff."
+        )
+    return guidance
+
+
+def visual_regression_has_failures(visual_regression: dict[str, object] | None) -> bool:
+    if not isinstance(visual_regression, dict):
+        return False
+    return str(visual_regression.get("status") or "ok") != "ok"
+
+
+def format_visual_regression_failure(
+    visual_regression: dict[str, object] | None,
+    *,
+    context: str,
+) -> str:
+    if not isinstance(visual_regression, dict):
+        return f"{context} did not produce a visual regression report. Provide a baseline first."
+
+    parts: list[str] = [f"{context} failed visual regression"]
+    diff_count = int(visual_regression.get("diff_count") or 0)
+    missing_baseline_count = int(visual_regression.get("missing_baseline_count") or 0)
+    extra_baseline_count = int(visual_regression.get("extra_baseline_count") or 0)
+    if diff_count:
+        parts.append(f"{diff_count} diff(s)")
+    if missing_baseline_count:
+        parts.append(f"{missing_baseline_count} missing baseline slide(s)")
+    if extra_baseline_count:
+        parts.append(f"{extra_baseline_count} extra baseline slide(s)")
+    if visual_regression.get("source_mismatch"):
+        parts.append("preview provenance mismatch")
+
+    message = "; ".join(parts)
+    guidance = visual_regression.get("guidance") or []
+    if isinstance(guidance, list) and guidance:
+        first_guidance = next((item for item in guidance if isinstance(item, str) and item.strip()), None)
+        if first_guidance:
+            message = f"{message}. {first_guidance}"
+    return message
+
+
 def _normalized_diff_score(generated: Image.Image, baseline: Image.Image) -> tuple[float, float, Image.Image]:
     left = generated.convert("RGB")
     right = baseline.convert("RGB")
@@ -816,6 +882,37 @@ class PreviewRenderer:
         if diff_count or missing_baseline_count or extra_baseline_count or source_mismatch:
             status = "review"
 
+        added_slide_numbers = list(range(compared + 1, len(preview_paths) + 1))
+        removed_slide_numbers = list(range(compared + 1, len(baseline_images) + 1))
+        top_regressions = sorted(
+            (
+                {
+                    "slide_number": int(slide_report["slide_number"]),
+                    "generated_path": slide_report["generated_path"],
+                    "baseline_path": slide_report["baseline_path"],
+                    "mean_diff": slide_report["mean_diff"],
+                    "changed_ratio": slide_report["changed_ratio"],
+                    "diff_score": round(
+                        max(float(slide_report["mean_diff"]), float(slide_report["changed_ratio"])),
+                        6,
+                    ),
+                    "diff_image": slide_report["diff_image"],
+                }
+                for slide_report in slide_reports
+                if slide_report["regression"]
+            ),
+            key=lambda item: float(item["diff_score"]),
+            reverse=True,
+        )[:5]
+        guidance = _build_visual_regression_guidance(
+            diff_count=diff_count,
+            missing_baseline_count=missing_baseline_count,
+            extra_baseline_count=extra_baseline_count,
+            source_mismatch=source_mismatch,
+            current_source=current_source,
+            baseline_source=baseline_source,
+        )
+
         return {
             "status": status,
             "baseline_dir": str(self.baseline_dir),
@@ -832,6 +929,10 @@ class PreviewRenderer:
             "diff_count": diff_count,
             "missing_baseline_count": missing_baseline_count,
             "extra_baseline_count": extra_baseline_count,
+            "added_slide_numbers": added_slide_numbers,
+            "removed_slide_numbers": removed_slide_numbers,
+            "top_regressions": top_regressions,
+            "guidance": guidance,
             "slides": slide_reports,
             "diff_images": diff_images,
         }
@@ -1268,11 +1369,35 @@ class PreviewRenderer:
         draw.line((chart_left, chart_top, chart_left, chart_bottom), fill=_rgb_tuple(colors.line), width=2)
         draw.line((chart_left, chart_bottom, chart_right, chart_bottom), fill=_rgb_tuple(colors.line), width=2)
 
-        max_value = max(max(series.values) for series in slide_spec.chart_series) or 1
+        min_value = min(min(series.values) for series in slide_spec.chart_series)
+        max_value = max(max(series.values) for series in slide_spec.chart_series)
         category_count = len(slide_spec.chart_categories)
         series_count = len(slide_spec.chart_series)
         variant = slide_spec.layout_variant or "column"
         label_font = _load_font(15)
+        usable_height = max(1, chart_bottom - chart_top - 18)
+        usable_width = max(1, chart_right - chart_left - 20)
+        value_range = max(max_value - min_value, 1e-9)
+
+        def _value_to_y(value: float) -> float:
+            return chart_bottom - (((value - min_value) / value_range) * usable_height)
+
+        def _value_to_x(value: float) -> float:
+            return chart_left + (((value - min_value) / value_range) * usable_width)
+
+        if min_value >= 0:
+            zero_y = chart_bottom
+            zero_x = chart_left
+        elif max_value <= 0:
+            zero_y = chart_top
+            zero_x = chart_right
+        else:
+            zero_y = _value_to_y(0.0)
+            zero_x = _value_to_x(0.0)
+
+        if min_value < 0 < max_value:
+            draw.line((chart_left, zero_y, chart_right, zero_y), fill=_rgb_tuple(colors.line), width=1)
+            draw.line((zero_x, chart_top, zero_x, chart_bottom), fill=_rgb_tuple(colors.line), width=1)
 
         if variant == "line":
             step_x = (chart_right - chart_left) / max(category_count - 1, 1)
@@ -1280,7 +1405,7 @@ class PreviewRenderer:
                 points: list[tuple[float, float]] = []
                 for idx, value in enumerate(series.values):
                     x = chart_left + idx * step_x
-                    y = chart_bottom - ((value / max_value) * (chart_bottom - chart_top - 18))
+                    y = _value_to_y(value)
                     points.append((x, y))
                 draw.line(points, fill=_rgb_tuple(palette[series_index % len(palette)]), width=4)
                 for x, y in points:
@@ -1298,10 +1423,11 @@ class PreviewRenderer:
                 draw.text((chart_left - 48, y), category, fill=_rgb_tuple(colors.muted), font=label_font)
                 for series_index, series in enumerate(slide_spec.chart_series):
                     value = series.values[idx]
-                    bar_length = ((value / max_value) * (chart_right - chart_left - 20))
+                    value_x = _value_to_x(value)
                     bar_top = y + series_index * 14
+                    x_start, x_end = sorted((zero_x, value_x))
                     draw.rectangle(
-                        (chart_left, bar_top, chart_left + bar_length, bar_top + 10),
+                        (x_start, bar_top, x_end, bar_top + 10),
                         fill=_rgb_tuple(palette[series_index % len(palette)]),
                     )
             return
@@ -1313,11 +1439,11 @@ class PreviewRenderer:
             draw.text((base_x, chart_bottom + 12), category, fill=_rgb_tuple(colors.muted), font=label_font)
             for series_index, series in enumerate(slide_spec.chart_series):
                 value = series.values[idx]
-                bar_height = ((value / max_value) * (chart_bottom - chart_top - 18))
                 x1 = base_x + series_index * series_bar_width
                 x2 = x1 + series_bar_width - 6
-                y1 = chart_bottom - bar_height
-                draw.rectangle((x1, y1, x2, chart_bottom), fill=_rgb_tuple(palette[series_index % len(palette)]))
+                value_y = _value_to_y(value)
+                y1, y2 = sorted((value_y, zero_y))
+                draw.rectangle((x1, y1, x2, y2), fill=_rgb_tuple(palette[series_index % len(palette)]))
 
     def _render_image_text(self, draw: ImageDraw.ImageDraw, image: Image.Image, slide_spec: Slide, meta: PresentationMeta) -> None:
         self._render_heading(draw, slide_spec)
@@ -1572,6 +1698,8 @@ def compare_preview_directories(
 
     destination.mkdir(parents=True, exist_ok=True)
     base = basename or f"{_safe_basename(current_root.name)}-vs-{_safe_basename(baseline_root.name)}"
+    current_label = str((current_manifest or {}).get("presentation_title") or current_root.name)
+    baseline_label = str((baseline_manifest or {}).get("presentation_title") or baseline_root.name)
     renderer = PreviewRenderer(
         theme_name=theme_name,
         baseline_dir=baseline_root,
@@ -1597,6 +1725,8 @@ def compare_preview_directories(
         "current_dir": str(current_root),
         "baseline_dir": str(baseline_root),
         "output_dir": str(destination),
+        "current_label": current_label,
+        "baseline_label": baseline_label,
         "current_preview_count": len(current_images),
         "baseline_preview_count": len(baseline_images),
         "current_manifest": str(_preview_manifest_path(current_root)) if _preview_manifest_path(current_root).exists() else None,
@@ -1604,6 +1734,64 @@ def compare_preview_directories(
         "current_preview_source": current_manifest.get("preview_source") if current_manifest else None,
         "baseline_preview_source": baseline_manifest.get("preview_source") if baseline_manifest else None,
         "comparison": comparison,
+    }
+
+
+def promote_preview_baseline(
+    source_dir: str | Path,
+    baseline_dir: str | Path,
+    *,
+    clean: bool = True,
+    include_thumbnail_sheet: bool = True,
+) -> dict[str, object]:
+    source_root = Path(source_dir).resolve()
+    baseline_root = Path(baseline_dir).resolve()
+
+    if not source_root.exists() or not source_root.is_dir():
+        raise FileNotFoundError(f"Preview source directory not found: {source_root}")
+
+    preview_paths, manifest = _resolve_preview_sequence(source_root)
+    if not preview_paths:
+        raise FileNotFoundError(f"No preview PNGs found in source directory: {source_root}")
+
+    cleaned = False
+    if clean and baseline_root.exists():
+        shutil.rmtree(baseline_root)
+        cleaned = True
+
+    baseline_root.mkdir(parents=True, exist_ok=True)
+    copied_previews: list[str] = []
+    copied_thumbnail_sheets: list[str] = []
+
+    source_manifest_path = _preview_manifest_path(source_root)
+    target_manifest_path = baseline_root / PREVIEW_MANIFEST_FILENAME
+    if source_manifest_path.exists():
+        shutil.copy2(source_manifest_path, target_manifest_path)
+
+    for preview_path in preview_paths:
+        source_path = Path(preview_path)
+        target_path = baseline_root / source_path.name
+        shutil.copy2(source_path, target_path)
+        copied_previews.append(str(target_path))
+
+    if include_thumbnail_sheet:
+        for thumbnail_path in sorted(source_root.glob("*-thumbnails.png")):
+            target_path = baseline_root / thumbnail_path.name
+            shutil.copy2(thumbnail_path, target_path)
+            copied_thumbnail_sheets.append(str(target_path))
+
+    return {
+        "mode": "promote-baseline",
+        "source_dir": str(source_root),
+        "baseline_dir": str(baseline_root),
+        "clean": clean,
+        "cleaned_existing_baseline": cleaned,
+        "preview_count": len(copied_previews),
+        "copied_previews": copied_previews,
+        "copied_thumbnail_sheets": copied_thumbnail_sheets,
+        "preview_manifest": str(target_manifest_path) if target_manifest_path.exists() else None,
+        "preview_source": (manifest or {}).get("preview_source"),
+        "real_preview": (manifest or {}).get("real_preview"),
     }
 
 
