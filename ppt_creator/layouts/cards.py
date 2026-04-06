@@ -5,7 +5,6 @@ from ppt_creator.layouts._components import render_content_card
 
 def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
     g = renderer.theme.grid
-    t = renderer.theme.typography
     colors = renderer.theme.colors
     card_weights = [
         renderer.estimate_content_weight(

@@ -9,7 +9,6 @@ from ppt_creator_ai.briefing import (
     _infer_narrative_archetype,
     assess_generated_payload_quality,
     build_llm_generation_contract,
-    generate_presentation_payload_from_briefing,
     summarize_text_to_executive_bullets,
 )
 

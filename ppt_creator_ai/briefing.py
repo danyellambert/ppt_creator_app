@@ -2361,7 +2361,6 @@ def assess_generated_payload_quality(
             [briefing.title, briefing.subtitle, briefing.objective, briefing.context, briefing.briefing_text],
         )
     )
-    language = _infer_prompt_language(prompt_text)
     candidate_story_mode = _is_candidate_story_briefing(briefing)
     resolved_metrics = list(briefing.metrics) or [
         BriefingMetric.model_validate(item)

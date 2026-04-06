@@ -8,8 +8,6 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from urllib import error as urllib_error
-from urllib import request as urllib_request
 from urllib.parse import parse_qs, urlparse
 
 from pydantic import ValidationError

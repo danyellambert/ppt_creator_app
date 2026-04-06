@@ -13,8 +13,6 @@ def _metric_dense(metric, weight: float) -> bool:
 
 def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
     g = renderer.theme.grid
-    t = renderer.theme.typography
-    components = renderer.theme.components
     colors = renderer.theme.colors
     variant = renderer.resolve_layout_variant(slide_spec, "standard")
     default_eyebrow = slide_spec.eyebrow or "Key metrics"

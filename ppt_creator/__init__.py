@@ -11,7 +11,12 @@ from ppt_creator.api import (
     validate_spec_payload,
 )
 from ppt_creator.assets import get_asset_collection, list_asset_collections
-from ppt_creator.brand_packs import apply_brand_pack, build_branding_bundle, get_brand_pack, list_brand_packs
+from ppt_creator.brand_packs import (
+    apply_brand_pack,
+    build_branding_bundle,
+    get_brand_pack,
+    list_brand_packs,
+)
 from ppt_creator.catalog import build_marketplace_catalog
 from ppt_creator.layouts import get_layout_catalog, list_layout_catalog
 from ppt_creator.preview import (
