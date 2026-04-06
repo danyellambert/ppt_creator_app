@@ -206,6 +206,9 @@ class PresentationMeta(BaseModel):
     client_name: str | None = None
     footer_text: str | None = None
     logo_path: str | None = None
+    logo_text: str | None = None
+    logo_fill_color: str | None = None
+    logo_text_color: str | None = None
     primary_color: str | None = None
     secondary_color: str | None = None
 
@@ -221,13 +224,20 @@ class PresentationMeta(BaseModel):
         "client_name",
         "footer_text",
         "logo_path",
+        "logo_text",
         mode="before",
     )
     @classmethod
     def clean_optional_fields(cls, value: object) -> str | None | object:
         return _clean_optional_text(value)
 
-    @field_validator("primary_color", "secondary_color", mode="before")
+    @field_validator(
+        "primary_color",
+        "secondary_color",
+        "logo_fill_color",
+        "logo_text_color",
+        mode="before",
+    )
     @classmethod
     def normalize_brand_colors(cls, value: object, info) -> str | None | object:
         return _normalize_hex_color(value, info.field_name)

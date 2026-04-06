@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from copy import deepcopy
+from dataclasses import dataclass, field, replace
 
 from pptx.dml.color import RGBColor
 
@@ -20,6 +21,38 @@ def theme_display_name(name: str) -> str:
     return name.replace("_", " ").title()
 
 
+THEME_MARKETPLACE_METADATA: dict[str, dict[str, object]] = {
+    "executive_premium_minimal": {
+        "summary": "Neutral premium executive system for versatile leadership decks.",
+        "mood": "premium_minimal",
+        "recommended_profiles": ["board", "consulting"],
+        "recommended_workflows": ["board_strategy", "consulting_steerco", "commercial_proposal"],
+        "recommended_brand_packs": ["board_navy", "consulting_signature"],
+    },
+    "consulting_clean": {
+        "summary": "Clean advisory theme for structured, synthesis-heavy client narratives.",
+        "mood": "consulting_structured",
+        "recommended_profiles": ["consulting", "proposal"],
+        "recommended_workflows": ["consulting_steerco", "commercial_proposal"],
+        "recommended_brand_packs": ["consulting_signature"],
+    },
+    "dark_boardroom": {
+        "summary": "High-contrast boardroom theme for decision-heavy executive reviews.",
+        "mood": "boardroom_high_contrast",
+        "recommended_profiles": ["board", "sales"],
+        "recommended_workflows": ["board_strategy", "sales_qbr"],
+        "recommended_brand_packs": ["board_navy", "sales_pipeline"],
+    },
+    "startup_minimal": {
+        "summary": "Brighter modern theme for product and growth operating decks.",
+        "mood": "modern_product",
+        "recommended_profiles": ["product"],
+        "recommended_workflows": ["product_operating_review"],
+        "recommended_brand_packs": ["product_signal"],
+    },
+}
+
+
 @dataclass(frozen=True)
 class CanvasTokens:
     width: float = 13.333
@@ -37,7 +70,7 @@ class TypographyTokens:
     section_size: int = 30
     subtitle_size: int = 13
     body_size: int = 15
-    small_size: int = 9
+    small_size: int = 10
     eyebrow_size: int = 10
     metric_value_size: int = 24
     metric_label_size: int = 11
@@ -93,6 +126,22 @@ class ComponentTokens:
 
 
 @dataclass(frozen=True)
+class SemanticLayoutPreset:
+    heading_top: float = 1.02
+    body_top: float = 2.45
+    panel_top: float = 2.42
+    eyebrow_offset: float = 0.27
+    subtitle_gap: float = 0.78
+    footer_boundary: float = 6.86
+    panel_title_height: float = 0.42
+
+
+@dataclass(frozen=True)
+class SemanticLayoutTokens:
+    default: SemanticLayoutPreset = field(default_factory=SemanticLayoutPreset)
+
+
+@dataclass(frozen=True)
 class Theme:
     name: str
     canvas: CanvasTokens
@@ -101,6 +150,7 @@ class Theme:
     grid: GridTokens
     colors: ColorTokens
     components: ComponentTokens
+    semantic: SemanticLayoutTokens = field(default_factory=SemanticLayoutTokens)
 
 
 EXECUTIVE_PREMIUM_MINIMAL = Theme(
@@ -176,6 +226,38 @@ THEMES = {
     DARK_BOARDROOM.name: DARK_BOARDROOM,
     STARTUP_MINIMAL.name: STARTUP_MINIMAL,
 }
+
+
+def list_themes() -> list[str]:
+    return sorted(THEMES)
+
+
+def get_theme_catalog(name: str) -> dict[str, object]:
+    normalized = name.strip().lower().replace("-", "_").replace(" ", "_")
+    if normalized not in THEMES:
+        raise ValueError(f"Unknown theme: {name}")
+    theme = THEMES[normalized]
+    metadata = deepcopy(THEME_MARKETPLACE_METADATA.get(normalized, {}))
+    return {
+        "name": normalized,
+        "display_name": theme_display_name(normalized),
+        "summary": metadata.get("summary"),
+        "mood": metadata.get("mood"),
+        "recommended_profiles": list(metadata.get("recommended_profiles", [])),
+        "recommended_workflows": list(metadata.get("recommended_workflows", [])),
+        "recommended_brand_packs": list(metadata.get("recommended_brand_packs", [])),
+        "tokens": {
+            "background": theme.colors.background,
+            "surface": theme.colors.surface,
+            "primary": theme.colors.navy,
+            "accent": theme.colors.accent,
+            "text": theme.colors.text,
+        },
+    }
+
+
+def list_theme_catalog() -> list[dict[str, object]]:
+    return [get_theme_catalog(name) for name in list_themes()]
 
 
 def get_theme(

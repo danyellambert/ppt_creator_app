@@ -320,6 +320,7 @@ def test_cli_workflows_and_workflow_template_commands_emit_reports(tmp_path: Pat
     workflows_payload = json.loads(workflows_report.read_text(encoding="utf-8"))
     workflow_detail_payload = json.loads(workflow_detail_report.read_text(encoding="utf-8"))
     assert workflows_payload["workflows"]
+    assert any(item["name"] == "commercial_proposal" for item in workflows_payload["workflows"])
     assert workflow_detail_payload["packet"]["preview_recommendation"]["recommended_source"] == "rendered_pptx"
     assert workflow_detail_payload["packet"]["preview_recommendation"]["require_real_previews"] is True
 
@@ -340,6 +341,27 @@ def test_cli_template_and_workflow_template_accept_brand_pack(tmp_path: Path) ->
     assert template_spec.presentation.footer_text == "Board brand pack"
     assert template_spec.slides[0].eyebrow == "Board review"
     assert workflow_spec.presentation.footer_text == "Sales pipeline brand pack"
+
+
+def test_cli_marketplace_and_proposal_workflow_emit_reports(tmp_path: Path) -> None:
+    marketplace_report = tmp_path / "marketplace.json"
+    proposal_template_output = tmp_path / "proposal_template.json"
+    proposal_workflow_output = tmp_path / "commercial_proposal_template.json"
+
+    assert main(["marketplace", "--report-json", str(marketplace_report)]) == 0
+    assert main(["template", "proposal", str(proposal_template_output), "--audience-profile", "proposal"]) == 0
+    assert main(["workflow-template", "commercial_proposal", str(proposal_workflow_output)]) == 0
+
+    marketplace_payload = json.loads(marketplace_report.read_text(encoding="utf-8"))
+    assert marketplace_payload["summary"]["workflow_count"] >= 5
+    assert any(item["name"] == "commercial_proposal" for item in marketplace_payload["workflows"])
+    assert any(item["type"] == "comparison" for item in marketplace_payload["layouts"])
+
+    proposal_spec = PresentationInput.from_path(proposal_template_output)
+    workflow_spec = PresentationInput.from_path(proposal_workflow_output)
+    assert proposal_spec.presentation.title == "Commercial proposal"
+    assert proposal_spec.presentation.footer_text == "Proposal profile"
+    assert workflow_spec.presentation.title == "Commercial proposal"
 
 
 def test_cli_preview_generates_pngs_and_thumbnail_sheet(tmp_path: Path, capsys) -> None:

@@ -3,7 +3,7 @@ from __future__ import annotations
 from copy import deepcopy
 
 from ppt_creator.assets import get_asset_collection
-from ppt_creator.brand_packs import get_brand_pack
+from ppt_creator.brand_packs import build_branding_bundle, get_brand_pack
 from ppt_creator.profiles import get_audience_profile
 from ppt_creator.templates import _build_slide_asset_suggestions, build_domain_template
 
@@ -96,6 +96,28 @@ WORKFLOW_PRESETS: dict[str, dict[str, object]] = {
         "suggested_steps": ["template", "review", "render", "preview-pptx", "compare-pptx", "promote-baseline"],
         "recommended_regression_flow": ["render", "preview-pptx", "compare-pptx", "promote-baseline"],
     },
+    "commercial_proposal": {
+        "display_name": "Commercial Proposal",
+        "domain": "proposal",
+        "audience_profile": "proposal",
+        "description": "Proposal/commercial workflow for turning scoped offers into decision-ready executive decks.",
+        "operating_mode": "commercial_proposal",
+        "cadence": "deal_cycle",
+        "stakeholders": ["Account Executive", "Engagement Lead", "Client Sponsor"],
+        "recommended_asset_collections": ["executive_decision_moments", "strategy_workshops"],
+        "default_brand_pack": "consulting_signature",
+        "default_preview_backend": "office",
+        "default_preview_require_real": True,
+        "default_preview_fail_on_regression": False,
+        "default_baseline_dir": "outputs/commercial_proposal_baseline",
+        "recommended_preview_source": "rendered_pptx",
+        "preview_provenance_guidance": "Commercial proposals should be reviewed from the final rendered PPTX so proposal baselines track exactly what buyers see.",
+        "default_output_pptx": "outputs/commercial_proposal.pptx",
+        "default_preview_dir": "outputs/commercial_proposal_previews",
+        "default_report_json": "outputs/commercial_proposal_report.json",
+        "suggested_steps": ["template", "review", "render", "preview-pptx", "compare-pptx", "promote-baseline"],
+        "recommended_regression_flow": ["render", "preview-pptx", "compare-pptx", "promote-baseline"],
+    },
 }
 
 
@@ -140,6 +162,7 @@ def build_workflow_packet(
     return {
         "workflow": workflow,
         "brand_pack": brand_pack_payload,
+        "branding_bundle": build_branding_bundle(brand_pack_payload),
         "audience_profile": get_audience_profile(audience_profile_name),
         "asset_collections": recommended_asset_collections,
         "asset_strategy": {
@@ -147,6 +170,8 @@ def build_workflow_packet(
             "visual_language": (brand_pack_payload or {}).get("visual_language"),
             "cover_asset_collection": (brand_pack_payload or {}).get("cover_asset_collection"),
             "placeholder_style": (brand_pack_payload or {}).get("placeholder_style"),
+            "logo_text": ((brand_pack_payload or {}).get("presentation_overrides") or {}).get("logo_text"),
+            "logo_path": ((brand_pack_payload or {}).get("presentation_overrides") or {}).get("logo_path"),
             "recommended_asset_collections": asset_collection_names,
         },
         "preview_recommendation": {

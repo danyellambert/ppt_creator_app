@@ -15,6 +15,9 @@ BRAND_PACKS: dict[str, dict[str, object]] = {
             "client_name": "Executive Leadership",
             "primary_color": "14263F",
             "secondary_color": "B08B5B",
+            "logo_text": "BOARD NAVY",
+            "logo_fill_color": "14263F",
+            "logo_text_color": "F7F5F2",
         },
         "cover_eyebrow": "Board review",
         "cover_layout_variant": "hero_cover",
@@ -33,6 +36,9 @@ BRAND_PACKS: dict[str, dict[str, object]] = {
             "client_name": "Advisory Team",
             "primary_color": "0E5A8A",
             "secondary_color": "7A8C99",
+            "logo_text": "CONSULTING",
+            "logo_fill_color": "0E5A8A",
+            "logo_text_color": "FFFFFF",
         },
         "cover_eyebrow": "Advisory review",
         "cover_layout_variant": "hero_cover",
@@ -51,6 +57,9 @@ BRAND_PACKS: dict[str, dict[str, object]] = {
             "client_name": "Revenue Leadership",
             "primary_color": "6B1F2B",
             "secondary_color": "F59E0B",
+            "logo_text": "SALES PIPELINE",
+            "logo_fill_color": "6B1F2B",
+            "logo_text_color": "FFF7ED",
         },
         "cover_eyebrow": "Revenue review",
         "cover_layout_variant": "hero_cover",
@@ -69,6 +78,9 @@ BRAND_PACKS: dict[str, dict[str, object]] = {
             "client_name": "Product Leadership",
             "primary_color": "0F766E",
             "secondary_color": "7C3AED",
+            "logo_text": "PRODUCT SIGNAL",
+            "logo_fill_color": "0F766E",
+            "logo_text_color": "F8FAFB",
         },
         "cover_eyebrow": "Product review",
         "cover_layout_variant": "hero_cover",
@@ -89,6 +101,32 @@ def get_brand_pack(name: str) -> dict[str, object]:
     payload = deepcopy(BRAND_PACKS[normalized])
     payload["name"] = normalized
     return payload
+
+
+def build_branding_bundle(brand_pack_payload: dict[str, object] | None) -> dict[str, object] | None:
+    if not brand_pack_payload:
+        return None
+
+    presentation = dict(brand_pack_payload.get("presentation_overrides") or {})
+    return {
+        "name": brand_pack_payload.get("name"),
+        "display_name": brand_pack_payload.get("display_name"),
+        "theme": presentation.get("theme"),
+        "footer_text": presentation.get("footer_text"),
+        "client_name": presentation.get("client_name"),
+        "primary_color": presentation.get("primary_color"),
+        "secondary_color": presentation.get("secondary_color"),
+        "logo_path": presentation.get("logo_path"),
+        "logo_text": presentation.get("logo_text"),
+        "logo_fill_color": presentation.get("logo_fill_color"),
+        "logo_text_color": presentation.get("logo_text_color"),
+        "cover_eyebrow": brand_pack_payload.get("cover_eyebrow"),
+        "cover_layout_variant": brand_pack_payload.get("cover_layout_variant"),
+        "visual_language": brand_pack_payload.get("visual_language"),
+        "placeholder_style": brand_pack_payload.get("placeholder_style"),
+        "recommended_asset_collections": list(brand_pack_payload.get("recommended_asset_collections", [])),
+        "recommended_workflows": list(brand_pack_payload.get("recommended_workflows", [])),
+    }
 
 
 def apply_brand_pack(payload: dict[str, object], brand_pack_name: str) -> dict[str, object]:

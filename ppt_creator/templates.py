@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 
 from ppt_creator.assets import get_asset_collection
-from ppt_creator.brand_packs import apply_brand_pack, get_brand_pack
+from ppt_creator.brand_packs import apply_brand_pack, build_branding_bundle, get_brand_pack
 from ppt_creator.profiles import get_audience_profile
 
 DOMAIN_ASSET_COLLECTIONS: dict[str, list[str]] = {
@@ -11,6 +11,7 @@ DOMAIN_ASSET_COLLECTIONS: dict[str, list[str]] = {
     "consulting": ["strategy_workshops", "team_alignment_sessions"],
     "strategy": ["boardroom_backdrops", "strategy_workshops"],
     "product": ["product_mockups", "roadmap_workshops"],
+    "proposal": ["executive_decision_moments", "strategy_workshops", "team_alignment_sessions"],
 }
 
 DOMAIN_TEMPLATES: dict[str, dict[str, object]] = {
@@ -206,6 +207,89 @@ DOMAIN_TEMPLATES: dict[str, dict[str, object]] = {
             },
         ],
     },
+    "proposal": {
+        "presentation": {
+            "title": "Commercial proposal",
+            "subtitle": "Decision-ready proposal and scoped path to impact",
+            "client_name": "Prospective Client",
+            "author": "PPT Creator",
+            "date": "2026-03-26",
+            "theme": "consulting_clean",
+            "footer_text": "Proposal template",
+        },
+        "slides": [
+            {
+                "type": "title",
+                "title": "Commercial proposal",
+                "subtitle": "Decision-ready proposal and scoped path to impact",
+                "layout_variant": "hero_cover",
+                "eyebrow": "Proposal template",
+            },
+            {
+                "type": "agenda",
+                "title": "Proposal flow",
+                "bullets": ["Client context", "Value case", "Offer options", "Commercial structure", "Recommendation"],
+            },
+            {
+                "type": "cards",
+                "title": "Why this proposal is built to win",
+                "cards": [
+                    {
+                        "title": "Faster path to value",
+                        "body": "Start with the highest-confidence workstream so value is visible early and the engagement de-risks quickly.",
+                        "footer": "Accelerate proof",
+                    },
+                    {
+                        "title": "Scoped for execution",
+                        "body": "Keep the initial scope narrow enough to deliver cleanly while preserving room to expand after sign-off.",
+                        "footer": "Lower delivery risk",
+                    },
+                    {
+                        "title": "Clear decision structure",
+                        "body": "Translate the proposal into explicit workstreams, commercial choices, and approval points.",
+                        "footer": "Better buying clarity",
+                    },
+                ],
+            },
+            {
+                "type": "comparison",
+                "title": "Offer options",
+                "comparison_columns": [
+                    {
+                        "title": "Focused pilot",
+                        "body": "A narrower first phase to prove value, stabilize delivery, and create confidence for expansion.",
+                        "bullets": ["Fast launch", "Lower commitment", "Sharper proof points"],
+                    },
+                    {
+                        "title": "Scaled engagement",
+                        "body": "A broader scope for teams that already have strong alignment and want a faster transformation arc.",
+                        "bullets": ["Wider reach", "More coordination", "Higher upfront commitment"],
+                    },
+                ],
+            },
+            {
+                "type": "table",
+                "title": "Commercial structure",
+                "table_columns": ["Workstream", "Included scope", "Commercial model"],
+                "table_rows": [
+                    ["Discovery and framing", "Leadership interviews, operating hypothesis, executive readout", "Fixed fee"],
+                    ["Pilot delivery", "Workflow build, rollout support, QA cadence", "Milestone-based"],
+                    ["Scale-up option", "Expansion backlog, enablement, governance handoff", "Optional phase"],
+                ],
+            },
+            {
+                "type": "summary",
+                "title": "Recommended path",
+                "body": "The best path is to approve a focused first phase that proves business value quickly while preserving an explicit scale-up option after the first decision gate.",
+                "bullets": ["Approve the focused pilot", "Measure visible value early", "Expand only after proof and alignment"],
+            },
+            {
+                "type": "closing",
+                "title": "Closing thought",
+                "quote": "A strong proposal makes the buying decision feel clearer, safer, and easier to act on.",
+            },
+        ],
+    },
 }
 
 
@@ -349,6 +433,7 @@ def build_template_packet(
         "template": template,
         "audience_profile": audience_profile_payload,
         "brand_pack": brand_pack_payload,
+        "branding_bundle": build_branding_bundle(brand_pack_payload),
         "asset_collections": asset_collections,
         "asset_strategy": {
             "domain_asset_collections": DOMAIN_ASSET_COLLECTIONS.get(normalized, []),
@@ -356,6 +441,8 @@ def build_template_packet(
             "visual_language": (brand_pack_payload or {}).get("visual_language"),
             "cover_asset_collection": (brand_pack_payload or {}).get("cover_asset_collection"),
             "placeholder_style": (brand_pack_payload or {}).get("placeholder_style"),
+            "logo_text": ((brand_pack_payload or {}).get("presentation_overrides") or {}).get("logo_text"),
+            "logo_path": ((brand_pack_payload or {}).get("presentation_overrides") or {}).get("logo_path"),
         },
         "slide_asset_suggestions": slide_asset_suggestions,
     }

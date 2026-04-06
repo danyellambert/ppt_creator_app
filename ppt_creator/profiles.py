@@ -39,6 +39,15 @@ AUDIENCE_PROFILES: dict[str, dict[str, object]] = {
         "tone": "roadmap-driven, adoption-aware, prioritization-focused",
         "recommended_asset_collections": ["product_mockups", "roadmap_workshops"],
     },
+    "proposal": {
+        "display_name": "Proposal",
+        "default_theme": "consulting_clean",
+        "footer_text": "Proposal profile",
+        "cover_eyebrow": "Commercial proposal",
+        "preferred_layouts": ["title", "cards", "comparison", "table", "summary", "closing"],
+        "tone": "persuasive, commercially precise, outcome-oriented",
+        "recommended_asset_collections": ["executive_decision_moments", "strategy_workshops"],
+    },
 }
 
 

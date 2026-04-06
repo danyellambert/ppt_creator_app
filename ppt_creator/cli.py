@@ -10,6 +10,7 @@ from pydantic import ValidationError
 
 from ppt_creator.assets import get_asset_collection, list_asset_collections
 from ppt_creator.brand_packs import get_brand_pack, list_brand_packs
+from ppt_creator.catalog import build_marketplace_catalog
 from ppt_creator.preview import (
     compare_pptx_artifacts,
     format_visual_regression_failure,
@@ -275,6 +276,12 @@ def build_parser() -> argparse.ArgumentParser:
     workflows_parser = subparsers.add_parser("workflows", help="List built-in operational workflow presets")
     workflows_parser.add_argument("workflow_name", nargs="?", help="Optional specific workflow preset to inspect")
     workflows_parser.add_argument("--report-json", help="Optional path to write a JSON workflows report")
+
+    marketplace_parser = subparsers.add_parser(
+        "marketplace",
+        help="Emit a lightweight internal catalog of themes, layouts, workflows, brand packs, assets, and profiles",
+    )
+    marketplace_parser.add_argument("--report-json", help="Optional path to write a JSON marketplace report")
 
     workflow_template_parser = subparsers.add_parser(
         "workflow-template",
@@ -1052,6 +1059,18 @@ def list_workflows(workflow_name: str | None = None) -> dict[str, object]:
     return {"mode": "workflows", "workflows": [get_workflow_preset(name) for name in names]}
 
 
+def list_marketplace() -> dict[str, object]:
+    catalog = build_marketplace_catalog()
+    summary = catalog["summary"]
+    print_info(
+        "Marketplace catalog: "
+        f"{summary['theme_count']} theme(s), "
+        f"{summary['layout_count']} layout(s), "
+        f"{summary['workflow_count']} workflow(s)"
+    )
+    return catalog
+
+
 def generate_workflow_template(
     workflow_name: str,
     output_json: str | Path,
@@ -1215,6 +1234,12 @@ def main(argv: list[str] | None = None) -> int:
 
         if args.command == "workflows":
             report = list_workflows(args.workflow_name)
+            if args.report_json:
+                write_report(args.report_json, report)
+            return 0
+
+        if args.command == "marketplace":
+            report = list_marketplace()
             if args.report_json:
                 write_report(args.report_json, report)
             return 0
