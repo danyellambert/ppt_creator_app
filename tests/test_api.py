@@ -40,7 +40,7 @@ def test_api_health_and_templates_endpoints(monkeypatch) -> None:
 
         status, templates_payload = _request_json(f"{base_url}/templates")
         assert status == 200
-        assert templates_payload["domains"] == ["consulting", "product", "sales", "strategy"]
+        assert templates_payload["domains"] == ["consulting", "product", "proposal", "sales", "strategy"]
 
         status, profiles_payload = _request_json(f"{base_url}/profiles")
         assert status == 200
@@ -57,6 +57,13 @@ def test_api_health_and_templates_endpoints(monkeypatch) -> None:
         status, workflows_payload = _request_json(f"{base_url}/workflows")
         assert status == 200
         assert workflows_payload["workflows"]
+        assert any(item["name"] == "commercial_proposal" for item in workflows_payload["workflows"])
+
+        status, marketplace_payload = _request_json(f"{base_url}/marketplace")
+        assert status == 200
+        assert marketplace_payload["summary"]["workflow_count"] >= 5
+        assert any(item["name"] == "commercial_proposal" for item in marketplace_payload["workflows"])
+        assert any(item["type"] == "summary" for item in marketplace_payload["layouts"])
 
         status, providers_payload = _request_json(f"{base_url}/ai/providers")
         assert status == 200
@@ -87,8 +94,16 @@ def test_api_health_and_templates_endpoints(monkeypatch) -> None:
         assert "compareBeforePptx" in html
         assert "Compare PPTX" in html
         assert "Review rendered PPTX" in html
+        assert "Iterate flow" in html
+        assert "Focus top risk slide" in html
+        assert "Export current deck" in html
+        assert "liveReviewSummary" in html
         assert "slideSelector" in html
         assert "Apply guided edits" in html
+        assert "guidedImagePath" in html
+        assert "guidedImageCaption" in html
+        assert "guidedImageFocalX" in html
+        assert "guidedImageFocalY" in html
         assert "Promote baseline" in html
         assert "requireRealPreviews" in html
         assert "failOnRegression" in html
@@ -186,6 +201,15 @@ def test_playground_html_embedded_script_remains_valid(tmp_path: Path) -> None:
     assert "join('\\n')" in html
     assert "split(/\\n+/)" in html
     assert "attachGenerationContextToActionData" in html
+    assert "runIterateFlow()" in html
+    assert "exportCurrentDeck()" in html
+    assert "focusSlide(index" in html
+    assert "focusTopRiskSlide()" in html
+    assert "syncLiveReviewSummary()" in html
+    assert "latestActionResult = null" in html
+    assert "optionalUnitFloat(" in html
+    assert "Top risk right now:" in html
+    assert "document.addEventListener('keydown'" in html
     assert "await runAction('/review', { generationResult: result });" in html
     assert "await runAction('/render', { generationResult: result });" in html
     assert "const merged = attachGenerationContextToActionData(response.data, options.generationResult);" in html
@@ -417,6 +441,15 @@ def test_api_validate_render_and_template_endpoints(tmp_path: Path) -> None:
         assert template_payload["packet"]["asset_strategy"]["cover_asset_collection"] == "boardroom_backdrops"
         assert template_payload["packet"]["slide_asset_suggestions"]
 
+        status, proposal_template_payload = _request_json(
+            f"{base_url}/template",
+            {"domain": "proposal", "audience_profile": "proposal"},
+            method="POST",
+        )
+        assert status == 200
+        assert proposal_template_payload["template"]["presentation"]["title"] == "Commercial proposal"
+        assert proposal_template_payload["template"]["presentation"]["footer_text"] == "Proposal profile"
+
         status, workflow_template_payload = _request_json(
             f"{base_url}/workflow-template",
             {"workflow_name": "sales_qbr", "brand_pack": "sales_pipeline"},
@@ -430,6 +463,16 @@ def test_api_validate_render_and_template_endpoints(tmp_path: Path) -> None:
         assert str(workflow_template_payload["packet"]["preview_recommendation"]["baseline_dir"]).endswith("sales_qbr_baseline")
         assert workflow_template_payload["packet"]["asset_strategy"]["placeholder_style"] == "analytical_visual"
         assert workflow_template_payload["packet"]["slide_asset_suggestions"]
+
+        status, proposal_workflow_template_payload = _request_json(
+            f"{base_url}/workflow-template",
+            {"workflow_name": "commercial_proposal"},
+            method="POST",
+        )
+        assert status == 200
+        assert proposal_workflow_template_payload["packet"]["workflow"]["name"] == "commercial_proposal"
+        assert proposal_workflow_template_payload["packet"]["workflow"]["domain"] == "proposal"
+        assert proposal_workflow_template_payload["packet"]["template"]["presentation"]["title"] == "Commercial proposal"
 
         preview_module.find_office_runtime = lambda: None
         preview_dir = tmp_path / "api_previews"

@@ -71,8 +71,9 @@ Existe agora também uma camada **opcional e separada** em `ppt_creator_ai/`, us
 
 - `heuristic` para geração local sem LLM real
 - `local_service` para delegar a geração ao serviço persistido `hf_local_llm_service`
+- `ollama_local` para autoria direta contra um daemon local do Ollama quando isso fizer mais sentido para exploração local
 
-Ela não interfere no núcleo do renderizador.
+Ela não interfere no núcleo do renderizador. O caminho **recomendado/mais estável** para produção continua sendo `local_service`; `ollama_local` existe como atalho first-class para uso local e debugging mais direto.
 
 Além do tema base, o projeto agora também expõe temas prontos adicionais:
 
@@ -162,6 +163,15 @@ Hoje o tema já separa tokens em grupos para:
 - grid
 - colors
 - components
+- semantic layout anchors/baselines
+
+Além dos tokens clássicos, o app agora também expõe uma camada de **semantic layout tokens** para reduzir drift entre layouts semelhantes. Isso formaliza anchors como:
+
+- heading
+- subtitle
+- panel title
+- body region
+- footer boundary
 
 ---
 
@@ -269,10 +279,15 @@ Campos adicionais de branding disponíveis em `presentation`:
 - `client_name`
 - `footer_text`
 - `logo_path`
+- `logo_text`
+- `logo_fill_color`
+- `logo_text_color`
 - `primary_color`
 - `secondary_color`
 
 `primary_color` e `secondary_color` aceitam hex de 6 dígitos e permitem adaptar o tema sem criar um tema novo do zero.
+
+`logo_text` / `logo_fill_color` / `logo_text_color` permitem montar uma assinatura de marca textual quando você não quiser depender de um arquivo de logo.
 
 ---
 
@@ -753,6 +768,40 @@ Também existe um modo HTTP simples para integrar o `ppt_creator` em outros flux
 python -m ppt_creator.api --host 127.0.0.1 --port 8787 --asset-root examples
 ```
 
+### Operação recomendada agora para integração com o AI Workbench
+
+Neste momento, o caminho operacional recomendado continua sendo **host-native**:
+
+```bash
+make api
+```
+
+ou, equivalentemente:
+
+```bash
+python -m ppt_creator.api --host 127.0.0.1 --port 8787 --asset-root examples
+```
+
+Esse é o modo mais rápido para preservar praticamente todas as capabilities atuais do app, especialmente quando você quer manter preview/review/compare mais perto do ambiente local real.
+
+Para o AI Workbench Local, a configuração recomendada é:
+
+```env
+PRESENTATION_EXPORT_ENABLED=true
+PRESENTATION_EXPORT_BASE_URL=http://127.0.0.1:8787
+PRESENTATION_EXPORT_TIMEOUT_SECONDS=120
+PRESENTATION_EXPORT_INCLUDE_REVIEW=true
+PRESENTATION_EXPORT_PREVIEW_BACKEND=auto
+PRESENTATION_EXPORT_REQUIRE_REAL_PREVIEWS=false
+PRESENTATION_EXPORT_FAIL_ON_REGRESSION=false
+```
+
+O fluxo atual do Workbench usa principalmente:
+
+- `GET /health`
+- `POST /render`
+- `GET /artifact`
+
 Endpoints disponíveis:
 
 - `GET /health`
@@ -915,6 +964,50 @@ curl -X POST http://127.0.0.1:8787/template \
 
 ## Como rodar com Docker
 
+O repositório agora foi preparado para um caminho **Docker service-first** futuro, mas a operação recomendada hoje ainda continua sendo **host-native** quando a prioridade é usar o máximo das capabilities do app com o menor atrito.
+
+### Modo service-first preparado
+
+Build da imagem:
+
+```bash
+docker compose build ppt_creator_api
+```
+
+Subida do serviço:
+
+```bash
+docker compose up --build ppt_creator_api
+```
+
+Ou com helper:
+
+```bash
+bash bin/run_ppt_creator_api_docker.sh
+```
+
+O compose expõe:
+
+- `http://127.0.0.1:8787/health`
+- `http://127.0.0.1:8787/playground`
+
+e monta o repositório inteiro em `/work`, para preservar acesso a:
+
+- `examples/`
+- `outputs/`
+- assets e arquivos auxiliares do projeto
+
+### O que esta imagem passou a incluir
+
+Para deixar o caminho Docker mais próximo de “feature-complete”, a imagem foi preparada para incluir:
+
+- API HTTP local como `CMD` padrão
+- `ghostscript`
+- `libreoffice-impress`
+- fontes básicas para previews/review mais robustos
+
+Isso deixa o caminho pronto para, depois, endurecer smoke tests e operação containerizada sem mudar o boundary arquitetural com o AI Workbench.
+
 Build:
 
 ```bash
@@ -935,6 +1028,11 @@ bash bin/render_ppt_creator_docker.sh examples/ai_sales.json outputs/ai_sales.pp
 ```
 
 O container do app continua **enxuto**: ele inclui apenas `ppt_creator` e `ppt_creator_ai`, mas não empacota Ollama nem o `hf_local_llm_service`.
+
+Mesmo com esse preparo, a leitura recomendada continua sendo:
+
+- **agora:** host-native para integração principal com o AI Workbench
+- **depois:** Docker como service-first endurecido para operação mais isolada/reprodutível
 
 ---
 

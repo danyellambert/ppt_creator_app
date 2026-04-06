@@ -1,0 +1,16 @@
+services:
+  ppt_creator_api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ppt_creator_api
+    ports:
+      - "8787:8787"
+    environment:
+      PPT_CREATOR_API_HOST: 0.0.0.0
+      PPT_CREATOR_API_PORT: 8787
+      PPT_CREATOR_API_ASSET_ROOT: /work/examples
+    working_dir: /work
+    volumes:
+      - ./:/work
+    restart: unless-stopped

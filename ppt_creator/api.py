@@ -16,6 +16,7 @@ from pydantic import ValidationError
 
 from ppt_creator.assets import get_asset_collection, list_asset_collections
 from ppt_creator.brand_packs import get_brand_pack, list_brand_packs
+from ppt_creator.catalog import build_marketplace_catalog
 from ppt_creator.preview import (
     compare_pptx_artifacts,
     format_visual_regression_failure,
@@ -113,7 +114,7 @@ def _build_playground_html() -> str:
     )
     js_newline = r"\n"
     js_newline_pattern = r"\n+"
-    return f"""<!doctype html>
+    return rf"""<!doctype html>
 <html lang='en'>
 <head>
   <meta charset='utf-8'>
@@ -344,7 +345,18 @@ def _build_playground_html() -> str:
       background: var(--panel-muted);
       box-shadow: var(--shadow);
     }}
+    .gallery-card button {{
+      all: unset;
+      display: block;
+      width: 100%;
+      cursor: pointer;
+    }}
+    .gallery-card button:focus-visible {{
+      outline: 3px solid var(--accent);
+      border-radius: 14px;
+    }}
     .gallery-card img {{ width: 100%; border-radius: 12px; display: block; border: 1px solid var(--border); }}
+    .thumb-meta {{ margin-top: 8px; font-size: 12px; color: var(--text-muted); }}
     .action-toolbar {{ margin-top: 18px; }}
     .action-toolbar button {{ min-width: 132px; }}
     @media (max-width: 960px) {{
@@ -463,6 +475,13 @@ def _build_playground_html() -> str:
         <li>Use rendered previews for sign-off instead of trusting only synthetic previews.</li>
       </ul>
     </div>
+    <div class='insight-card'>
+      <h3>Live review mode</h3>
+      <ul id='liveReviewSummary'>
+        <li>Auto review is off. Use Iterate flow for one-click QA.</li>
+      </ul>
+      <div class='editor-hint'>Tip: Ctrl/Cmd+Enter runs the iterate flow. Ctrl/Cmd+Shift+Enter exports the current deck.</div>
+    </div>
   </div>
   </div>
   <div class='editor-section'>
@@ -551,6 +570,9 @@ def _build_playground_html() -> str:
     </div>
   </div>
   <div class='toolbar action-toolbar'>
+    <button onclick='runIterateFlow()'>Iterate flow</button>
+    <button onclick='focusTopRiskSlide()'>Focus top risk slide</button>
+    <button onclick='exportCurrentDeck()'>Export current deck</button>
     <button onclick='loadWorkflow()'>Load workflow</button>
     <button onclick='loadTemplate()'>Load starter</button>
     <button onclick='runAction("/review")'>1. Review draft</button>
@@ -579,6 +601,7 @@ def _build_playground_html() -> str:
     const storageKey = 'ppt_creator_playground_state_v3';
     const themeStorageKey = 'ppt_creator_playground_theme_v1';
     let aiProviderMetadata = {{}};
+    let latestActionResult = null;
 
     function applyTheme(theme) {{
       const resolved = theme === 'dark' ? 'dark' : 'light';
@@ -614,6 +637,7 @@ def _build_playground_html() -> str:
       return {{
         outputPath: document.getElementById('outputPath').value,
         previewDir: document.getElementById('previewDir').value,
+        slideSelector: document.getElementById('slideSelector').value,
         workflowPreset: document.getElementById('workflowPreset').value,
         templateDomain: document.getElementById('templateDomain').value,
         brandPack: document.getElementById('brandPack').value,
@@ -673,9 +697,61 @@ def _build_playground_html() -> str:
       for (const [index, preview] of previews.entries()) {{
         const card = document.createElement('div');
         card.className = 'gallery-card';
-        card.innerHTML = `<img src="${{artifactUrl(preview)}}" alt="Preview ${{index + 1}}" /><div style="margin-top: 8px; font-size: 12px; color: #44576d;">Slide ${{String(index + 1).padStart(2, '0')}}</div>`;
+        card.innerHTML = `<button type="button" onclick="focusSlide(${{index}})"><img src="${{artifactUrl(preview)}}" alt="Preview ${{index + 1}}" /><div class="thumb-meta">Slide ${{String(index + 1).padStart(2, '0')}} · jump to editor</div></button>`;
         gallery.appendChild(card);
       }}
+    }}
+
+    function focusEditor() {{
+      const node = document.getElementById('slideFields');
+      if (node) node.scrollIntoView({{ behavior: 'smooth', block: 'start' }});
+    }}
+
+    function focusSlide(index, options = {{}}) {{
+      const selector = document.getElementById('slideSelector');
+      if (!selector || !selector.options.length) return;
+      const normalized = Math.max(0, Math.min(selector.options.length - 1, Number(index) || 0));
+      selector.value = String(normalized);
+      renderSelectedSlideEditor();
+      if (options.scroll !== false) focusEditor();
+    }}
+
+    function syncLiveReviewSummary() {{
+      const node = document.getElementById('liveReviewSummary');
+      if (!node) return;
+      const autoValidate = document.getElementById('autoValidate').checked;
+      const autoReview = document.getElementById('autoReview').checked;
+      const includePreview = document.getElementById('autoPreviewWithReview').checked;
+      const previewBackend = document.getElementById('previewBackend').value || 'auto';
+      const requireReal = document.getElementById('requireRealPreviews').checked;
+      const topRiskSlides = ((latestActionResult && (latestActionResult.top_risk_slides || (latestActionResult.quality_review && latestActionResult.quality_review.top_risk_slides))) || []).slice(0, 1);
+      const messages = [];
+      if (autoReview) {{
+        messages.push(`Auto review is on${{includePreview ? ' with preview artifacts.' : '.'}}`);
+      }} else if (autoValidate) {{
+        messages.push('Auto validate is on.');
+      }} else {{
+        messages.push('Auto review is off. Use Iterate flow for one-click QA.');
+      }}
+      if (includePreview) {{
+        messages.push(`Preview backend: ${{previewBackend}}${{requireReal ? ' (real preview required)' : ''}}.`);
+      }}
+      if (topRiskSlides.length) {{
+        const topRisk = topRiskSlides[0];
+        messages.push(`Top risk right now: slide ${{String(topRisk.slide_number || 1).padStart(2, '0')}}${{topRisk.title ? ` • ${{escapeHtml(topRisk.title)}}` : ''}}.`);
+      }}
+      messages.push('Click a preview thumbnail to jump back to that slide in the editor.');
+      node.innerHTML = messages.map(item => `<li>${{escapeHtml(item)}}</li>`).join('');
+    }}
+
+    function focusTopRiskSlide() {{
+      const topRiskSlides = ((latestActionResult && (latestActionResult.top_risk_slides || (latestActionResult.quality_review && latestActionResult.quality_review.top_risk_slides))) || []).slice(0, 1);
+      if (!topRiskSlides.length) {{
+        setStatus('No risky slide available yet. Run review first.');
+        return;
+      }}
+      focusSlide(Math.max(0, (topRiskSlides[0].slide_number || 1) - 1));
+      setStatus(`Focused top-risk slide ${{String(topRiskSlides[0].slide_number || 1).padStart(2, '0')}}.`);
     }}
 
     function updateArtifactLinks(result) {{
@@ -692,6 +768,7 @@ def _build_playground_html() -> str:
     function renderInsights(result) {{
       const container = document.getElementById('insights');
       container.innerHTML = '';
+      latestActionResult = result || {{}};
       const previewPayload = result.preview_result || result;
       const packet = result.packet || (result.preview_recommendation ? result : {{}});
       const regression = previewPayload.visual_regression || result.comparison;
@@ -726,6 +803,15 @@ def _build_playground_html() -> str:
               <li>Issues: ${{result.issue_count ?? 0}}</li>
               <li>High / Medium / Low: ${{(result.severity_counts || {{}}).high || 0}} / ${{(result.severity_counts || {{}}).medium || 0}} / ${{(result.severity_counts || {{}}).low || 0}}</li>
             </ul>
+          </div>
+        `);
+      }}
+      const topRiskSlides = (result.top_risk_slides || (result.quality_review && result.quality_review.top_risk_slides) || []).slice(0, 3);
+      if (topRiskSlides.length) {{
+        cards.push(`
+          <div class="insight-card">
+            <h3>Focus risky slides</h3>
+            <ul>${{topRiskSlides.map(item => `<li><a href="#" onclick="focusSlide(${{Math.max(0, (item.slide_number || 1) - 1)}}); return false;">Slide ${{String(item.slide_number || 1).padStart(2, '0')}}</a>${{item.title ? ` • ${{escapeHtml(item.title)}}` : ''}}</li>`).join('')}}</ul>
           </div>
         `);
       }}
@@ -1088,6 +1174,14 @@ def _build_playground_html() -> str:
       return normalized || undefined;
     }}
 
+    function optionalUnitFloat(value) {{
+      const normalized = String(value || '').trim();
+      if (!normalized) return undefined;
+      const parsed = Number.parseFloat(normalized);
+      if (!Number.isFinite(parsed)) return undefined;
+      return Math.max(0, Math.min(1, parsed));
+    }}
+
     function splitDelimitedLine(line) {{
       return line.split('|').map(part => part.trim());
     }}
@@ -1167,6 +1261,24 @@ def _build_playground_html() -> str:
           <textarea id="guidedBody">${{escapeHtml(slide.body || '')}}</textarea>
         </div>
       `);
+
+      const supportsImageFields = ['title', 'section', 'image_text', 'summary', 'closing'].includes(slide.type);
+      if (supportsImageFields) {{
+        cards.push(`
+          <div class="editor-card">
+            <h3>Visual slot</h3>
+            <label>Image asset path</label>
+            <input id="guidedImagePath" value="${{escapeHtml(slide.image_path || '')}}" />
+            <label>Image caption</label>
+            <input id="guidedImageCaption" value="${{escapeHtml(slide.image_caption || '')}}" />
+            <label>Focal point X</label>
+            <input id="guidedImageFocalX" value="${{escapeHtml(slide.image_focal_x ?? '')}}" placeholder="0.0 - 1.0" />
+            <label>Focal point Y</label>
+            <input id="guidedImageFocalY" value="${{escapeHtml(slide.image_focal_y ?? '')}}" placeholder="0.0 - 1.0" />
+            <div class="editor-hint">Use focal values between 0 and 1 to bias cropping around the subject.</div>
+          </div>
+        `);
+      }}
 
       if (Array.isArray(slide.bullets)) {{
         cards.push(`
@@ -1273,6 +1385,10 @@ def _build_playground_html() -> str:
       slide.subtitle = optionalText(document.getElementById('guidedSubtitle')?.value);
       slide.eyebrow = optionalText(document.getElementById('guidedEyebrow')?.value);
       slide.body = optionalText(document.getElementById('guidedBody')?.value);
+      if (document.getElementById('guidedImagePath')) slide.image_path = optionalText(document.getElementById('guidedImagePath')?.value);
+      if (document.getElementById('guidedImageCaption')) slide.image_caption = optionalText(document.getElementById('guidedImageCaption')?.value);
+      if (document.getElementById('guidedImageFocalX')) slide.image_focal_x = optionalUnitFloat(document.getElementById('guidedImageFocalX')?.value);
+      if (document.getElementById('guidedImageFocalY')) slide.image_focal_y = optionalUnitFloat(document.getElementById('guidedImageFocalY')?.value);
 
       const bulletsField = document.getElementById('guidedBullets');
       if (bulletsField) {{
@@ -1364,7 +1480,31 @@ def _build_playground_html() -> str:
       persistState();
       refreshSlideEditor();
       scheduleAutoRun();
+      focusEditor();
+      focusTopRiskSlide();
       setStatus('Guided edits applied to JSON spec.');
+    }}
+
+    async function exportCurrentDeck() {{
+      setStatus('Exporting current deck...');
+      const ok = await runAction('/render');
+      if (ok) setStatus('Deck exported and latest artifacts refreshed.');
+      return ok;
+    }}
+
+    async function runIterateFlow() {{
+      setStatus('Running iterate flow...');
+      const reviewed = await runAction('/review');
+      if (!reviewed) return false;
+      focusTopRiskSlide();
+      const rendered = await runAction('/render');
+      if (!rendered) return false;
+      if (document.getElementById('previewDir').value.trim()) {{
+        const reviewedRendered = await reviewRenderedPptx();
+        if (!reviewedRendered) return false;
+      }}
+      setStatus('Iterate flow complete. Review artifacts, adjust risky slides, and export when ready.');
+      return true;
     }}
 
     function parseBriefingInput() {{
@@ -1609,7 +1749,14 @@ def _build_playground_html() -> str:
       renderPreviewGallery(previewPayload.previews || []);
       updateArtifactLinks(result);
       renderInsights(result);
-      setStatus(autoReview ? 'Auto review up to date.' : 'Auto validation up to date.');
+      const topRiskSlides = (result.top_risk_slides || []).slice(0, 1);
+      if (autoReview && topRiskSlides.length) {{
+        const focusSlideNumber = String(topRiskSlides[0].slide_number || '').padStart(2, '0');
+        setStatus(`Auto review up to date. Start with slide ${{focusSlideNumber}}.`);
+      }} else {{
+        setStatus(autoReview ? 'Auto review up to date.' : 'Auto validation up to date.');
+      }}
+      syncLiveReviewSummary();
     }}
 
     async function initControls() {{
@@ -1691,17 +1838,27 @@ def _build_playground_html() -> str:
         await refreshAiStatus(false);
       }});
       refreshSlideEditor();
+      syncLiveReviewSummary();
       await refreshAiStatus(false);
       setAiActionStatus('AI section ready.', 'info');
       for (const id of ['outputPath', 'previewDir', 'workflowPreset', 'templateDomain', 'brandPack', 'audienceProfile', 'previewBackend', 'baselineDir', 'requireRealPreviews', 'failOnRegression', 'compareBeforePptx', 'compareAfterPptx', 'compareOutputDir', 'aiProvider', 'aiBaseUrl', 'aiModelName', 'aiGenerationAttempts', 'aiThemeName', 'aiAuthoringMode', 'aiUseIntentMode', 'aiAutoPreview', 'aiAutoRender', 'intentInput', 'briefingInput', 'spec', 'autoValidate', 'autoReview', 'autoPreviewWithReview']) {{
         const element = document.getElementById(id);
         element.addEventListener('change', persistState);
         element.addEventListener('input', persistState);
+        element.addEventListener('change', syncLiveReviewSummary);
+        element.addEventListener('input', syncLiveReviewSummary);
         if (id !== 'briefingInput' && id !== 'intentInput' && id !== 'aiProvider' && id !== 'aiBaseUrl' && id !== 'aiModelName' && id !== 'aiGenerationAttempts' && id !== 'aiThemeName' && id !== 'aiAuthoringMode') {{
           element.addEventListener('change', scheduleAutoRun);
           element.addEventListener('input', scheduleAutoRun);
         }}
       }}
+      document.addEventListener('keydown', event => {{
+        if (!(event.metaKey || event.ctrlKey) || event.repeat) return;
+        if (event.key !== 'Enter') return;
+        event.preventDefault();
+        if (event.shiftKey) exportCurrentDeck();
+        else runIterateFlow();
+      }});
     }}
 
     async function loadWorkflow() {{
@@ -1730,6 +1887,7 @@ def _build_playground_html() -> str:
       renderInsights({{ packet: data.packet }});
       renderPreviewGallery([]);
       refreshSlideEditor();
+      syncLiveReviewSummary();
       persistState();
     }}
 
@@ -1750,6 +1908,7 @@ def _build_playground_html() -> str:
       renderInsights({{}});
       renderPreviewGallery([]);
       refreshSlideEditor();
+      syncLiveReviewSummary();
       persistState();
     }}
 
@@ -1758,7 +1917,7 @@ def _build_playground_html() -> str:
       const baselineDir = document.getElementById('baselineDir').value;
       if (!previewDir || !baselineDir) {{
         setStatus('Preview directory and baseline directory are required to promote a baseline.');
-        return;
+        return false;
       }}
       const response = await fetch('/promote-baseline', {{
         method: 'POST',
@@ -1772,6 +1931,7 @@ def _build_playground_html() -> str:
       renderInsights(result);
       setStatus('Baseline promoted.');
       persistState();
+      return true;
     }}
 
     async function comparePptxArtifacts() {{
@@ -1780,7 +1940,7 @@ def _build_playground_html() -> str:
       const outputDir = document.getElementById('compareOutputDir').value;
       if (!beforePptx || !afterPptx || !outputDir) {{
         setStatus('Before PPTX, after PPTX and compare output directory are required.');
-        return;
+        return false;
       }}
       const response = await executeAction('/compare-pptx', {{
         before_pptx: beforePptx,
@@ -1798,7 +1958,7 @@ def _build_playground_html() -> str:
         renderErrorInsights(data);
         setStatus(`Compare failed (${{response.status}}).`);
         persistState();
-        return;
+        return false;
       }}
       const result = data.result || data;
       renderPreviewGallery([]);
@@ -1806,6 +1966,7 @@ def _build_playground_html() -> str:
       renderInsights(result);
       setStatus('Finished compare-pptx flow.');
       persistState();
+      return true;
     }}
 
     async function reviewRenderedPptx() {{
@@ -1813,7 +1974,7 @@ def _build_playground_html() -> str:
       const outputDir = document.getElementById('previewDir').value;
       if (!inputPptx || !outputDir) {{
         setStatus('Output PPTX path and preview directory are required for review-pptx.');
-        return;
+        return false;
       }}
       const response = await executeAction('/review-pptx', {{
         input_pptx: inputPptx,
@@ -1831,7 +1992,7 @@ def _build_playground_html() -> str:
         renderErrorInsights(data);
         setStatus(`review-pptx failed (${{response.status}}).`);
         persistState();
-        return;
+        return false;
       }}
       const result = data.result || data;
       const previewPayload = result.preview_result || result;
@@ -1840,10 +2001,18 @@ def _build_playground_html() -> str:
       renderInsights(result);
       setStatus('Finished review-pptx flow.');
       persistState();
+      return true;
     }}
 
     async function runAction(path, options = {{}}) {{
-      const spec = JSON.parse(document.getElementById('spec').value);
+      let spec;
+      try {{
+        spec = JSON.parse(document.getElementById('spec').value);
+      }} catch (error) {{
+        renderErrorInsights({{ error: `Invalid JSON syntax: ${{error.message}}` }});
+        setStatus('Cannot run action until JSON is valid.');
+        return false;
+      }}
       const outputPath = document.getElementById('outputPath').value;
       const previewDir = document.getElementById('previewDir').value;
       const previewBackend = document.getElementById('previewBackend').value;
@@ -1883,7 +2052,7 @@ def _build_playground_html() -> str:
         renderErrorInsights(data);
         setStatus(`Action failed (${{response.status}}).`);
         persistState();
-        return;
+        return false;
       }}
       const result = merged.result;
       const previewPayload = result.preview_result || result;
@@ -1892,6 +2061,7 @@ def _build_playground_html() -> str:
       renderInsights(result);
       setStatus(`Finished ${{path.replace('/', '')}} flow.`);
       persistState();
+      return true;
     }}
     initializeTheme();
     initControls();
@@ -2488,6 +2658,9 @@ class PptCreatorAPIHandler(BaseHTTPRequestHandler):
                 HTTPStatus.OK,
                 {"workflows": [get_workflow_preset(name) for name in list_workflow_presets()]},
             )
+            return
+        if parsed.path == "/marketplace":
+            self._json_response(HTTPStatus.OK, build_marketplace_catalog())
             return
         if parsed.path == "/ai/providers":
             from ppt_creator_ai.providers import get_provider, list_provider_names

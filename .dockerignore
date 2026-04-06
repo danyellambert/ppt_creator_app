@@ -8,7 +8,6 @@ __pycache__
 *.pyd
 tests
 docs
-examples
 outputs
 dist
 build
