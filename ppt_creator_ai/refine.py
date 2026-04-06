@@ -31,7 +31,7 @@ _GENERIC_TITLE_KEYS = {
 
 
 def _normalize_title_key(value: str | None) -> str:
-    return re.sub(r"[^a-z0-9à-ÿ]+", " ", (value or "").strip().lower()).strip()
+    return re.sub(r"[^a-z0-9]+", " ", (value or "").strip().lower()).strip()
 
 
 def _shorten_words(value: str | None, *, max_words: int) -> str | None:
@@ -113,29 +113,29 @@ def _suggest_executive_title(
 ) -> str | None:
     seed = _briefing_seed(briefing)
     if slide_type == "agenda":
-        return "Agenda da decisão" if language == "pt" else "Decision agenda"
+        return "Decision agenda"
     if slide_type == "metrics":
-        return "Métricas que importam" if language == "pt" else "Metrics that matter"
+        return "Metrics that matter"
     if slide_type == "comparison":
-        return "Trade-offs da decisão" if language == "pt" else "Decision trade-offs"
+        return "Decision trade-offs"
     if slide_type == "two_column":
-        return "Frentes da recomendação" if language == "pt" else "Recommendation lenses"
+        return "Recommendation lenses"
     if slide_type == "table":
-        return "Quadro executivo da decisão" if language == "pt" else "Executive decision table"
+        return "Executive decision table"
     if slide_type == "faq":
-        return "Riscos e objeções" if language == "pt" else "Risks and objections"
+        return "Risks and objections"
     if slide_type == "summary":
-        return "Recomendação final" if language == "pt" else "Final recommendation"
+        return "Final recommendation"
     if slide_type == "closing":
         if seed:
-            return (f"Próximo movimento: {seed}" if language == "pt" else f"Next move: {seed}")
-        return "Próximo movimento" if language == "pt" else "Next move"
+            return f"Next move: {seed}"
+        return "Next move"
     if slide_type in {"bullets", "image_text"}:
         if narrative_archetype == "proposal":
-            return "Por que esta abordagem" if language == "pt" else "Why this approach"
+            return "Why this approach"
         if seed:
             return seed
-        return "Contexto que importa" if language == "pt" else "Context that matters"
+        return "Context that matters"
     return seed
 
 
@@ -172,11 +172,7 @@ def _rewrite_body_copy(
         return current_body
     normalized_body = (current_body or "").strip().lower()
     if slide_type == "agenda" and (not normalized_body or normalized_body in {"dense intro", "intro", "agenda"}):
-        return (
-            "Sequência executiva do contexto à recomendação final."
-            if language == "pt"
-            else "Executive path from context to the final recommendation."
-        )
+        return "Executive path from context to the final recommendation."
     if slide_type == "summary" and (not normalized_body or len(normalized_body.split()) <= 5):
         return preferred
     if slide_type in {"bullets", "image_text"} and (not normalized_body or normalized_body in {"generic", "generic intro", "dense intro"}):
@@ -195,11 +191,7 @@ def _rewrite_closing_quote(
     if preferred is None:
         return current_quote
     if not normalized_quote or normalized_quote in {"done.", "done", "generic close.", "generic close"}:
-        return (
-            f"A melhor próxima decisão é esta: {preferred}"
-            if language == "pt"
-            else f"The best next move is this: {preferred}"
-        )
+        return f"The best next move is this: {preferred}"
     return current_quote
 
 

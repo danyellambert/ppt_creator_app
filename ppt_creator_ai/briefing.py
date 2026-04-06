@@ -62,31 +62,7 @@ def _sentence_case(value: str | None) -> str | None:
 
 
 def _infer_prompt_language(text: str | None) -> str:
-    normalized = f" {(text or '').lower()} "
-    if any(char in normalized for char in "ãõçáéíóúâêôà"):
-        return "pt"
-
-    portuguese_markers = [
-        " quero ",
-        " apresentação ",
-        " apresentacao ",
-        " vaga ",
-        " recrutador ",
-        " lideran",
-        " métricas ",
-        " metricas ",
-        " roteiro ",
-        " riscos ",
-        " negócio ",
-        " negocio ",
-        " próximo trimestre ",
-        " proximo trimestre ",
-        " por que ",
-        " devemos ",
-    ]
-    score = sum(1 for marker in portuguese_markers if marker in normalized)
-    return "pt" if score >= 2 else "en"
-
+    return "en"
 
 def _condense_messages(values: list[str], *, max_items: int, max_words: int) -> list[str]:
     condensed: list[str] = []
@@ -100,92 +76,51 @@ def _condense_messages(values: list[str], *, max_items: int, max_words: int) -> 
 
 
 def _localized_phrase(language: str, *, pt: str, en: str) -> str:
-    return pt if language == "pt" else en
-
+    return en
 
 _SPECIFICITY_STOPWORDS = {
     "about",
     "above",
     "across",
     "after",
-    "agora",
-    "algo",
-    "ainda",
     "also",
-    "apenas",
-    "apresentacao",
-    "apresentação",
     "approach",
-    "assim",
     "between",
     "briefing",
     "clearly",
-    "como",
-    "contra",
     "deck",
     "decks",
-    "dentro",
-    "depois",
-    "desde",
-    "dessa",
-    "desse",
-    "deste",
-    "diferente",
-    "disso",
     "each",
-    "esse",
-    "esta",
-    "este",
     "executive",
-    "fazer",
     "final",
-    "forte",
-    "forma",
     "from",
-    "geral",
     "have",
-    "isso",
-    "logo",
-    "mais",
-    "mesmo",
-    "muito",
-    "narrativa",
     "need",
-    "objetiva",
-    "objetivo",
     "only",
-    "para",
-    "pela",
-    "pelos",
-    "pelo",
-    "porque",
-    "porquê",
     "premium",
-    "quero",
+    "presentation",
+    "presentations",
     "role",
     "should",
     "slide",
     "slides",
-    "sobre",
+    "story",
     "strong",
     "tech",
     "technological",
-    "tecnologico",
-    "tecnológico",
     "that",
     "them",
     "this",
     "through",
-    "uma",
+    "want",
     "with",
 }
-
 
 def _extract_keyword_tokens(text: str | None, *, min_length: int = 4) -> list[str]:
     if not text:
         return []
     tokens: list[str] = []
-    for token in re.findall(r"[A-Za-zÀ-ÿ0-9_+-]+", text.lower()):
+    for token in re.findall(r"[A-Za-z0-9_+-]+", text.lower()):
         cleaned = token.strip("_+-")
         if len(cleaned) < min_length:
             continue
@@ -193,7 +128,6 @@ def _extract_keyword_tokens(text: str | None, *, min_length: int = 4) -> list[st
             continue
         tokens.append(cleaned)
     return tokens
-
 
 def _infer_narrative_archetype(intent_text: str | None) -> str:
     lowered = (intent_text or "").lower()
@@ -211,55 +145,42 @@ def _infer_narrative_archetype(intent_text: str | None) -> str:
             if keyword in lowered:
                 scores[archetype] += weight
 
-    add_score("profile", ["entrevista", "interview", "candidate", "candidato", "vaga", "hiring"], weight=5)
+    add_score("profile", ["interview", "candidate", "hiring", "career"], weight=5)
     add_score("review", ["qbr", "review", "operating review", "status update", "retrospective", "business review"], weight=4)
-    add_score("proposal", ["proposal", "proposta", "pitch", "rfp", "cliente", "commercial proposal", "business case"], weight=4)
-    add_score("strategy", ["strategy", "estratég", "north star", "vision", "visioning", "positioning", "strategic"], weight=4)
+    add_score("proposal", ["proposal", "pitch", "rfp", "client", "commercial proposal", "business case"], weight=4)
+    add_score("strategy", ["strategy", "north star", "vision", "visioning", "positioning", "strategic"], weight=4)
     add_score(
         "operating",
         [
             "operating",
             "operation",
-            "operação",
-            "operacao",
-            "operacional",
+            "operational",
             "workflow",
             "process",
-            "processo",
             "governance",
             "roadmap",
             "rollout",
             "execution model",
-            "gargalos",
             "bottleneck",
-            "dependências",
-            "dependencias",
-            "sequência operacional",
-            "sequencia operacional",
+            "dependencies",
+            "operating sequence",
         ],
         weight=2,
     )
     add_score(
         "decision",
         [
-            "por que",
             "why",
             "recommend",
-            "recomendação",
-            "recomendacao",
+            "recommendation",
             "decision",
             "launch",
-            "lançar",
-            "lancar",
             "trade-off",
             "tradeoff",
             "go/no-go",
             "options",
-            "opções",
-            "opcoes",
-            "melhor escolha",
             "best choice",
-            "devemos",
+            "should",
         ],
         weight=3,
     )
@@ -273,89 +194,87 @@ def _infer_narrative_archetype(intent_text: str | None) -> str:
             return archetype
     return "decision"
 
-
 def _default_outline_for_prompt(*, language: str, domain: str, candidate_story_mode: bool, narrative_archetype: str) -> list[str]:
     if candidate_story_mode:
         return [
-            _localized_phrase(language, pt="Quem sou e como penso", en="Who I am and how I think"),
-            _localized_phrase(language, pt="Projetos relevantes", en="Relevant projects"),
-            _localized_phrase(language, pt="Stack e arquitetura de IA", en="AI stack and architecture"),
-            _localized_phrase(language, pt="Produção e escalabilidade", en="Production and scalability"),
-            _localized_phrase(language, pt="Produto e negócio", en="Product and business"),
-            _localized_phrase(language, pt="Valor para a empresa", en="Value to the company"),
+            "Who I am and how I think",
+            "Relevant projects",
+            "AI stack and architecture",
+            "Production and scalability",
+            "Product and business",
+            "Value to the company",
         ]
     if domain == "sales":
         return [
-            _localized_phrase(language, pt="Tese de lançamento", en="Launch thesis"),
-            _localized_phrase(language, pt="Impacto esperado", en="Expected impact"),
-            _localized_phrase(language, pt="Roteiro de rollout", en="Rollout roadmap"),
-            _localized_phrase(language, pt="Trade-offs da decisão", en="Decision trade-offs"),
-            _localized_phrase(language, pt="Riscos e objeções", en="Risks and objections"),
-            _localized_phrase(language, pt="Recomendação final", en="Final recommendation"),
+            "Launch thesis",
+            "Expected impact",
+            "Rollout roadmap",
+            "Decision trade-offs",
+            "Risks and objections",
+            "Final recommendation",
         ]
     if domain == "product":
         return [
-            _localized_phrase(language, pt="Diagnóstico do roadmap", en="Roadmap diagnosis"),
-            _localized_phrase(language, pt="KPIs críticos", en="Critical KPIs"),
-            _localized_phrase(language, pt="Sequência do trimestre", en="Quarter sequence"),
-            _localized_phrase(language, pt="Trade-offs de foco", en="Focus trade-offs"),
-            _localized_phrase(language, pt="Riscos da mudança", en="Change risks"),
-            _localized_phrase(language, pt="Recomendação do review", en="Review recommendation"),
+            "Roadmap diagnosis",
+            "Critical KPIs",
+            "Quarter sequence",
+            "Focus trade-offs",
+            "Change risks",
+            "Review recommendation",
         ]
     if domain == "board":
         return [
-            _localized_phrase(language, pt="Contexto da decisão", en="Decision context"),
-            _localized_phrase(language, pt="Sinais principais", en="Key signals"),
-            _localized_phrase(language, pt="Opções em jogo", en="Options in play"),
-            _localized_phrase(language, pt="Riscos e mitigação", en="Risks and mitigation"),
-            _localized_phrase(language, pt="Próximos passos", en="Next steps"),
-            _localized_phrase(language, pt="Recomendação final", en="Final recommendation"),
+            "Decision context",
+            "Key signals",
+            "Options in play",
+            "Risks and mitigation",
+            "Next steps",
+            "Final recommendation",
         ]
     if narrative_archetype == "review":
         return [
-            _localized_phrase(language, pt="Diagnóstico atual", en="Current diagnosis"),
-            _localized_phrase(language, pt="Sinais principais", en="Key signals"),
-            _localized_phrase(language, pt="O que está funcionando", en="What is working"),
-            _localized_phrase(language, pt="O que precisa corrigir", en="What needs correction"),
-            _localized_phrase(language, pt="Riscos e decisões", en="Risks and decisions"),
-            _localized_phrase(language, pt="Próximos passos", en="Next steps"),
+            "Current diagnosis",
+            "Key signals",
+            "What is working",
+            "What needs correction",
+            "Risks and decisions",
+            "Next steps",
         ]
     if narrative_archetype == "proposal":
         return [
-            _localized_phrase(language, pt="Tese da proposta", en="Proposal thesis"),
-            _localized_phrase(language, pt="Por que esta abordagem", en="Why this approach"),
-            _localized_phrase(language, pt="Provas e diferenciais", en="Proof and differentiators"),
-            _localized_phrase(language, pt="Escopo e execução", en="Scope and execution"),
-            _localized_phrase(language, pt="Riscos e mitigação", en="Risks and mitigation"),
-            _localized_phrase(language, pt="Recomendação comercial", en="Commercial recommendation"),
+            "Proposal thesis",
+            "Why this approach",
+            "Proof and differentiators",
+            "Scope and execution",
+            "Risks and mitigation",
+            "Commercial recommendation",
         ]
     if narrative_archetype == "strategy":
         return [
-            _localized_phrase(language, pt="Tese estratégica", en="Strategic thesis"),
-            _localized_phrase(language, pt="Mudança de contexto", en="Context shift"),
-            _localized_phrase(language, pt="Opções e trade-offs", en="Options and trade-offs"),
-            _localized_phrase(language, pt="Aposta recomendada", en="Recommended bet"),
-            _localized_phrase(language, pt="Riscos e alavancas", en="Risks and levers"),
-            _localized_phrase(language, pt="Próximos passos", en="Next steps"),
+            "Strategic thesis",
+            "Context shift",
+            "Options and trade-offs",
+            "Recommended bet",
+            "Risks and levers",
+            "Next steps",
         ]
     if narrative_archetype == "operating":
         return [
-            _localized_phrase(language, pt="Diagnóstico operacional", en="Operating diagnosis"),
-            _localized_phrase(language, pt="Gargalos principais", en="Main bottlenecks"),
-            _localized_phrase(language, pt="Sequência recomendada", en="Recommended sequence"),
-            _localized_phrase(language, pt="Riscos e dependências", en="Risks and dependencies"),
-            _localized_phrase(language, pt="Métricas de execução", en="Execution metrics"),
-            _localized_phrase(language, pt="Próximos passos", en="Next steps"),
+            "Operating diagnosis",
+            "Main bottlenecks",
+            "Recommended sequence",
+            "Risks and dependencies",
+            "Execution metrics",
+            "Next steps",
         ]
     return [
-        _localized_phrase(language, pt="Contexto da decisão", en="Decision context"),
-        _localized_phrase(language, pt="Evidências principais", en="Core evidence"),
-        _localized_phrase(language, pt="Estrutura de execução", en="Execution structure"),
-        _localized_phrase(language, pt="Riscos e objeções", en="Risks and objections"),
-        _localized_phrase(language, pt="Próximos passos", en="Next steps"),
-        _localized_phrase(language, pt="Recomendação final", en="Final recommendation"),
+        "Decision context",
+        "Core evidence",
+        "Execution structure",
+        "Risks and objections",
+        "Next steps",
+        "Final recommendation",
     ]
-
 
 def _derive_slide_copy(
     briefing: "BriefingInput",
@@ -368,120 +287,112 @@ def _derive_slide_copy(
 ) -> dict[str, object]:
     if candidate_story_mode:
         return {
-            "agenda_title": _localized_phrase(language, pt="Agenda da conversa", en="Interview agenda"),
-            "agenda_subtitle": _localized_phrase(language, pt="História, profundidade técnica e valor para a empresa", en="Story, technical depth and company value"),
-            "section_title": _localized_phrase(language, pt="Trajetória, impacto e execução", en="Story, impact and execution"),
-            "section_label": _localized_phrase(language, pt="Narrativa", en="Narrative"),
-            "context_title": _localized_phrase(language, pt="Minha trajetória e proposta de valor", en="My story and value proposition"),
-            "context_subtitle": _localized_phrase(language, pt="O fio condutor que sustenta minha candidatura", en="The throughline behind my candidacy"),
-            "cards_title": _localized_phrase(language, pt="Por que sou um candidato forte para AI Engineer", en="Why I am a strong AI Engineer candidate"),
-            "cards_subtitle": _localized_phrase(language, pt="Os três pilares que me diferenciam para a vaga", en="Three reasons I stand out for the role"),
-            "image_text_title": _localized_phrase(language, pt="Projetos de IA mais relevantes", en="Most relevant AI projects"),
-            "image_text_subtitle": _localized_phrase(language, pt="Casos que mostram profundidade, execução e resultado", en="Cases that show depth, execution and outcomes"),
-            "metrics_title": _localized_phrase(language, pt="Resultados mensuráveis", en="Measured outcomes"),
-            "metrics_subtitle": _localized_phrase(language, pt="Indicadores que reforçam impacto e senioridade", en="Signals that reinforce impact and seniority"),
-            "chart_title": _localized_phrase(language, pt="Comparativo dos principais sinais", en="Comparison of the main signals"),
-            "chart_subtitle": _localized_phrase(language, pt="Leitura quantitativa da minha trajetória", en="Quantitative readout of my track record"),
-            "timeline_title": _localized_phrase(language, pt="Sequência de execução", en="Execution sequence"),
-            "timeline_subtitle": _localized_phrase(language, pt="Como estruturo problema, solução e entrega", en="How I structure problem, solution and delivery"),
-            "comparison_title": _localized_phrase(language, pt="Alternativas e trade-offs", en="Alternatives and trade-offs"),
-            "comparison_subtitle": _localized_phrase(language, pt="Como penso escolhas técnicas e de produto", en="How I think through technical and product choices"),
-            "two_column_title": _localized_phrase(language, pt="Stack técnica + visão de negócio", en="Technical depth + business view"),
-            "two_column_subtitle": _localized_phrase(language, pt="Como conecto arquitetura, produção e valor", en="How I connect architecture, production and value"),
-            "two_column_left_title": _localized_phrase(language, pt="Profundidade técnica", en="Technical depth"),
-            "two_column_right_title": _localized_phrase(language, pt="Produto e negócio", en="Product and business"),
-            "faq_title": _localized_phrase(language, pt="Perguntas críticas da entrevista", en="Critical interview questions"),
-            "table_title": _localized_phrase(language, pt="O que cada capítulo prova", en="What each chapter proves"),
-            "table_subtitle": _localized_phrase(language, pt="O deck como tese explícita de contratação", en="Turn the deck into an explicit hiring thesis"),
-            "table_columns": [
-                _localized_phrase(language, pt="Capítulo", en="Chapter"),
-                _localized_phrase(language, pt="O que prova", en="What it proves"),
-                _localized_phrase(language, pt="Por que importa", en="Why it matters"),
-            ],
-            "summary_title": _localized_phrase(language, pt="Por que sou um forte fit para a vaga", en="Why I am a strong fit for the role"),
-            "summary_subtitle": _localized_phrase(language, pt="A síntese do valor que entrego", en="The condensed value I bring"),
-            "closing_title": _localized_phrase(language, pt="O valor que posso gerar", en="The value I can generate"),
-            "closing_quote": _localized_phrase(language, pt="Eu combino profundidade em IA, disciplina de produção e visão de negócio para gerar resultados concretos em ambientes exigentes.", en="I combine AI depth, production discipline and business judgment to create concrete outcomes in demanding environments."),
-            "recommended_move_footer": _localized_phrase(language, pt="Execução com senioridade", en="Execution with seniority"),
+            "agenda_title": "Interview agenda",
+            "agenda_subtitle": "Story, technical depth and company value",
+            "section_title": "Story, impact and execution",
+            "section_label": "Narrative",
+            "context_title": "My story and value proposition",
+            "context_subtitle": "The throughline behind my candidacy",
+            "cards_title": "Why I am a strong AI Engineer candidate",
+            "cards_subtitle": "Three reasons I stand out for the role",
+            "image_text_title": "Most relevant AI projects",
+            "image_text_subtitle": "Cases that show depth, execution and outcomes",
+            "metrics_title": "Measured outcomes",
+            "metrics_subtitle": "Signals that reinforce impact and seniority",
+            "chart_title": "Comparison of the main signals",
+            "chart_subtitle": "Quantitative readout of my track record",
+            "timeline_title": "Execution sequence",
+            "timeline_subtitle": "How I structure problem, solution and delivery",
+            "comparison_title": "Alternatives and trade-offs",
+            "comparison_subtitle": "How I think through technical and product choices",
+            "two_column_title": "Technical depth + business view",
+            "two_column_subtitle": "How I connect architecture, production and value",
+            "two_column_left_title": "Technical depth",
+            "two_column_right_title": "Product and business",
+            "faq_title": "Critical interview questions",
+            "table_title": "What each chapter proves",
+            "table_subtitle": "Turn the deck into an explicit hiring thesis",
+            "table_columns": ["Chapter", "What it proves", "Why it matters"],
+            "summary_title": "Why I am a strong fit for the role",
+            "summary_subtitle": "The condensed value I bring",
+            "closing_title": "The value I can generate",
+            "closing_quote": "I combine AI depth, production discipline and business judgment to create concrete outcomes in demanding environments.",
+            "recommended_move_footer": "Execution with seniority",
         }
 
     generic_copy = {
-        "agenda_title": _localized_phrase(language, pt="Agenda da decisão", en="Decision agenda"),
-        "agenda_subtitle": _localized_phrase(language, pt="Sequência executiva construída a partir do briefing", en="Executive sequence built from the briefing"),
-        "section_title": _localized_phrase(language, pt="A decisão em jogo", en="The decision at stake"),
-        "section_label": _localized_phrase(language, pt="Contexto", en="Context"),
-        "context_title": _localized_phrase(language, pt="O contexto que exige decisão", en="The context that requires a decision"),
-        "context_subtitle": _localized_phrase(language, pt="Diagnóstico e tese central do deck", en="Diagnosis and core thesis of the deck"),
-        "cards_title": _localized_phrase(language, pt="Três mensagens que sustentam a recomendação", en="Three messages behind the recommendation"),
-        "cards_subtitle": _localized_phrase(language, pt="O que a liderança deve reter", en="What leadership should retain"),
-        "image_text_title": _localized_phrase(language, pt="Como a narrativa vira alavanca de execução", en="How the narrative becomes execution leverage"),
-        "image_text_subtitle": _localized_phrase(language, pt="Do diagnóstico à ação com clareza executiva", en="From diagnosis to action with executive clarity"),
-        "metrics_title": _localized_phrase(language, pt="Métricas que importam", en="Metrics that matter"),
-        "metrics_subtitle": _localized_phrase(language, pt="Os sinais que mais pesam na decisão", en="Signals that matter most for the decision"),
-        "chart_title": _localized_phrase(language, pt="Como os sinais se comparam", en="How the signals compare"),
-        "chart_subtitle": _localized_phrase(language, pt="Leitura rápida dos indicadores críticos", en="Quick read on the critical indicators"),
-        "timeline_title": _localized_phrase(language, pt="Sequência recomendada", en="Recommended sequence"),
-        "timeline_subtitle": _localized_phrase(language, pt="O ritmo de execução mais seguro para avançar", en="The safest execution sequence to move forward"),
-        "comparison_title": _localized_phrase(language, pt="Opções em jogo", en="Options in play"),
-        "comparison_subtitle": _localized_phrase(language, pt="Comparação direta das alternativas", en="Direct comparison of the alternatives"),
-        "two_column_title": _localized_phrase(language, pt="Diagnóstico atual vs movimento recomendado", en="Current diagnosis vs recommended move"),
-        "two_column_subtitle": _localized_phrase(language, pt="O contraste que sustenta a decisão", en="The contrast behind the decision"),
-        "two_column_left_title": _localized_phrase(language, pt="Diagnóstico atual", en="Current diagnosis"),
-        "two_column_right_title": _localized_phrase(language, pt="Movimento recomendado", en="Recommended move"),
-        "faq_title": _localized_phrase(language, pt="Perguntas críticas da liderança", en="Critical leadership questions"),
-        "table_title": _localized_phrase(language, pt="Plano de execução", en="Execution plan"),
-        "table_subtitle": _localized_phrase(language, pt="Como transformar a recomendação em sequência prática", en="How to turn the recommendation into a practical sequence"),
-        "table_columns": [
-            _localized_phrase(language, pt="Fase", en="Phase"),
-            _localized_phrase(language, pt="Foco", en="Focus"),
-            _localized_phrase(language, pt="Por que importa", en="Why it matters"),
-        ],
-        "summary_title": _localized_phrase(language, pt="Síntese executiva da recomendação", en="Executive synthesis of the recommendation"),
-        "summary_subtitle": _localized_phrase(language, pt="A leitura final para decisão", en="The final read for decision-making"),
-        "closing_title": _localized_phrase(language, pt="Mensagem final", en="Closing message"),
-        "closing_quote": _localized_phrase(language, pt="Um briefing forte só vira decisão forte quando a narrativa, a sequência e a execução ficam claras para a liderança.", en="A strong briefing becomes a strong decision only when the narrative, sequence and execution are clear to leadership."),
-        "recommended_move_footer": _localized_phrase(language, pt="Mover com clareza", en="Move with clarity"),
+        "agenda_title": "Decision agenda",
+        "agenda_subtitle": "Executive sequence built from the briefing",
+        "section_title": "The decision at stake",
+        "section_label": "Context",
+        "context_title": "The context that requires a decision",
+        "context_subtitle": "Diagnosis and core thesis of the deck",
+        "cards_title": "Three messages behind the recommendation",
+        "cards_subtitle": "What leadership should retain",
+        "image_text_title": "How the narrative becomes execution leverage",
+        "image_text_subtitle": "From diagnosis to action with executive clarity",
+        "metrics_title": "Metrics that matter",
+        "metrics_subtitle": "Signals that matter most for the decision",
+        "chart_title": "How the signals compare",
+        "chart_subtitle": "Quick read on the critical indicators",
+        "timeline_title": "Recommended sequence",
+        "timeline_subtitle": "The safest execution sequence to move forward",
+        "comparison_title": "Options in play",
+        "comparison_subtitle": "Direct comparison of the alternatives",
+        "two_column_title": "Current diagnosis vs recommended move",
+        "two_column_subtitle": "The contrast behind the decision",
+        "two_column_left_title": "Current diagnosis",
+        "two_column_right_title": "Recommended move",
+        "faq_title": "Critical leadership questions",
+        "table_title": "Execution plan",
+        "table_subtitle": "How to turn the recommendation into a practical sequence",
+        "table_columns": ["Phase", "Focus", "Why it matters"],
+        "summary_title": "Executive synthesis of the recommendation",
+        "summary_subtitle": "The final read for decision-making",
+        "closing_title": "Closing message",
+        "closing_quote": "A strong briefing becomes a strong decision only when the narrative, sequence and execution are clear to leadership.",
+        "recommended_move_footer": "Move with clarity",
     }
 
     if narrative_archetype == "review":
         generic_copy.update(
             {
-                "agenda_title": _localized_phrase(language, pt="Agenda do review", en="Review agenda"),
-                "section_title": _localized_phrase(language, pt="Leitura atual do cenário", en="Current readout"),
-                "context_title": _localized_phrase(language, pt="O que o review mostra com clareza", en="What the review shows clearly"),
-                "cards_title": _localized_phrase(language, pt="Três sinais que merecem atenção", en="Three signals that deserve attention"),
-                "timeline_title": _localized_phrase(language, pt="Sequência de correção", en="Correction sequence"),
-                "summary_title": _localized_phrase(language, pt="Síntese do review", en="Review synthesis"),
+                "agenda_title": "Review agenda",
+                "section_title": "Current readout",
+                "context_title": "What the review shows clearly",
+                "cards_title": "Three signals that deserve attention",
+                "timeline_title": "Correction sequence",
+                "summary_title": "Review synthesis",
             }
         )
     elif narrative_archetype == "proposal":
         generic_copy.update(
             {
-                "section_title": _localized_phrase(language, pt="Por que esta proposta", en="Why this proposal"),
-                "context_title": _localized_phrase(language, pt="O problema que a proposta resolve", en="The problem the proposal solves"),
-                "cards_title": _localized_phrase(language, pt="Três diferenciais da proposta", en="Three differentiators of the proposal"),
-                "comparison_title": _localized_phrase(language, pt="Alternativas consideradas", en="Alternatives considered"),
-                "summary_title": _localized_phrase(language, pt="Síntese da proposta", en="Proposal synthesis"),
-                "closing_title": _localized_phrase(language, pt="Movimento recomendado", en="Recommended move"),
+                "section_title": "Why this proposal",
+                "context_title": "The problem the proposal solves",
+                "cards_title": "Three differentiators of the proposal",
+                "comparison_title": "Alternatives considered",
+                "summary_title": "Proposal synthesis",
+                "closing_title": "Recommended move",
             }
         )
     elif narrative_archetype == "strategy":
         generic_copy.update(
             {
-                "section_title": _localized_phrase(language, pt="A escolha estratégica em jogo", en="The strategic choice in play"),
-                "context_title": _localized_phrase(language, pt="O contexto que pede reposicionamento", en="The context that requires repositioning"),
-                "cards_title": _localized_phrase(language, pt="Três razões para esta tese", en="Three reasons behind this thesis"),
-                "summary_title": _localized_phrase(language, pt="Síntese estratégica", en="Strategic synthesis"),
+                "section_title": "The strategic choice in play",
+                "context_title": "The context that requires repositioning",
+                "cards_title": "Three reasons behind this thesis",
+                "summary_title": "Strategic synthesis",
             }
         )
     elif narrative_archetype == "operating":
         generic_copy.update(
             {
-                "section_title": _localized_phrase(language, pt="Como a operação deve mudar", en="How the operating model should change"),
-                "context_title": _localized_phrase(language, pt="O gargalo operacional central", en="The core operating bottleneck"),
-                "timeline_title": _localized_phrase(language, pt="Sequência operacional recomendada", en="Recommended operating sequence"),
-                "table_title": _localized_phrase(language, pt="Plano operacional", en="Operating plan"),
-                "summary_title": _localized_phrase(language, pt="Síntese operacional", en="Operating synthesis"),
+                "section_title": "How the operating model should change",
+                "context_title": "The core operating bottleneck",
+                "timeline_title": "Recommended operating sequence",
+                "table_title": "Operating plan",
+                "summary_title": "Operating synthesis",
             }
         )
 
@@ -491,87 +402,82 @@ def _derive_slide_copy(
     if domain == "sales":
         generic_copy.update(
             {
-                "section_title": _localized_phrase(language, pt="Por que este movimento agora", en="Why this move now"),
-                "context_title": _localized_phrase(language, pt="O problema comercial que o copiloto resolve", en="The sales problem the copilot solves"),
-                "cards_title": _localized_phrase(language, pt="Três alavancas para liderança comercial", en="Three levers for sales leadership"),
-                "image_text_title": _localized_phrase(language, pt="Como o copiloto entra no fluxo comercial", en="How the copilot fits the commercial workflow"),
-                "metrics_title": _localized_phrase(language, pt="Impacto esperado no funil", en="Expected pipeline impact"),
-                "chart_title": _localized_phrase(language, pt="Onde o impacto aparece primeiro", en="Where impact appears first"),
-                "timeline_title": _localized_phrase(language, pt="Roteiro de rollout", en="Rollout roadmap"),
-                "two_column_title": _localized_phrase(language, pt="Diagnóstico comercial vs movimento recomendado", en="Commercial diagnosis vs recommended move"),
-                "faq_title": _localized_phrase(language, pt="Riscos e objeções do board", en="Board risks and objections"),
-                "table_title": _localized_phrase(language, pt="Plano de decisão em 90 dias", en="90-day decision plan"),
-                "summary_title": _localized_phrase(language, pt="Recomendação final ao board", en="Final recommendation to the board"),
-                "closing_title": _localized_phrase(language, pt="Decisão recomendada", en="Recommended decision"),
-                "closing_quote": _localized_phrase(language, pt="Começar com um workflow de alta tração reduz risco, acelera aprendizado e mostra valor cedo para a liderança.", en="Starting with a high-traction workflow reduces risk, accelerates learning and proves value early to leadership."),
+                "section_title": "Why this move now",
+                "context_title": "The sales problem the copilot solves",
+                "cards_title": "Three levers for sales leadership",
+                "image_text_title": "How the copilot fits the commercial workflow",
+                "metrics_title": "Expected pipeline impact",
+                "chart_title": "Where impact appears first",
+                "timeline_title": "Rollout roadmap",
+                "two_column_title": "Commercial diagnosis vs recommended move",
+                "faq_title": "Board risks and objections",
+                "table_title": "90-day decision plan",
+                "summary_title": "Final recommendation to the board",
+                "closing_title": "Recommended decision",
+                "closing_quote": "Starting with a high-traction workflow reduces risk, accelerates learning and proves value early to leadership.",
             }
         )
     elif domain == "product":
         generic_copy.update(
             {
-                "section_title": _localized_phrase(language, pt="Onde o roadmap perdeu foco", en="Where the roadmap lost focus"),
-                "context_title": _localized_phrase(language, pt="O diagnóstico que pede decisão", en="The diagnosis that demands a decision"),
-                "cards_title": _localized_phrase(language, pt="Três sinais de diluição do roadmap", en="Three signs of roadmap dilution"),
-                "image_text_title": _localized_phrase(language, pt="Como transformar diagnóstico em foco", en="How to turn diagnosis into focus"),
-                "metrics_title": _localized_phrase(language, pt="KPIs que pedem correção de rota", en="KPIs that require a course correction"),
-                "chart_title": _localized_phrase(language, pt="Comparativo dos sinais críticos", en="Comparison of the critical signals"),
-                "timeline_title": _localized_phrase(language, pt="Sequência recomendada para o trimestre", en="Recommended sequence for the quarter"),
-                "two_column_title": _localized_phrase(language, pt="Situação atual vs foco recomendado", en="Current situation vs recommended focus"),
-                "faq_title": _localized_phrase(language, pt="Riscos e trade-offs da mudança", en="Risks and trade-offs of the change"),
-                "table_title": _localized_phrase(language, pt="Plano de foco para o trimestre", en="Quarter focus plan"),
-                "summary_title": _localized_phrase(language, pt="Recomendação para o operating review", en="Recommendation for the operating review"),
-                "closing_title": _localized_phrase(language, pt="A escolha que aumenta execução", en="The choice that improves execution"),
-                "closing_quote": _localized_phrase(language, pt="Menos frentes, melhor sequência e decisões mais rápidas aumentam a qualidade de execução do roadmap.", en="Fewer fronts, clearer sequencing and faster decisions improve roadmap execution quality."),
+                "section_title": "Where the roadmap lost focus",
+                "context_title": "The diagnosis that demands a decision",
+                "cards_title": "Three signs of roadmap dilution",
+                "image_text_title": "How to turn diagnosis into focus",
+                "metrics_title": "KPIs that require a course correction",
+                "chart_title": "Comparison of the critical signals",
+                "timeline_title": "Recommended sequence for the quarter",
+                "two_column_title": "Current situation vs recommended focus",
+                "faq_title": "Risks and trade-offs of the change",
+                "table_title": "Quarter focus plan",
+                "summary_title": "Recommendation for the operating review",
+                "closing_title": "The choice that improves execution",
+                "closing_quote": "Fewer fronts, clearer sequencing and faster decisions improve roadmap execution quality.",
             }
         )
 
     return generic_copy
 
-
 def _normalize_outline_label(value: str) -> str:
     cleaned = value.strip(" -*•\t:;,.\n")
     cleaned = re.sub(r"\s+", " ", cleaned)
-    cleaned = re.sub(r"^(?:e|and)\s+", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"^(?:and)\s+", "", cleaned, flags=re.IGNORECASE)
     if not cleaned:
         return ""
     lowered = cleaned.lower()
     replacements = {
-        "apresentação pessoal": "Apresentação pessoal",
-        "stack técnica": "Stack técnica",
-        "stack tecnico": "Stack técnica",
-        "projetos mais relevantes": "Projetos mais relevantes",
-        "arquiteturas/fluxos de ia": "Arquiteturas e fluxos de IA",
-        "resultados mensuráveis": "Resultados mensuráveis",
-        "resultados mensuraveis": "Resultados mensuráveis",
-        "forma de pensar em produção e escalabilidade": "Produção e escalabilidade",
-        "forma de pensar em producao e escalabilidade": "Produção e escalabilidade",
-        "como trabalho com produto e negócio": "Produto e negócio",
-        "como trabalho com produto e negocio": "Produto e negócio",
-        "um fechamento forte mostrando o valor que posso gerar para a empresa": "Valor que posso gerar",
-        "fechamento forte mostrando o valor que posso gerar para a empresa": "Valor que posso gerar",
+        "personal introduction": "Personal introduction",
+        "technical stack": "Technical stack",
+        "most relevant projects": "Most relevant projects",
+        "ai architectures/workflows": "AI architectures and workflows",
+        "ai architectures and workflows": "AI architectures and workflows",
+        "measured outcomes": "Measured outcomes",
+        "production and scalability": "Production and scalability",
+        "how i work with product and business": "Product and business",
+        "a strong closing showing the value i can create": "Value I can create",
+        "strong closing showing the value i can create": "Value I can create",
     }
     if lowered in replacements:
         return replacements[lowered]
     return _sentence_case(cleaned) or cleaned
 
-
 def _strip_intent_request_prefix(sentence: str) -> str:
     normalized = sentence.strip()
     prefixes = [
-        r"^quero\s+(?:uma?|um)\s+(?:apresenta(?:ç|c)ão|deck|pitch)\s+(?:para|sobre|de)\s+",
-        r"^preciso\s+de\s+(?:uma?|um)\s+(?:apresenta(?:ç|c)ão|deck|pitch)\s+(?:para|sobre|de)\s+",
-        r"^crie\s+(?:uma?|um)\s+(?:apresenta(?:ç|c)ão|deck|pitch)\s+(?:para|sobre|de)\s+",
-        r"^monte\s+(?:uma?|um)\s+(?:apresenta(?:ç|c)ão|deck|pitch)\s+(?:para|sobre|de)\s+",
+        r"^i\s+want\s+(?:an?|the)?\s*(?:presentation|deck|pitch)\s+(?:for|about|on)\s+",
+        r"^i\s+need\s+(?:an?|the)?\s*(?:presentation|deck|pitch)\s+(?:for|about|on)\s+",
+        r"^create\s+(?:an?|the)?\s*(?:presentation|deck|pitch)\s+(?:for|about|on)\s+",
+        r"^build\s+(?:an?|the)?\s*(?:presentation|deck|pitch)\s+(?:for|about|on)\s+",
+        r"^make\s+(?:an?|the)?\s*(?:presentation|deck|pitch)\s+(?:for|about|on)\s+",
     ]
     lowered = normalized.lower()
     for pattern in prefixes:
         updated = re.sub(pattern, "", lowered, count=1, flags=re.IGNORECASE)
         if updated != lowered:
-            normalized = normalized[len(normalized) - len(updated) :]
+            normalized = normalized[len(normalized) - len(updated):]
             lowered = updated
             break
     return normalized.strip()
-
 
 def _extract_include_items(intent_text: str) -> list[str]:
     include_items: list[str] = []
@@ -579,16 +485,15 @@ def _extract_include_items(intent_text: str) -> list[str]:
         if ":" not in line:
             continue
         prefix, rest = line.split(":", 1)
-        if prefix.strip().lower() not in {"inclua", "include", "incluir"}:
+        if prefix.strip().lower() != "include":
             continue
-        normalized_rest = rest.replace("/", " e ")
+        normalized_rest = rest.replace("/", " and ")
         candidates = [segment.strip() for segment in re.split(r",|;", normalized_rest) if segment.strip()]
         for candidate in candidates:
             cleaned = _normalize_outline_label(candidate)
             if cleaned and cleaned not in include_items:
                 include_items.append(cleaned)
     return include_items
-
 
 def _extract_style_recommendations(intent_text: str) -> list[str]:
     recommendations: list[str] = []
@@ -598,39 +503,43 @@ def _extract_style_recommendations(intent_text: str) -> list[str]:
         if message not in recommendations:
             recommendations.append(message)
 
-    if any(keyword in lowered for keyword in ["visual premium", "premium", "sofisticado", "moderno", "profissional"]):
+    if any(keyword in lowered for keyword in ["premium visuals", "premium", "modern", "professional", "sophisticated"]):
         add("Use a premium, modern and highly professional visual language.")
-    if any(keyword in lowered for keyword in ["storytelling claro", "storytelling", "narrativa clara"]):
+    if any(keyword in lowered for keyword in ["clear storytelling", "storytelling", "clear narrative"]):
         add("Build a clear narrative arc with sharp executive transitions between slides.")
-    if any(keyword in lowered for keyword in ["pouca poluição visual", "pouca poluicao visual", "sem poluição visual", "sem poluicao visual"]):
+    if any(keyword in lowered for keyword in ["low visual clutter", "low clutter", "minimal clutter", "clean visual"]):
         add("Keep slides visually clean, with low clutter and strong whitespace discipline.")
-    if any(keyword in lowered for keyword in ["foco em impacto", "impacto", "mensurável", "mensuravel"]):
+    if any(keyword in lowered for keyword in ["focus on impact", "impact", "measurable", "measured"]):
         add("Prioritize measurable impact and decision-relevant outcomes over generic claims.")
-    if any(keyword in lowered for keyword in ["confiante", "sofisticado", "objetivo"]):
+    if any(keyword in lowered for keyword in ["confident", "sophisticated", "objective"]):
         add("Keep the tone confident, sophisticated and objective.")
 
     return recommendations
 
-
 def _infer_audience_from_intent(intent_text: str) -> str | None:
     lowered = intent_text.lower()
-    if any(keyword in lowered for keyword in ["entrevista", "vaga", "candidato", "recrutador", "hiring"]):
+    if any(keyword in lowered for keyword in ["interview", "candidate", "recruiter", "hiring"]):
         return "Hiring panel"
-    if any(keyword in lowered for keyword in ["board", "conselho", "steerco", "diretoria", "executivo"]):
+    if any(keyword in lowered for keyword in ["board", "steerco", "executive", "leadership team", "board of directors"]):
         return "Executive leadership"
-    if any(keyword in lowered for keyword in ["cliente", "sales", "produto", "product"]):
+    if any(keyword in lowered for keyword in ["client", "sales", "product"]):
         return "Business stakeholders"
     return None
 
-
 def _derive_title_from_intent(intent_text: str) -> str:
     first_sentence = _split_sentences(intent_text)[0] if _split_sentences(intent_text) else intent_text.strip()
-    interview_match = re.search(r"entrevista\s+de\s+([^\n\.,:;]+)", first_sentence, flags=re.IGNORECASE)
-    if interview_match:
+    interview_patterns = [
+        r"\binterview\s+(?:for|about)\s+([^\n\.,:;]+)",
+        r"\b([^\n\.,:;]+?)\s+interview\b",
+    ]
+    for pattern in interview_patterns:
+        interview_match = re.search(pattern, first_sentence, flags=re.IGNORECASE)
+        if not interview_match:
+            continue
         role = interview_match.group(1)
-        role = re.split(r"\s+(?:que|mostrando|para|com)\s+", role, maxsplit=1, flags=re.IGNORECASE)[0].strip(" :-,;")
+        role = re.split(r"\s+(?:showing|for|with|highlighting|covering)\s+", role, maxsplit=1, flags=re.IGNORECASE)[0].strip(" :-,;")
         if role:
-            return _sentence_case(_shorten_words(f"Entrevista de {role}", max_words=4)) or "Entrevista"
+            return _sentence_case(_shorten_words(f"{role} interview", max_words=4)) or "Interview"
 
     product_review_match = re.search(r"product operating review", first_sentence, flags=re.IGNORECASE)
     if product_review_match:
@@ -639,20 +548,16 @@ def _derive_title_from_intent(intent_text: str) -> str:
     candidate = _strip_intent_request_prefix(first_sentence)
     lowered_first_sentence = first_sentence.lower()
     subject_patterns = [
-        r"\bexplicando\s+por\s+que\s+(?:devemos|deveria|vale\s+a\s+pena)\s+(.+)",
-        r"\bpor\s+que\s+(?:devemos|deveria|vale\s+a\s+pena)\s+(.+)",
-        r"\bsobre\s+(.+)",
+        r"\bexplaining\s+why\s+(?:we\s+should|the\s+company\s+should|it\s+makes\s+sense\s+to)\s+(.+)",
+        r"\bwhy\s+(?:we\s+should|the\s+company\s+should|it\s+makes\s+sense\s+to)\s+(.+)",
+        r"\babout\s+(.+)",
     ]
     audience_placeholders = {
-        "o board",
+        "the board",
         "board",
-        "o conselho",
-        "conselho",
-        "a diretoria",
-        "diretoria",
-        "o comitê",
-        "comitê",
-        "comite",
+        "board of directors",
+        "leadership team",
+        "steering committee",
         "hiring panel",
     }
     normalized_candidate = candidate.strip().lower()
@@ -663,11 +568,11 @@ def _derive_title_from_intent(intent_text: str) -> str:
         for pattern in subject_patterns:
             match = re.search(pattern, lowered_first_sentence, flags=re.IGNORECASE)
             if match:
-                extracted = first_sentence[match.start(1) : match.end(1)].strip(" :-,;")
+                extracted = first_sentence[match.start(1): match.end(1)].strip(" :-,;")
                 if extracted:
                     candidate = extracted
                     break
-    split_markers = [" mostrando ", " explicando ", " sobre ", " com ", " para mostrar ", " para explicar "]
+    split_markers = [" showing ", " explaining ", " about ", " with ", " to show ", " to explain "]
     lowered_candidate = candidate.lower()
     for marker in split_markers:
         if marker in lowered_candidate:
@@ -680,17 +585,15 @@ def _derive_title_from_intent(intent_text: str) -> str:
     shortened = _shorten_words(candidate, max_words=8) or candidate
     return _sentence_case(shortened) or "Intent-driven presentation"
 
-
 def _derive_objective_from_intent(intent_text: str) -> str | None:
     first_sentence = _split_sentences(intent_text)[0] if _split_sentences(intent_text) else intent_text.strip()
     lowered = first_sentence.lower()
-    for marker in [" mostrando ", " explicando ", " para mostrar ", " para explicar "]:
+    for marker in [" showing ", " explaining ", " to show ", " to explain "]:
         if marker in lowered:
-            objective = first_sentence[lowered.index(marker) + len(marker) :].strip(" :-,;")
+            objective = first_sentence[lowered.index(marker) + len(marker):].strip(" :-,;")
             return _sentence_case(objective)
     stripped = _strip_intent_request_prefix(first_sentence)
     return _sentence_case(stripped)
-
 
 def _derive_context_from_intent(intent_text: str) -> str | None:
     lines = [line.strip() for line in intent_text.splitlines() if line.strip()]
@@ -699,7 +602,7 @@ def _derive_context_from_intent(intent_text: str) -> str | None:
         for line in lines[1:]
         if any(
             keyword in line.lower()
-            for keyword in ["visual", "storytelling", "poluição visual", "poluicao visual", "impacto", "tom", "confiante", "sofisticado", "objetivo"]
+            for keyword in ["visual", "storytelling", "impact", "tone", "confident", "sophisticated", "objective", "clean"]
         )
     ]
     if not context_lines:
@@ -708,25 +611,23 @@ def _derive_context_from_intent(intent_text: str) -> str | None:
             context_lines = sentences[1:3]
     return _shorten_words(" ".join(context_lines), max_words=40)
 
-
 def _infer_intent_domain(intent_text: str) -> str:
     lowered = intent_text.lower()
-    if any(keyword in lowered for keyword in ["entrevista", "interview", "candidate", "candidato", "hiring", "vaga", "ai engineer"]):
+    if any(keyword in lowered for keyword in ["interview", "candidate", "hiring", "ai engineer"]):
         return "interview"
-    if any(keyword in lowered for keyword in ["sales", "revenue", "pipeline", "qbr", "forecast", "vendas"]):
+    if any(keyword in lowered for keyword in ["sales", "revenue", "pipeline", "qbr", "forecast"]):
         return "sales"
-    if any(keyword in lowered for keyword in ["product", "roadmap", "quarter", "trimestre", "priorit", "produto"]):
+    if any(keyword in lowered for keyword in ["product", "roadmap", "quarter", "priorit"]):
         return "product"
-    if any(keyword in lowered for keyword in ["board", "conselho", "diretoria", "steerco", "strategy", "estratég"]):
+    if any(keyword in lowered for keyword in ["board", "steerco", "strategy", "directors"]):
         return "board"
     return "generic"
-
 
 def _derive_metrics_from_intent(intent_text: str) -> list[dict[str, object]]:
     lowered = intent_text.lower()
     if not any(
         keyword in lowered
-        for keyword in ["metric", "metrics", "métrica", "métricas", "metricas", "kpi", "impact", "impacto", "performance", "resultado", "%"]
+        for keyword in ["metric", "metrics", "kpi", "impact", "performance", "result", "%"]
     ):
         return []
 
@@ -755,10 +656,9 @@ def _derive_metrics_from_intent(intent_text: str) -> list[dict[str, object]]:
         {"label": "Adoption", "value": "60%", "detail": "initial rollout target", "trend": "pilot"},
     ]
 
-
 def _derive_milestones_from_intent(intent_text: str) -> list[dict[str, object]]:
     lowered = intent_text.lower()
-    if not any(keyword in lowered for keyword in ["timeline", "rollout", "roadmap", "milestone", "quarter", "trimestre", "sequência", "sequencia", "phase", "next-quarter"]):
+    if not any(keyword in lowered for keyword in ["timeline", "rollout", "roadmap", "milestone", "quarter", "phase", "next-quarter"]):
         return []
 
     domain = _infer_intent_domain(intent_text)
@@ -780,10 +680,9 @@ def _derive_milestones_from_intent(intent_text: str) -> list[dict[str, object]]:
         {"title": "Scale", "detail": "Expand only once the pilot proves repeatable value.", "phase": "Phase 3"},
     ]
 
-
 def _derive_options_from_intent(intent_text: str) -> list[dict[str, object]]:
     lowered = intent_text.lower()
-    if not any(keyword in lowered for keyword in ["comparison", "comparação", "comparacao", "opções", "opcoes", "options", "trade-off", "tradeoff", "versus"]):
+    if not any(keyword in lowered for keyword in ["comparison", "options", "trade-off", "tradeoff", "versus"]):
         return []
 
     domain = _infer_intent_domain(intent_text)
@@ -817,10 +716,9 @@ def _derive_options_from_intent(intent_text: str) -> list[dict[str, object]]:
         },
     ]
 
-
 def _derive_faqs_from_intent(intent_text: str) -> list[dict[str, object]]:
     lowered = intent_text.lower()
-    if not any(keyword in lowered for keyword in ["risk", "risks", "riscos", "faq", "objeções", "objecoes", "trade-off", "tradeoff", "concerns"]):
+    if not any(keyword in lowered for keyword in ["risk", "risks", "faq", "trade-off", "tradeoff", "concerns"]):
         return []
 
     domain = _infer_intent_domain(intent_text)
@@ -842,7 +740,6 @@ def _derive_faqs_from_intent(intent_text: str) -> list[dict[str, object]]:
         {"question": "How will success be judged?", "answer": "By measurable impact, adoption quality and a cleaner decision narrative."},
     ]
 
-
 def _is_candidate_story_briefing(briefing: BriefingInput) -> bool:
     text = " ".join(
         filter(
@@ -856,8 +753,7 @@ def _is_candidate_story_briefing(briefing: BriefingInput) -> bool:
             ],
         )
     ).lower()
-    return any(keyword in text for keyword in ["entrevista", "interview", "candidate", "candidato", "vaga", "hiring"])
-
+    return any(keyword in text for keyword in ["interview", "candidate", "hiring"])
 
 def _has_any_keyword(text: str, keywords: list[str]) -> bool:
     lowered = text.lower()
@@ -872,23 +768,22 @@ def _derive_interview_key_messages(briefing: BriefingInput) -> list[str]:
         if message not in messages:
             messages.append(message)
 
-    if _has_any_keyword(text, ["trajetória", "trajetoria", "apresentação pessoal", "apresentacao pessoal"]):
-        add("Trajetória em IA com foco em impacto real.")
-    if _has_any_keyword(text, ["projeto", "projetos", "arquitetura", "fluxos de ia", "stack"]):
-        add("Projetos relevantes mostram profundidade técnica e pragmatismo.")
-    if _has_any_keyword(text, ["negócio", "negocio", "produto", "soluções técnicas", "solucoes tecnicas"]):
-        add("Traduzo problemas de negócio em soluções técnicas claras.")
-    if _has_any_keyword(text, ["produção", "producao", "escalabilidade", "mensurável", "mensuravel"]):
-        add("Penso em produção, escala e resultado mensurável.")
+    if _has_any_keyword(text, ["journey", "background", "personal introduction"]):
+        add("My AI journey is grounded in real-world impact.")
+    if _has_any_keyword(text, ["project", "projects", "architecture", "ai workflows", "stack"]):
+        add("Relevant projects show technical depth and pragmatic execution.")
+    if _has_any_keyword(text, ["business", "product", "technical solutions"]):
+        add("I translate business problems into clear technical solutions.")
+    if _has_any_keyword(text, ["production", "scalability", "measurable", "measured"]):
+        add("I think in terms of production, scale and measurable outcomes.")
 
     fallbacks = [
-        "Conecto contexto estratégico, design técnico e execução.",
-        "Tenho repertório para atuar em ambientes exigentes.",
+        "I connect strategic context, technical design and execution.",
+        "I can operate effectively in demanding environments.",
     ]
     for item in fallbacks:
         add(item)
     return messages[:4]
-
 
 def _derive_interview_project_bullets(briefing: BriefingInput) -> list[str]:
     text = " ".join(filter(None, [briefing.objective, briefing.briefing_text]))
@@ -898,46 +793,44 @@ def _derive_interview_project_bullets(briefing: BriefingInput) -> list[str]:
         if message not in bullets:
             bullets.append(message)
 
-    if _has_any_keyword(text, ["projetos", "projeto"]):
-        add("Projetos selecionados evidenciam profundidade técnica e priorização.")
-    if _has_any_keyword(text, ["arquitetura", "fluxos de ia", "stack"]):
-        add("Arquiteturas e fluxos mostram como estruturo sistemas robustos.")
-    if _has_any_keyword(text, ["resultado", "mensurável", "mensuravel", "impacto"]):
-        add("Cada caso reforça impacto, métrica e aprendizado de negócio.")
-    if _has_any_keyword(text, ["produção", "producao", "escalabilidade"]):
-        add("A narrativa inclui produção, confiabilidade e escalabilidade.")
+    if _has_any_keyword(text, ["projects", "project"]):
+        add("Selected projects show technical depth and prioritization.")
+    if _has_any_keyword(text, ["architecture", "ai workflows", "stack"]):
+        add("Architectures and workflows show how I build robust systems.")
+    if _has_any_keyword(text, ["result", "measurable", "measured", "impact"]):
+        add("Each case reinforces impact, metrics and business learning.")
+    if _has_any_keyword(text, ["production", "scalability"]):
+        add("The narrative covers production, reliability and scalability.")
 
     if not bullets:
         bullets = [
-            "Projetos relevantes demonstram consistência entre profundidade técnica e resultado.",
-            "Arquiteturas escolhidas mostram clareza de decisão e senso de trade-off.",
-            "Os casos reforçam minha capacidade de executar em contexto real de negócio.",
+            "Relevant projects show consistency between technical depth and outcomes.",
+            "Selected architectures show decision clarity and trade-off judgment.",
+            "The cases reinforce my ability to execute in real business contexts.",
         ]
     return bullets[:4]
-
 
 def _derive_interview_execution_columns(briefing: BriefingInput) -> list[dict[str, object]]:
     return [
         {
-            "title": "Profundidade técnica",
-            "body": "Estruturo soluções de IA com foco em arquitetura, qualidade e confiabilidade.",
+            "title": "Technical depth",
+            "body": "I structure AI solutions with a focus on architecture, quality and reliability.",
             "bullets": [
-                "Escolha de stack aderente ao problema",
-                "Observabilidade, fallback e evolução contínua",
+                "Problem-aligned stack selection",
+                "Observability, fallback and continuous improvement",
             ],
-            "footer": "Execução técnica com maturidade",
+            "footer": "Technical execution with maturity",
         },
         {
-            "title": "Produto e negócio",
-            "body": "Conecto a solução ao fluxo do usuário, à decisão de negócio e ao valor em produção.",
+            "title": "Product and business",
+            "body": "I connect the solution to the user workflow, the business decision and value in production.",
             "bullets": [
-                "Traduzo ambiguidade em recortes executáveis",
-                "Priorizo adoção, impacto e mensuração",
+                "I turn ambiguity into executable scopes",
+                "I prioritize adoption, impact and measurement",
             ],
-            "footer": "IA aplicada com foco em valor",
+            "footer": "Applied AI with a value focus",
         },
     ]
-
 
 def _derive_interview_capability_cards(briefing: BriefingInput) -> list[dict[str, object]]:
     text = " ".join(filter(None, [briefing.objective, briefing.context, briefing.briefing_text])).lower()
@@ -950,88 +843,86 @@ def _derive_interview_capability_cards(briefing: BriefingInput) -> list[dict[str
             return
         cards.append({"title": title, "body": body, "footer": footer})
 
-    if any(keyword in text for keyword in ["trajetória", "trajetoria", "apresentação pessoal", "apresentacao pessoal"]):
+    if any(keyword in text for keyword in ["journey", "background", "personal introduction"]):
         add(
-            "Trajetória com substância",
-            "Apresento evolução consistente em IA aplicada, unindo repertório técnico, clareza narrativa e senso de prioridade.",
-            "História com senioridade",
+            "A substantive track record",
+            "I show consistent growth in applied AI, combining technical range, narrative clarity and prioritization.",
+            "Senior story",
         )
-    if any(keyword in text for keyword in ["stack", "arquitetura", "fluxos de ia", "arquiteturas e fluxos"]):
+    if any(keyword in text for keyword in ["stack", "architecture", "ai workflows", "architectures and workflows"]):
         add(
-            "Stack e arquitetura de IA",
-            "Desenho pipelines, integrações e fluxos de IA com atenção a qualidade técnica, observabilidade e robustez operacional.",
-            "Profundidade técnica",
+            "AI stack and architecture",
+            "I design pipelines, integrations and AI workflows with attention to technical quality, observability and operational robustness.",
+            "Technical depth",
         )
-    if any(keyword in text for keyword in ["projeto", "impacto", "resultado", "mensurável", "mensuravel"]):
+    if any(keyword in text for keyword in ["project", "impact", "result", "measurable", "measured"]):
         add(
-            "Projetos com impacto real",
-            "Conecto execução técnica a resultados tangíveis, mostrando como IA resolve problemas relevantes de produto e negócio.",
-            "Impacto comprovável",
+            "Projects with real impact",
+            "I connect technical execution to tangible results, showing how AI solves meaningful product and business problems.",
+            "Provable impact",
         )
-    if any(keyword in text for keyword in ["produção", "producao", "escalabilidade", "produção e escalabilidade", "producao e escalabilidade"]):
+    if any(keyword in text for keyword in ["production", "scalability", "production and scalability"]):
         add(
-            "Produção e escala",
-            "Penso em deployment, custo, confiabilidade, fallback, monitoramento e evolução contínua desde o desenho da solução.",
-            "Pensamento de produção",
+            "Production and scale",
+            "I think about deployment, cost, reliability, fallback, monitoring and continuous improvement from the moment the solution is designed.",
+            "Production thinking",
         )
-    if any(keyword in text for keyword in ["produto", "negócio", "negocio"]):
+    if any(keyword in text for keyword in ["product", "business"]):
         add(
-            "Produto + negócio",
-            "Traduzo ambiguidade de negócio em recortes técnicos viáveis, priorizando adoção, valor e velocidade de aprendizado.",
-            "Parceria com negócio",
+            "Product + business",
+            "I translate business ambiguity into viable technical scopes, prioritizing adoption, value and learning speed.",
+            "Business partnership",
         )
 
     fallbacks = [
         (
-            "Clareza estratégica",
-            "Organizo a narrativa para mostrar por que minhas decisões técnicas importam para a empresa e para o produto.",
-            "Visão executiva",
+            "Strategic clarity",
+            "I organize the narrative to show why my technical decisions matter to the company and the product.",
+            "Executive view",
         ),
         (
-            "Execução end-to-end",
-            "Consigo ir do problema ao desenho da solução, implementação, operacionalização e melhoria contínua.",
-            "Entrega completa",
+            "End-to-end execution",
+            "I can move from problem definition to solution design, implementation, operationalization and continuous improvement.",
+            "Complete delivery",
         ),
         (
-            "Maturidade para ambiente exigente",
-            "Atuo com autonomia, rigor e senso de impacto em contextos com alta barra técnica e de negócio.",
-            "Fit para high standards",
+            "Maturity for demanding environments",
+            "I operate with autonomy, rigor and impact judgment in contexts with a high technical and business bar.",
+            "Fit for high standards",
         ),
     ]
     for title, body, footer in fallbacks:
         add(title, body, footer)
     return cards[:3]
 
-
 def _derive_interview_story_rows(briefing: BriefingInput) -> list[list[str]]:
     rows: list[list[str]] = []
 
     def proof_for_outline_item(item: str) -> str:
         lowered = item.lower()
-        if any(keyword in lowered for keyword in ["trajetória", "trajetoria", "apresentação pessoal", "apresentacao pessoal"]):
-            return "Senioridade, ownership e narrativa pessoal"
-        if any(keyword in lowered for keyword in ["stack", "arquitetura", "fluxos de ia", "arquiteturas"]):
-            return "Profundidade técnica e design de sistemas"
-        if any(keyword in lowered for keyword in ["projeto", "resultado", "mensurável", "mensuravel"]):
-            return "Impacto aplicado e capacidade de execução"
-        if any(keyword in lowered for keyword in ["produção", "producao", "escalabilidade"]):
-            return "Maturidade de produção e escala"
-        if any(keyword in lowered for keyword in ["produto", "negócio", "negocio"]):
-            return "Tradução entre negócio, produto e engenharia"
-        if any(keyword in lowered for keyword in ["fechamento", "valor"]):
-            return "Proposta de valor clara para a empresa"
-        return "Relevância direta para a decisão de contratação"
+        if any(keyword in lowered for keyword in ["journey", "background", "personal introduction"]):
+            return "Seniority, ownership and personal narrative"
+        if any(keyword in lowered for keyword in ["stack", "architecture", "ai workflows"]):
+            return "Technical depth and systems design"
+        if any(keyword in lowered for keyword in ["project", "result", "measurable", "measured"]):
+            return "Applied impact and execution capability"
+        if any(keyword in lowered for keyword in ["production", "scalability"]):
+            return "Production maturity and scale judgment"
+        if any(keyword in lowered for keyword in ["product", "business"]):
+            return "Translation across business, product and engineering"
+        if any(keyword in lowered for keyword in ["closing", "value"]):
+            return "Clear value proposition for the company"
+        return "Direct relevance to the hiring decision"
 
     for item in briefing.outline[:5]:
-        rows.append([item, proof_for_outline_item(item), "Evidência para a decisão de contratação"])
+        rows.append([item, proof_for_outline_item(item), "Evidence for the hiring decision"])
     if not rows:
         rows = [
-            ["Trajetória e posicionamento", "Senioridade e clareza narrativa", "Mostra fit para uma função exigente"],
-            ["Projetos e impacto", "Execução aplicada com resultado", "Prova capacidade de entregar valor"],
-            ["Produção e negócio", "Visão de escala e produto", "Reduz risco de execução"],
+            ["Story and positioning", "Seniority and narrative clarity", "Shows fit for a demanding role"],
+            ["Projects and impact", "Applied execution with outcomes", "Proves the ability to deliver value"],
+            ["Production and business", "View of scale and product", "Reduces execution risk"],
         ]
     return rows[:5]
-
 
 def _parse_numeric_signal(value: str | None) -> float | None:
     if not value:
@@ -2646,17 +2537,6 @@ def assess_generated_payload_quality(
         "accelerated",
         "continuous",
         "ongoing",
-        "alta",
-        "alto",
-        "forte",
-        "otimizada",
-        "otimizado",
-        "acelerada",
-        "acelerado",
-        "contínua",
-        "contínuo",
-        "continua",
-        "continuo",
     }
     weak_metric_values: list[str] = []
     for slide in spec.slides:
@@ -2670,50 +2550,36 @@ def assess_generated_payload_quality(
     evidence_slide_types = {"metrics", "chart", "table", "comparison", "timeline", "faq"}
     navigational_slide_types = {"title", "agenda", "section"}
     claim_markers = {
-        "impacto",
-        "valor",
-        "diferencial",
-        "diferenciais",
-        "forte fit",
+        "impact",
+        "value",
+        "differentiator",
+        "differentiators",
         "strong fit",
         "end_to_end",
         "end-to-end",
-        "escalabilidade",
-        "escalavel",
-        "escalável",
-        "produção",
-        "producao",
-        "resultado",
-        "resultados",
-        "melhor escolha",
+        "scalability",
+        "result",
+        "results",
         "best choice",
         "high impact",
-        "alto impacto",
         "hired",
-        "contratado",
     }
     proof_markers = {
         "kpi",
         "metric",
         "metrics",
-        "métrica",
-        "métricas",
-        "metricas",
         "evidence",
         "proof",
         "case",
-        "caso",
         "project",
         "projects",
-        "projeto",
-        "projetos",
         "stack",
         "deploy",
         "pipeline",
         "benchmark",
-        "arquitetura",
-        "dados",
-        "modelos",
+        "architecture",
+        "data",
+        "models",
     }
 
     def _contains_marker(text: str, markers: set[str]) -> bool:
@@ -2731,12 +2597,7 @@ def assess_generated_payload_quality(
             "decision",
             "executive",
             "review",
-            "impacto",
-            "valor",
-            "resultado",
-            "resultados",
             "risks",
-            "riscos",
             "next",
             "move",
             "final",
@@ -2859,8 +2720,6 @@ def assess_generated_payload_quality(
         problems.append(f"too many generic placeholder titles: {', '.join(str(title) for title in placeholder_titles[:4])}")
     if duplicate_titles:
         problems.append(f"repeated slide titles: {', '.join(duplicate_titles[:3])}")
-    if language == "pt" and placeholder_titles:
-        problems.append("prompt is Portuguese but deck still contains generic English placeholder titles")
     if default_copy_leaks:
         problems.append(
             "deck still contains renderer/template scaffolding copy: "

@@ -61,29 +61,29 @@ class DeckTextGenerationAdapter:
             f"Keep the narrative consistent with the dominant deck archetype implied by the briefing: {archetype}.",
         ]
 
-        if any(keyword in text for keyword in ["entrevista", "interview", "candidate", "candidato", "vaga", "hiring", "ai engineer"]):
+        if any(keyword in text for keyword in ["interview", "candidate", "hiring", "ai engineer"]):
             guidance.extend(
                 [
                     "This is a candidate/interview deck. Cover story, projects, technical depth, production/scalability, product/business partnership and explicit value to the company.",
-                    "Good slide title patterns include: Minha trajetória e proposta de valor; Projetos de IA mais relevantes; Stack técnica + visão de negócio; O valor que posso gerar.",
+                    "Good slide title patterns include: My story and value proposition; Most relevant AI projects; Technical depth + business view; The value I can generate.",
                 ]
             )
 
-        if any(keyword in text for keyword in ["board", "conselho", "diretoria", "steerco"]):
+        if any(keyword in text for keyword in ["board", "board of directors", "leadership team", "steerco"]):
             guidance.extend(
                 [
                     "This is a board/executive deck. The cover title must name the initiative or decision, not the audience.",
-                    "Never use audience-only titles like 'O board' or 'Board review' when the briefing clearly names a business initiative.",
+                    "Never use audience-only titles like 'The board' or 'Board review' when the briefing clearly names a business initiative.",
                 ]
             )
 
-        if any(keyword in text for keyword in ["comparação", "comparacao", "comparison", "opções", "opcoes", "versus"]):
+        if any(keyword in text for keyword in ["comparison", "options", "versus", "trade-off", "tradeoff"]):
             guidance.append("If the prompt asks for options or comparison, include a comparison slide with prompt-specific column titles.")
-        if any(keyword in text for keyword in ["timeline", "rollout", "roadmap", "milestone", "sequência", "sequencia", "trimestre"]):
+        if any(keyword in text for keyword in ["timeline", "rollout", "roadmap", "milestone", "quarter"]):
             guidance.append("If the prompt asks for sequencing or rollout, include a timeline slide with milestone-oriented language from the briefing.")
-        if any(keyword in text for keyword in ["métricas", "metricas", "kpi", "resultados", "mensurável", "mensuravel", "sucesso"]):
+        if any(keyword in text for keyword in ["metrics", "metric", "kpi", "results", "measurable", "success"]):
             guidance.append("If the prompt asks for measurable results or success metrics, include metrics or chart slides instead of only bullet slides.")
-        if any(keyword in text for keyword in ["riscos", "risks", "faq", "objeções", "objecoes", "concerns"]):
+        if any(keyword in text for keyword in ["risks", "faq", "objections", "concerns"]):
             guidance.append("If the prompt mentions risks, objections or FAQ, include a matching slide type rather than hiding the topic inside generic bullets.")
 
         return guidance

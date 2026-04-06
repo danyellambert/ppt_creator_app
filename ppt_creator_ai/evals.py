@@ -133,14 +133,14 @@ BENCHMARK_SCENARIOS: list[dict[str, object]] = [
     {
         "name": "ai_engineer_interview_prompt",
         "briefing": {
-            "title": "Entrevista de AI Engineer",
+            "title": "AI Engineer interview",
             "audience": "Hiring panel",
-            "objective": "Mostrar profundidade técnica, execução em produção e capacidade de transformar problemas de negócio em sistemas de IA úteis.",
-            "briefing_text": "Quero uma apresentação para entrevista de AI Engineer mostrando minha trajetória, principais projetos em IA, arquitetura, produção, escalabilidade, resultados mensuráveis e o valor que posso gerar para a empresa.",
+            "objective": "Show technical depth, production execution, and the ability to turn business problems into useful AI systems.",
+            "briefing_text": "Create a presentation for an AI Engineer interview covering my background, major AI projects, architecture, production, scalability, measurable results, and the value I can create for the company.",
             "recommendations": [
-                "Conectar trajetória, profundidade técnica e impacto real.",
-                "Mostrar projetos com evidência concreta e decisões de arquitetura.",
-                "Fechar com proposta de valor clara para a empresa.",
+                "Connect background, technical depth, and real impact.",
+                "Show projects with concrete evidence and architecture decisions.",
+                "Close with a clear value proposition for the company.",
             ],
         },
     },
@@ -149,8 +149,8 @@ BENCHMARK_SCENARIOS: list[dict[str, object]] = [
         "briefing": {
             "title": "Client AI proposal",
             "audience": "Client steering committee",
-            "objective": "Defender uma proposta de IA com diferenciais claros, provas, riscos e plano de execução credível.",
-            "briefing_text": "Monte um proposal deck para cliente explicando por que esta abordagem de IA é a melhor opção comercial, com diferenciais, riscos, métricas esperadas e plano de execução em fases.",
+            "objective": "Defend an AI proposal with clear differentiators, evidence, risks, and a credible execution plan.",
+            "briefing_text": "Build a proposal deck for a client explaining why this AI approach is the best commercial option, with differentiators, risks, expected metrics, and a phased execution plan.",
             "metrics": [
                 {"label": "Savings potential", "value": "$2.4M"},
                 {"label": "Cycle-time reduction", "value": "22%"},
@@ -180,8 +180,8 @@ BENCHMARK_SCENARIOS: list[dict[str, object]] = [
         "briefing": {
             "title": "AI for support operations",
             "audience": "Operations leadership",
-            "objective": "Melhorar a operação de atendimento com menos retrabalho, melhor SLA e sequência mais clara de execução.",
-            "briefing_text": "Crie um deck sobre como melhorar a operação de atendimento com IA, mostrando gargalos, métricas de execução, riscos, dependências e sequência operacional recomendada.",
+            "objective": "Improve support operations with less rework, better SLA performance, and a clearer execution sequence.",
+            "briefing_text": "Create a deck about improving support operations with AI, showing bottlenecks, execution metrics, risks, dependencies, and the recommended operating sequence.",
             "metrics": [
                 {"label": "SLA hit rate", "value": "82%"},
                 {"label": "Rework share", "value": "19%"},
