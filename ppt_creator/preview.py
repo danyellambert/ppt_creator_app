@@ -1289,12 +1289,33 @@ class PreviewRenderer:
         title_font = _load_font(54, bold=True)
         label_font = _load_font(22, bold=True)
         subtitle_font = _load_font(24)
-        if slide_spec.section_label:
-            draw.text((92, 170), slide_spec.section_label.upper(), fill=_rgb_tuple(colors.accent), font=label_font)
+        label = slide_spec.section_label or slide_spec.eyebrow
+        if label:
+            draw.text((92, 170), label.upper(), fill=_rgb_tuple(colors.accent), font=label_font)
         draw.text((92, 245), slide_spec.title or "", fill=_rgb_tuple(colors.navy), font=title_font)
         if slide_spec.subtitle:
             draw.text((92, 320), slide_spec.subtitle, fill=_rgb_tuple(colors.muted), font=subtitle_font)
         draw.rectangle((92, 382, 430, 392), fill=_rgb_tuple(colors.accent))
+
+        asset = self.resolve_asset(slide_spec.image_path)
+        if not asset:
+            return
+
+        focal_x, focal_y = infer_contextual_image_focal_point(slide_spec)
+        panel_box = (916, 170, 1188, 402)
+        inner_box = (932, 186, 1172, 386)
+        self._draw_panel(draw, panel_box)
+        draw.rectangle((916, 170, 1188, 180), fill=_rgb_tuple(colors.accent))
+
+        loaded = Image.open(asset).convert("RGB")
+        resampling = getattr(getattr(Image, "Resampling", Image), "LANCZOS")
+        fitted = ImageOps.fit(
+            loaded,
+            (inner_box[2] - inner_box[0], inner_box[3] - inner_box[1]),
+            method=resampling,
+            centering=(focal_x, focal_y),
+        )
+        image.paste(fitted, (inner_box[0], inner_box[1]))
 
     def _render_agenda(self, draw: ImageDraw.ImageDraw, image: Image.Image, slide_spec: Slide, meta: PresentationMeta) -> None:
         top = self._render_heading(draw, slide_spec, eyebrow_default="Agenda") + 18

@@ -27,14 +27,14 @@ def render_column_panels(
     columns,
     heading_width: float = 8.0,
     subtitle_width: float,
-    panel_top: float,
+    panel_top: float | None = None,
     panel_height: float,
     gap: float = 0.42,
     min_width: float = 3.6,
     panel_max_width: float | None = None,
     accent_mode: str = "top",
     panel_padding: float = 0.28,
-    title_height: float = 0.42,
+    title_height: float | None = None,
     body_min_height: float = 0.72,
     body_fixed_height: float = 1.48,
     bullets_min_height: float = 0.44,
@@ -43,6 +43,9 @@ def render_column_panels(
     g = renderer.theme.grid
     t = renderer.theme.typography
     colors = renderer.theme.colors
+    semantic = renderer.resolve_semantic_layout(slide_spec.type.value, slide_spec.layout_variant)
+    resolved_panel_top = panel_top if panel_top is not None else semantic.panel_top
+    base_title_height = title_height if title_height is not None else semantic.panel_title_height
 
     renderer.add_heading(
         slide,
@@ -50,15 +53,17 @@ def render_column_panels(
         subtitle=slide_spec.subtitle,
         eyebrow=slide_spec.eyebrow or eyebrow_default,
         left=g.content_left,
-        top=g.title_top,
+        top=semantic.heading_top,
         width=heading_width,
         subtitle_width=subtitle_width,
+        slide_type=slide_spec.type.value,
+        layout_variant=slide_spec.layout_variant,
     )
 
     weights = [_column_weight(renderer, column) for column in columns]
     panel_bounds = renderer.build_constrained_panel_row_bounds(
         left=g.content_left,
-        top=panel_top,
+        top=resolved_panel_top,
         width=g.content_width,
         height=panel_height,
         gap=gap,
@@ -84,7 +89,7 @@ def render_column_panels(
 
         resolved_padding = max(0.20, panel_padding - (0.05 if very_dense else 0.03 if dense else 0.0))
         resolved_gap = 0.05 if very_dense else 0.06
-        resolved_title_height = title_height + (0.06 if len(column.title) > 28 else 0.0)
+        resolved_title_height = base_title_height + (0.06 if len(column.title) > 28 else 0.0)
         resolved_body_min_height = body_min_height + (0.10 if dense and column.bullets else 0.0)
         resolved_body_fixed_height = body_fixed_height + (0.16 if dense and not column.bullets else 0.0)
         resolved_bullets_min_height = bullets_min_height + (0.12 if len(column.bullets) >= 3 else 0.04 if column.bullets else 0.0)

@@ -4,8 +4,13 @@ from pathlib import Path
 
 from pptx import Presentation
 
+from ppt_creator.layouts._components import (
+    render_content_card,
+    render_metric_card,
+    render_numbered_agenda_row,
+)
 from ppt_creator.renderer import PresentationRenderer
-from ppt_creator.schema import PresentationInput
+from ppt_creator.schema import CardItem, MetricItem, PresentationInput
 
 
 def build_layout_smoke_spec() -> PresentationInput:
@@ -238,6 +243,44 @@ def test_layout_variants_render_without_crashing(tmp_path: Path) -> None:
     assert rendered.exists()
     presentation = Presentation(str(rendered))
     assert len(presentation.slides) == 5
+
+
+def test_reusable_layout_components_render_without_crashing() -> None:
+    presentation = Presentation()
+    slide = presentation.slides.add_slide(presentation.slide_layouts[6])
+    renderer = PresentationRenderer(asset_root="examples")
+
+    render_metric_card(
+        renderer,
+        slide,
+        metric=MetricItem(value="14%", label="Lift", detail="Higher conversion in the pilot cohort.", trend="+2.1 pts"),
+        panel_bounds=(1.0, 1.0, 2.8, 1.9),
+        accent_color=renderer.theme.colors.accent,
+        dense=False,
+    )
+    render_content_card(
+        renderer,
+        slide,
+        card=CardItem(title="Pillar", body="Codify the workflow and remove ad-hoc variance.", footer="Operational priority"),
+        panel_bounds=(4.1, 1.0, 3.0, 2.1),
+        accent_color=renderer.theme.colors.navy,
+        dense=False,
+    )
+    render_numbered_agenda_row(
+        renderer,
+        slide,
+        row_bounds=(1.0, 3.4, 6.4, 0.64),
+        number=1,
+        text="Frame the decision and confirm the operating constraints.",
+        accent_color=renderer.theme.colors.accent,
+        dense=False,
+    )
+
+    texts = "\n".join(shape.text for shape in slide.shapes if hasattr(shape, "text"))
+
+    assert "14%" in texts
+    assert "Pillar" in texts
+    assert "01" in texts
 
 
 def test_new_layout_types_render_without_crashing(tmp_path: Path) -> None:

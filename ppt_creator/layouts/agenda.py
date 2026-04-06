@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+from ppt_creator.layouts._components import render_numbered_agenda_row
+
 
 def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
     g = renderer.theme.grid
     t = renderer.theme.typography
     colors = renderer.theme.colors
+    dense_agenda = len(slide_spec.bullets) >= 6 or any(len(bullet) > 72 for bullet in slide_spec.bullets)
 
     renderer.add_heading(
         slide,
@@ -39,68 +42,54 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
 
     for region, (region_top, region_height) in renderer.build_content_stack(
         top=2.2,
-        height=3.9,
+        height=4.0 if dense_agenda else 3.9,
         regions=stack_regions,
         gap=0.18,
         min_flex=0.9,
-        max_flex=1.25,
+        max_flex=1.32 if dense_agenda else 1.25,
     ):
         if region["kind"] == "intro":
             intro_box = renderer.textbox(slide, g.content_left, region_top, g.content_width, region_height)
             renderer.write_paragraph(
                 intro_box.text_frame,
                 slide_spec.body or "",
-                size=t.body_size - 1,
+                size=t.body_size - (2 if dense_agenda else 1),
                 color=colors.text,
             )
-            renderer.fit_text_frame(intro_box.text_frame, max_size=t.body_size - 1)
+            renderer.fit_text_frame(
+                intro_box.text_frame,
+                max_size=t.body_size - (2 if dense_agenda else 1),
+                min_size=t.small_size,
+            )
             continue
 
-        row_bounds = renderer.build_weighted_rows(
+        row_flexes = renderer.normalize_content_flexes(
+            bullet_weights,
+            min_flex=0.9,
+            max_flex=1.26 if dense_agenda else 1.2,
+        )
+        row_bounds = renderer.build_named_rows(
             top=region_top,
             height=region_height,
-            gap=0.16,
-            weights=bullet_weights,
-            min_height=0.46,
-            min_flex=0.9,
-            max_flex=1.2,
-            kind_prefix="agenda_row",
+            gap=0.12 if dense_agenda else 0.16,
+            min_height=0.40 if dense_agenda else 0.46,
+            regions=[
+                {
+                    "kind": f"agenda_row_{index + 1}",
+                    "min_height": 0.40 if dense_agenda else 0.46,
+                    "flex": flex,
+                }
+                for index, flex in enumerate(row_flexes)
+            ],
         )
-        for idx, (bullet, (row_top, row_height)) in enumerate(zip(slide_spec.bullets, row_bounds, strict=True), start=1):
-            renderer.add_panel(
+        for idx, bullet in enumerate(slide_spec.bullets, start=1):
+            row_top, row_height = row_bounds[f"agenda_row_{idx}"]
+            render_numbered_agenda_row(
+                renderer,
                 slide,
-                g.content_left,
-                row_top,
-                g.content_width,
-                row_height,
-                fill_color=colors.surface,
-                line_color=colors.line,
+                row_bounds=(g.content_left, row_top, g.content_width, row_height),
+                number=idx,
+                text=bullet,
+                accent_color=colors.accent if idx == 1 else colors.navy,
+                dense=dense_agenda,
             )
-            renderer.add_accent_bar(
-                slide,
-                g.content_left,
-                row_top,
-                0.09,
-                row_height,
-                color=colors.accent if idx == 1 else colors.navy,
-            )
-
-            number_box = renderer.textbox(slide, g.content_left + 0.18, row_top + 0.10, 0.45, max(0.24, row_height - 0.20))
-            renderer.write_paragraph(
-                number_box.text_frame,
-                f"{idx:02d}",
-                size=t.small_size + 1,
-                color=colors.accent if idx == 1 else colors.navy,
-                bold=True,
-            )
-            renderer.fit_text_frame(number_box.text_frame, max_size=t.small_size + 1, bold=True)
-
-            text_box = renderer.textbox(slide, g.content_left + 0.72, row_top + 0.09, g.content_width - 0.95, max(0.28, row_height - 0.18))
-            renderer.write_paragraph(
-                text_box.text_frame,
-                bullet,
-                size=t.body_size - 1,
-                color=colors.text,
-                bold=idx == 1,
-            )
-            renderer.fit_text_frame(text_box.text_frame, max_size=t.body_size - 1, bold=idx == 1)

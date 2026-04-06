@@ -349,3 +349,64 @@ def test_review_presentation_reports_closing_pressure_regions() -> None:
 
     assert any(region.startswith("closing:") for region in slide["likely_collision_regions"])
     assert any(region in slide["likely_collision_regions"] for region in ["closing:quote", "closing:attribution", "closing:panel"])
+
+
+def test_review_presentation_reports_section_cards_chart_and_image_text_pressure_regions() -> None:
+    spec = PresentationInput.model_validate(
+        {
+            "presentation": {"title": "Broader QA Deck", "theme": "executive_premium_minimal"},
+            "slides": [
+                {
+                    "type": "section",
+                    "title": "Section heading with dense supporting subtitle",
+                    "subtitle": "A deliberately long subtitle that adds enough narrative density to pressure the section composition.",
+                    "section_label": "Transition",
+                    "image_path": "examples/missing-visual.png",
+                },
+                {
+                    "type": "cards",
+                    "title": "Cards",
+                    "cards": [
+                        {"title": "Card one", "body": "A dense body that adds substantially more explanatory detail than a compact executive card usually wants, including extra narrative that makes the panel meaningfully heavier.", "footer": "Owner"},
+                        {"title": "Card two", "body": "Another dense body that pushes the grid toward stronger crowding pressure by combining a long explanation, more qualifiers and more narrative weight than a clean card layout should normally absorb.", "footer": "Status"},
+                        {"title": "Card three", "body": "A third dense card to force grid-level pressure detection with enough wording to stay structurally heavy even after balancing heuristics and text fitting improvements.", "footer": "Impact"},
+                    ],
+                },
+                {
+                    "type": "chart",
+                    "title": "Chart",
+                    "chart_categories": [
+                        "Very long category A",
+                        "Very long category B",
+                        "Very long category C",
+                        "Very long category D",
+                        "Very long category E",
+                    ],
+                    "chart_series": [{"name": "Signal", "values": [10, 20, 30, 40, 50]}],
+                },
+                {
+                    "type": "image_text",
+                    "title": "Image text",
+                    "body": "A deliberately dense narrative body that competes strongly with the visual region on the right side of the slide.",
+                    "bullets": [
+                        "Long supporting bullet one that adds more narrative pressure.",
+                        "Long supporting bullet two that increases the split competition.",
+                        "Long supporting bullet three that keeps the slide compact but risky.",
+                    ],
+                    "image_path": "examples/missing-visual.png",
+                },
+            ],
+        }
+    )
+
+    review = review_presentation(spec, asset_root=".")
+    section_slide = review["slides"][0]
+    cards_slide = review["slides"][1]
+    chart_slide = review["slides"][2]
+    image_text_slide = review["slides"][3]
+
+    assert "section:heading" in section_slide["likely_collision_regions"]
+    assert cards_slide["collision_risk_count"] >= 1
+    assert "cards:grid_density" in cards_slide["likely_collision_regions"]
+    assert "chart:category_labels" in chart_slide["likely_collision_regions"]
+    assert "image_text:visual_split" in image_text_slide["likely_collision_regions"]

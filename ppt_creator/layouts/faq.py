@@ -33,7 +33,7 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
     panel_gap = 0.3 if dense_faq else 0.35
     top_start = 2.16
     row_count = (len(items) + columns - 1) // columns
-    total_height = 3.52 if row_count > 1 else (1.82 if dense_faq else 1.68)
+    total_height = 3.72 if row_count > 1 else (1.96 if dense_faq else 1.68)
     row_weights = [
         max(_faq_item_weight(renderer, item) for item in items[row_index * columns : (row_index + 1) * columns])
         for row_index in range(row_count)
@@ -51,7 +51,7 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
         width=g.content_width,
         height=total_height,
         column_gap=panel_gap,
-        row_gap=0.16 if dense_faq else 0.22,
+        row_gap=0.14 if dense_faq else 0.22,
         column_regions=[
             {
                 "kind": f"faq_column_{column_index + 1}",
@@ -81,7 +81,7 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
         content_left, content_top, content_width, content_height = content_bounds
         dense_item = _faq_item_dense(renderer, item)
         title_size = t.small_size + (1 if dense_item else 2)
-        body_size = t.small_size + (0 if dense_item else 1)
+        body_size = t.small_size + (-1 if dense_item else 1)
 
         renderer.add_panel(
             slide,
@@ -140,4 +140,4 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
                     size=body_size,
                     color=colors.text,
                 )
-                renderer.fit_text_frame(body_box.text_frame, max_size=body_size, min_size=t.small_size - 1)
+                renderer.fit_text_frame(body_box.text_frame, max_size=body_size, min_size=t.small_size - 2)

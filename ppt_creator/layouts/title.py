@@ -5,6 +5,43 @@ from pptx.util import Inches
 from ppt_creator.theme import theme_display_name
 
 
+def _is_dense_cover_copy(title: str | None, subtitle: str | None) -> bool:
+    return len(title or "") > 82 or len(subtitle or "") > 78
+
+
+def _render_body_panel(renderer, slide, *, left, top, width, text, typography, colors, dense: bool) -> None:
+    panel_width = min(width, 5.35 if dense else 5.75)
+    panel_height = 1.02 if dense else 0.92
+    renderer.add_panel(
+        slide,
+        left,
+        top,
+        panel_width,
+        panel_height,
+        fill_color=colors.surface,
+        line_color=colors.line,
+    )
+    content_left, content_top, content_width, content_height = renderer.panel_inner_bounds(
+        left=left,
+        top=top,
+        width=panel_width,
+        height=panel_height,
+        padding=0.18 if dense else 0.20,
+    )
+    body_box = renderer.textbox(slide, content_left, content_top + 0.02, content_width, content_height - 0.04)
+    renderer.write_paragraph(
+        body_box.text_frame,
+        text,
+        size=typography.body_size - (1 if dense else 0),
+        color=colors.text,
+    )
+    renderer.fit_text_frame(
+        body_box.text_frame,
+        max_size=typography.body_size - (1 if dense else 0),
+        min_size=typography.small_size + 1,
+    )
+
+
 def _render_meta_blocks(renderer, slide, *, left, top, width, height, blocks, typography, colors) -> None:
     if not blocks:
         return
@@ -63,6 +100,7 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
     logo_asset = renderer.resolve_brand_logo(meta)
     cover_asset = renderer.resolve_asset(slide_spec.image_path)
     focal_x, focal_y = renderer.resolve_image_focal_point(slide_spec)
+    dense_cover = _is_dense_cover_copy(slide_spec.title or meta.title, slide_spec.subtitle)
 
     if variant == "hero_cover":
         renderer.add_accent_bar(slide, g.content_left, 0.78, g.content_width, 0.08, color=colors.accent)
@@ -105,26 +143,35 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
         if eyebrow_text:
             renderer.add_eyebrow(slide, eyebrow_text, left=main_left, top=1.2, width=min(main_width, 5.4), uppercase=False)
 
-        renderer.add_heading(
+        heading_bottom = renderer.add_heading(
             slide,
             title=slide_spec.title or meta.title,
             subtitle=slide_spec.subtitle,
             left=main_left,
             top=1.55,
-            width=main_width,
-            subtitle_width=min(main_width, 7.6),
-            title_size=t.title_size + 8,
+            width=min(main_width, 6.85 if dense_cover else 7.2),
+            subtitle_width=min(main_width, 5.9 if dense_cover else 6.4),
+            title_size=t.title_size + (4 if dense_cover else 6),
+            max_title_lines=2,
+            max_subtitle_lines=2,
+            min_title_size=22 if dense_cover else 24,
+            min_subtitle_size=11,
+            title_subtitle_gap=0.16,
         )
 
         if slide_spec.body:
-            body_box = renderer.textbox(slide, main_left, 3.55, min(main_width, 7.6), 1.1)
-            renderer.write_paragraph(
-                body_box.text_frame,
-                slide_spec.body,
-                size=t.body_size,
-                color=colors.text,
+            body_top = max(3.72, heading_bottom + 0.54)
+            _render_body_panel(
+                renderer,
+                slide,
+                left=main_left,
+                top=body_top,
+                width=main_width,
+                text=slide_spec.body,
+                typography=t,
+                colors=colors,
+                dense=dense_cover,
             )
-            renderer.fit_text_frame(body_box.text_frame, max_size=t.body_size)
 
         if cover_asset:
             renderer.add_image_cover(
@@ -237,27 +284,36 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
             height=Inches(0.48),
         )
 
-    renderer.add_heading(
+    heading_bottom = renderer.add_heading(
         slide,
         title=slide_spec.title or meta.title,
         subtitle=slide_spec.subtitle,
         eyebrow=slide_spec.eyebrow or meta.subtitle,
         left=main_left,
         top=1.25,
-        width=main_width,
-        subtitle_width=min(main_width, 6.8),
-        title_size=t.title_size + 6,
+        width=min(main_width, 6.15 if dense_cover else 6.7),
+        subtitle_width=min(main_width, 5.35 if dense_cover else 5.9),
+        title_size=t.title_size + (2 if dense_cover else 4),
+        max_title_lines=2,
+        max_subtitle_lines=2,
+        min_title_size=21 if dense_cover else 23,
+        min_subtitle_size=11,
+        title_subtitle_gap=0.16,
     )
 
     if slide_spec.body:
-        body_box = renderer.textbox(slide, main_left, 3.35, min(main_width, 5.9), 1.25)
-        renderer.write_paragraph(
-            body_box.text_frame,
-            slide_spec.body,
-            size=t.body_size,
-            color=colors.text,
+        body_top = max(3.52, heading_bottom + 0.54)
+        _render_body_panel(
+            renderer,
+            slide,
+            left=main_left,
+            top=body_top,
+            width=main_width,
+            text=slide_spec.body,
+            typography=t,
+            colors=colors,
+            dense=dense_cover,
         )
-        renderer.fit_text_frame(body_box.text_frame, max_size=t.body_size)
 
     if cover_asset:
         renderer.add_image_cover(

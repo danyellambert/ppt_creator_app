@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -11,7 +12,7 @@ from pptx.util import Inches, Pt
 
 from ppt_creator.layouts import LAYOUT_RENDERERS
 from ppt_creator.schema import PresentationInput, PresentationMeta, Slide, SlideType
-from ppt_creator.theme import get_theme, rgb
+from ppt_creator.theme import SemanticLayoutPreset, get_theme, rgb
 
 if TYPE_CHECKING:
     from pptx.slide import Slide as PptxSlide
@@ -138,6 +139,77 @@ class PresentationRenderer:
         grid = self.theme.grid
         return grid.content_left, grid.content_right, grid.content_width
 
+    def resolve_semantic_layout(
+        self,
+        slide_type: SlideType | str | None = None,
+        layout_variant: str | None = None,
+    ) -> SemanticLayoutPreset:
+        normalized_type = slide_type.value if isinstance(slide_type, SlideType) else str(slide_type or "").strip().lower()
+        normalized_variant = str(layout_variant or "").strip().lower().replace("-", "_")
+
+        if normalized_type == SlideType.TITLE.value:
+            if normalized_variant == "hero_cover":
+                return SemanticLayoutPreset(
+                    heading_top=1.55,
+                    body_top=3.55,
+                    panel_top=1.60,
+                    panel_title_height=0.44,
+                )
+            return SemanticLayoutPreset(
+                heading_top=1.25,
+                body_top=3.35,
+                panel_top=1.60,
+                panel_title_height=0.42,
+            )
+        if normalized_type == SlideType.SECTION.value:
+            return SemanticLayoutPreset(
+                heading_top=2.40,
+                body_top=3.05,
+                panel_top=2.15,
+                footer_boundary=5.65,
+                panel_title_height=0.42,
+            )
+        if normalized_type == SlideType.METRICS.value:
+            return SemanticLayoutPreset(
+                heading_top=1.02,
+                body_top=2.42,
+                panel_top=2.42,
+                panel_title_height=0.42,
+            )
+        if normalized_type in {
+            SlideType.COMPARISON.value,
+            SlideType.TWO_COLUMN.value,
+            SlideType.FAQ.value,
+            SlideType.SUMMARY.value,
+        }:
+            return SemanticLayoutPreset(
+                heading_top=1.02,
+                body_top=2.24,
+                panel_top=2.24,
+                panel_title_height=0.43,
+            )
+        if normalized_type == SlideType.TABLE.value:
+            return SemanticLayoutPreset(
+                heading_top=1.02,
+                body_top=2.10,
+                panel_top=2.10,
+                panel_title_height=0.40,
+            )
+        return SemanticLayoutPreset()
+
+    def _build_named_region_map(
+        self,
+        *,
+        regions: list[dict[str, float | str]],
+        bounds: list[object],
+        default_prefix: str,
+    ) -> dict[str, object]:
+        named: dict[str, object] = {}
+        for index, (region, bound) in enumerate(zip(regions, bounds, strict=True), start=1):
+            kind = str(region.get("kind") or f"{default_prefix}_{index}")
+            named[kind] = bound
+        return named
+
     def resolve_layout_variant(self, slide_spec: Slide, default: str) -> str:
         return slide_spec.layout_variant or default
 
@@ -210,45 +282,184 @@ class PresentationRenderer:
         title_size: int | None = None,
         subtitle_width: float | None = None,
         align: PP_ALIGN = PP_ALIGN.LEFT,
-    ) -> None:
+        slide_type: SlideType | str | None = None,
+        layout_variant: str | None = None,
+        max_title_lines: int | None = None,
+        max_subtitle_lines: int | None = 2,
+        min_title_size: int | None = None,
+        min_subtitle_size: int | None = None,
+        title_subtitle_gap: float = 0.10,
+    ) -> float:
+        def _truncate_to_chars(text: str, limit: int) -> str:
+            if len(text) <= limit:
+                return text
+            clipped = text[: max(1, limit - 1)].rstrip()
+            last_space = clipped.rfind(" ")
+            if last_space >= max(12, int(limit * 0.55)):
+                clipped = clipped[:last_space].rstrip()
+            return clipped.rstrip("-–—,:; ") + "…"
+
+        requested_title_size = title_size or self.theme.typography.title_size
+        resolved_title_size = requested_title_size
+        resolved_min_title_size = min_title_size or max(self.theme.typography.body_size + 4, requested_title_size - 8)
+        display_title = title
+
+        def _estimate_line_count(text: str | None, box_width: float, font_size: int, *, min_chars_per_inch: float, base_chars_per_inch: float, slope: float, min_chars_per_line: int) -> int:
+            if not text:
+                return 1
+            chars_per_inch = max(min_chars_per_inch, base_chars_per_inch - (font_size * slope))
+            chars_per_line = max(min_chars_per_line, int(box_width * chars_per_inch))
+            return max(1, math.ceil(len(text) / max(1, chars_per_line)))
+
+        def _conservative_char_budget(box_width: float, *, lines: int, chars_per_inch: float) -> int:
+            return max(18, int(box_width * chars_per_inch * max(1, lines)))
+
+        allowed_title_lines = max_title_lines or 2
+
+        estimated_lines = 1
+        while True:
+            estimated_lines = _estimate_line_count(
+                display_title,
+                width,
+                resolved_title_size,
+                min_chars_per_inch=3.8,
+                base_chars_per_inch=10.6,
+                slope=0.16,
+                min_chars_per_line=14,
+            )
+            if estimated_lines <= allowed_title_lines or resolved_title_size <= resolved_min_title_size:
+                break
+            resolved_title_size -= 1
+
+        if max_title_lines == 1 and display_title:
+            display_title = _truncate_to_chars(
+                display_title,
+                _conservative_char_budget(
+                    width,
+                    lines=1,
+                    chars_per_inch=5.35 if resolved_title_size >= 30 else 5.8,
+                ),
+            )
+            estimated_lines = 1
+
+        if display_title and estimated_lines > allowed_title_lines:
+            chars_per_inch = max(3.8, 10.6 - (resolved_title_size * 0.16))
+            chars_per_line = max(14, int(width * chars_per_inch))
+            display_title = _truncate_to_chars(display_title, chars_per_line * allowed_title_lines)
+            estimated_lines = _estimate_line_count(
+                display_title,
+                width,
+                resolved_title_size,
+                min_chars_per_inch=3.8,
+                base_chars_per_inch=10.6,
+                slope=0.16,
+                min_chars_per_line=14,
+            )
+
+        title_box_height = min(1.95, 0.72 + (0.32 * estimated_lines))
+
         if eyebrow:
             self.add_eyebrow(slide, eyebrow, left=left, top=top - 0.27, width=min(width, 4.8), align=align)
 
-        title_box = self.textbox(slide, left, top, width, 0.95)
+        title_box = self.textbox(slide, left, top, width, title_box_height)
         self.write_paragraph(
             title_box.text_frame,
-            title,
-            size=title_size or self.theme.typography.title_size,
+            display_title,
+            size=resolved_title_size,
             color=self.theme.colors.navy,
             bold=True,
             align=align,
         )
         self.fit_text_frame(
             title_box.text_frame,
-            max_size=title_size or self.theme.typography.title_size,
+            max_size=resolved_title_size,
+            min_size=max(14, resolved_min_title_size),
             bold=True,
         )
 
+        heading_bottom = top + title_box_height
+
         if subtitle:
-            subtitle_box = self.textbox(slide, left, top + 0.78, subtitle_width or width, 0.45)
+            resolved_subtitle_size = self.theme.typography.subtitle_size
+            resolved_min_subtitle_size = min_subtitle_size or max(self.theme.typography.small_size + 1, resolved_subtitle_size - 2)
+            subtitle_box_width = subtitle_width or width
+            allowed_subtitle_lines = max_subtitle_lines or 2
+            subtitle_lines = 1
+            display_subtitle = subtitle
+            while True:
+                subtitle_lines = _estimate_line_count(
+                    display_subtitle,
+                    subtitle_box_width,
+                    resolved_subtitle_size,
+                    min_chars_per_inch=5.0,
+                    base_chars_per_inch=13.0,
+                    slope=0.20,
+                    min_chars_per_line=18,
+                )
+                if subtitle_lines <= allowed_subtitle_lines or resolved_subtitle_size <= resolved_min_subtitle_size:
+                    break
+                resolved_subtitle_size -= 1
+
+            display_subtitle = _truncate_to_chars(
+                display_subtitle,
+                _conservative_char_budget(
+                    subtitle_box_width,
+                    lines=allowed_subtitle_lines,
+                    chars_per_inch=8.9,
+                ),
+            )
+            subtitle_lines = min(
+                allowed_subtitle_lines,
+                _estimate_line_count(
+                    display_subtitle,
+                    subtitle_box_width,
+                    resolved_subtitle_size,
+                    min_chars_per_inch=5.0,
+                    base_chars_per_inch=13.0,
+                    slope=0.20,
+                    min_chars_per_line=18,
+                ),
+            )
+
+            if display_subtitle and subtitle_lines > allowed_subtitle_lines:
+                subtitle_chars_per_inch = max(5.0, 13.0 - (resolved_subtitle_size * 0.20))
+                subtitle_chars_per_line = max(18, int(subtitle_box_width * subtitle_chars_per_inch))
+                display_subtitle = _truncate_to_chars(display_subtitle, subtitle_chars_per_line * allowed_subtitle_lines)
+                subtitle_lines = _estimate_line_count(
+                    display_subtitle,
+                    subtitle_box_width,
+                    resolved_subtitle_size,
+                    min_chars_per_inch=5.0,
+                    base_chars_per_inch=13.0,
+                    slope=0.20,
+                    min_chars_per_line=18,
+                )
+
+            subtitle_top = heading_bottom + title_subtitle_gap + (0.02 if estimated_lines > 1 else 0.0)
+            subtitle_height = min(0.88, 0.34 + (0.18 * subtitle_lines))
+            subtitle_box = self.textbox(slide, left, subtitle_top, subtitle_width or width, subtitle_height)
             self.write_paragraph(
                 subtitle_box.text_frame,
-                subtitle,
-                size=self.theme.typography.subtitle_size,
+                display_subtitle,
+                size=resolved_subtitle_size,
                 color=self.theme.colors.muted,
                 align=align,
             )
             self.fit_text_frame(
                 subtitle_box.text_frame,
-                max_size=self.theme.typography.subtitle_size,
+                max_size=resolved_subtitle_size,
+                min_size=resolved_min_subtitle_size,
             )
+            heading_bottom = subtitle_top + subtitle_height
+
+        return heading_bottom
 
     def fit_text_frame(
         self,
         text_frame: "TextFrame",
         *,
         max_size: int,
-        min_size: int = 9,
+        min_size: int = 10,
         bold: bool = False,
         italic: bool = False,
     ) -> None:
@@ -670,6 +881,35 @@ class PresentationRenderer:
             return self.build_constrained_columns(left=left, width=width, gap=gap, regions=regions)
         return [bounds for _, bounds in self.stack_horizontal_regions(left=left, width=width, regions=regions, gap=gap)]
 
+    def build_named_columns(
+        self,
+        *,
+        left: float,
+        width: float,
+        gap: float,
+        count: int | None = None,
+        min_width: float = 0.0,
+        regions: list[dict[str, float | str]] | None = None,
+        kind_prefix: str = "column",
+    ) -> dict[str, tuple[float, float]]:
+        resolved_regions = regions
+        if resolved_regions is None:
+            if count is None:
+                raise ValueError("build_named_columns requires count or regions")
+            resolved_regions = [
+                {"kind": f"{kind_prefix}_{index + 1}", "min_width": min_width, "flex": 1.0}
+                for index in range(count)
+            ]
+        bounds = self.build_columns(
+            left=left,
+            width=width,
+            gap=gap,
+            count=count,
+            min_width=min_width,
+            regions=resolved_regions,
+        )
+        return self._build_named_region_map(regions=resolved_regions, bounds=bounds, default_prefix=kind_prefix)
+
     def build_weighted_columns(
         self,
         *,
@@ -714,6 +954,35 @@ class PresentationRenderer:
         if any(region.get("target_share") is not None or region.get("max_height") is not None for region in regions):
             return self.build_constrained_rows(top=top, height=height, gap=gap, regions=regions)
         return [bounds for _, bounds in self.stack_vertical_regions(top=top, height=height, regions=regions, gap=gap)]
+
+    def build_named_rows(
+        self,
+        *,
+        top: float,
+        height: float,
+        gap: float,
+        count: int | None = None,
+        min_height: float = 0.0,
+        regions: list[dict[str, float | str]] | None = None,
+        kind_prefix: str = "row",
+    ) -> dict[str, tuple[float, float]]:
+        resolved_regions = regions
+        if resolved_regions is None:
+            if count is None:
+                raise ValueError("build_named_rows requires count or regions")
+            resolved_regions = [
+                {"kind": f"{kind_prefix}_{index + 1}", "min_height": min_height, "flex": 1.0}
+                for index in range(count)
+            ]
+        bounds = self.build_rows(
+            top=top,
+            height=height,
+            gap=gap,
+            count=count,
+            min_height=min_height,
+            regions=resolved_regions,
+        )
+        return self._build_named_region_map(regions=resolved_regions, bounds=bounds, default_prefix=kind_prefix)
 
     def build_weighted_rows(
         self,
@@ -836,6 +1105,45 @@ class PresentationRenderer:
             )
             for bounds in panel_bounds
         ]
+
+    def build_named_panel_row_content_bounds(
+        self,
+        *,
+        left: float,
+        top: float,
+        width: float,
+        height: float,
+        gap: float,
+        count: int | None = None,
+        min_width: float = 0.0,
+        regions: list[dict[str, float | str]] | None = None,
+        padding: float | None = None,
+        kind_prefix: str = "panel",
+    ) -> dict[str, dict[str, tuple[float, float, float, float]]]:
+        resolved_regions = regions
+        if resolved_regions is None:
+            if count is None:
+                raise ValueError("build_named_panel_row_content_bounds requires count or regions")
+            resolved_regions = [
+                {"kind": f"{kind_prefix}_{index + 1}", "min_width": min_width, "flex": 1.0}
+                for index in range(count)
+            ]
+        bounds = self.build_panel_row_content_bounds(
+            left=left,
+            top=top,
+            width=width,
+            height=height,
+            gap=gap,
+            count=count,
+            min_width=min_width,
+            regions=resolved_regions,
+            padding=padding,
+        )
+        named: dict[str, dict[str, tuple[float, float, float, float]]] = {}
+        for index, (region, (panel_bounds, content_bounds)) in enumerate(zip(resolved_regions, bounds, strict=True), start=1):
+            kind = str(region.get("kind") or f"{kind_prefix}_{index}")
+            named[kind] = {"panel": panel_bounds, "content": content_bounds}
+        return named
 
     def build_weighted_panel_row_content_bounds(
         self,
@@ -989,6 +1297,266 @@ class PresentationRenderer:
                 max_flex=max_flex,
             )
         ]
+
+    def build_named_panel_content_stack_bounds(
+        self,
+        *,
+        left: float,
+        top: float,
+        width: float,
+        height: float,
+        regions: list[dict[str, float | str]],
+        gap: float,
+        padding: float | None = None,
+        constrained: bool = False,
+        min_flex: float = 0.9,
+        max_flex: float = 1.35,
+        kind_prefix: str = "region",
+    ) -> dict[str, tuple[float, float, float, float]]:
+        bounds = (
+            self.build_constrained_panel_content_stack_bounds(
+                left=left,
+                top=top,
+                width=width,
+                height=height,
+                regions=regions,
+                gap=gap,
+                padding=padding,
+            )
+            if constrained
+            else self.build_panel_content_stack_bounds(
+                left=left,
+                top=top,
+                width=width,
+                height=height,
+                regions=regions,
+                gap=gap,
+                padding=padding,
+                min_flex=min_flex,
+                max_flex=max_flex,
+            )
+        )
+        return self._build_named_region_map(
+            regions=[region for region, _ in bounds],
+            bounds=[region_bounds for _, region_bounds in bounds],
+            default_prefix=kind_prefix,
+        )
+
+    def add_structured_panel(
+        self,
+        slide: "PptxSlide",
+        *,
+        left: float,
+        top: float,
+        width: float,
+        height: float,
+        regions: list[dict[str, float | str]] | None = None,
+        gap: float = 0.08,
+        padding: float | None = None,
+        fill_color: str | None = None,
+        line_color: str | None = None,
+        accent_color: str | None = None,
+        accent_height: float | None = None,
+        constrained: bool = False,
+        min_flex: float = 0.9,
+        max_flex: float = 1.35,
+    ) -> dict[str, object]:
+        panel = self.add_panel(
+            slide,
+            left,
+            top,
+            width,
+            height,
+            fill_color=fill_color or self.theme.colors.surface,
+            line_color=line_color or self.theme.colors.line,
+        )
+        if accent_color:
+            self.add_accent_bar(
+                slide,
+                left,
+                top,
+                width,
+                accent_height or self.theme.components.accent_bar_height,
+                color=accent_color,
+            )
+        inner_bounds = self.panel_inner_bounds(left=left, top=top, width=width, height=height, padding=padding)
+        content_regions = {}
+        if regions:
+            content_regions = self.build_named_panel_content_stack_bounds(
+                left=left,
+                top=top,
+                width=width,
+                height=height,
+                regions=regions,
+                gap=gap,
+                padding=padding,
+                constrained=constrained,
+                min_flex=min_flex,
+                max_flex=max_flex,
+            )
+        return {
+            "panel": panel,
+            "panel_bounds": (left, top, width, height),
+            "inner_bounds": inner_bounds,
+            "content_regions": content_regions,
+        }
+
+    def add_accent_panel(
+        self,
+        slide: "PptxSlide",
+        *,
+        left: float,
+        top: float,
+        width: float,
+        height: float,
+        accent_color: str,
+        padding: float | None = None,
+        fill_color: str | None = None,
+        line_color: str | None = None,
+        accent_height: float | None = None,
+    ) -> tuple[object, tuple[float, float, float, float]]:
+        panel = self.add_panel(
+            slide,
+            left,
+            top,
+            width,
+            height,
+            fill_color=fill_color or self.theme.colors.surface,
+            line_color=line_color or self.theme.colors.line,
+        )
+        self.add_accent_bar(
+            slide,
+            left,
+            top,
+            width,
+            accent_height or self.theme.components.accent_bar_height,
+            color=accent_color,
+        )
+        inner_bounds = self.panel_inner_bounds(
+            left=left,
+            top=top,
+            width=width,
+            height=height,
+            padding=padding,
+        )
+        return panel, inner_bounds
+
+    def add_visual_slot(
+        self,
+        slide: "PptxSlide",
+        slide_spec: Slide,
+        *,
+        left: float,
+        top: float,
+        width: float,
+        height: float,
+        accent_color: str | None = None,
+        padding: float | None = None,
+        caption_text: str | None = None,
+    ) -> dict[str, object]:
+        asset = self.resolve_asset(slide_spec.image_path)
+        focal_x, focal_y = self.resolve_image_focal_point(slide_spec)
+        caption = caption_text if caption_text is not None else slide_spec.image_caption
+
+        if asset:
+            picture = self.add_image_cover(
+                slide,
+                asset,
+                left=left,
+                top=top,
+                width=width,
+                height=height,
+                focal_x=focal_x,
+                focal_y=focal_y,
+            )
+            if caption:
+                caption_box = self.textbox(slide, left, top + height + 0.08, width, 0.24)
+                self.write_paragraph(
+                    caption_box.text_frame,
+                    caption,
+                    size=self.theme.typography.small_size,
+                    color=self.theme.colors.muted,
+                )
+                self.fit_text_frame(caption_box.text_frame, max_size=self.theme.typography.small_size)
+            return {
+                "asset": str(asset),
+                "used_asset": True,
+                "shape": picture,
+                "bounds": (left, top, width, height),
+            }
+
+        self.add_panel(
+            slide,
+            left,
+            top,
+            width,
+            height,
+            fill_color=self.theme.colors.soft_fill,
+            line_color=self.theme.colors.line,
+        )
+        self.add_accent_bar(
+            slide,
+            left,
+            top,
+            width,
+            self.theme.components.accent_bar_height,
+            color=accent_color or self.theme.colors.accent,
+        )
+        content_left, content_top, content_width, content_height = self.panel_inner_bounds(
+            left=left,
+            top=top,
+            width=width,
+            height=height,
+            padding=padding,
+        )
+        placeholder = self.describe_visual_placeholder(slide_spec)
+        label_box = self.textbox(slide, content_left, content_top, min(content_width, 2.4), 0.24)
+        self.write_paragraph(
+            label_box.text_frame,
+            placeholder["label"],
+            size=self.theme.typography.small_size,
+            color=self.theme.colors.accent,
+            bold=True,
+        )
+        self.fit_text_frame(label_box.text_frame, max_size=self.theme.typography.small_size, bold=True)
+
+        headline_box = self.textbox(slide, content_left, content_top + 0.30, content_width, 0.3)
+        self.write_paragraph(
+            headline_box.text_frame,
+            placeholder["headline"],
+            size=self.theme.typography.small_size + 2,
+            color=self.theme.colors.navy,
+            bold=True,
+        )
+        self.fit_text_frame(
+            headline_box.text_frame,
+            max_size=self.theme.typography.small_size + 2,
+            min_size=self.theme.typography.small_size,
+            bold=True,
+        )
+
+        missing_asset_note = f"Missing asset: {slide_spec.image_path}" if slide_spec.image_path else None
+        guidance_text = caption or placeholder["guidance"]
+        detail_lines = [line for line in [missing_asset_note, guidance_text] if line]
+        guidance_box = self.textbox(slide, content_left, content_top + 0.72, content_width, max(0.3, content_height - 0.72))
+        self.write_paragraph(
+            guidance_box.text_frame,
+            "\n".join(detail_lines),
+            size=self.theme.typography.small_size + 1,
+            color=self.theme.colors.text,
+        )
+        self.fit_text_frame(
+            guidance_box.text_frame,
+            max_size=self.theme.typography.small_size + 1,
+            min_size=self.theme.typography.small_size,
+        )
+        return {
+            "asset": None,
+            "used_asset": False,
+            "shape": None,
+            "bounds": (left, top, width, height),
+            "content_bounds": (content_left, content_top, content_width, content_height),
+        }
 
     def build_panel_grid(
         self,

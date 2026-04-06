@@ -93,6 +93,39 @@ def test_collect_missing_assets_reports_missing_brand_logo() -> None:
     assert missing_assets == ["presentation branding: missing asset 'missing-logo.png'"]
 
 
+def test_renderer_resolves_semantic_layout_by_slide_family() -> None:
+    renderer = PresentationRenderer(asset_root="examples")
+
+    hero = renderer.resolve_semantic_layout("title", "hero_cover")
+    split = renderer.resolve_semantic_layout("title", "split_panel")
+    comparison = renderer.resolve_semantic_layout("comparison")
+    two_column = renderer.resolve_semantic_layout("two_column")
+
+    assert hero.heading_top > split.heading_top
+    assert comparison.panel_top == two_column.panel_top
+    assert comparison.panel_title_height >= 0.43
+
+
+def test_renderer_can_draw_text_based_brand_signature(tmp_path: Path) -> None:
+    spec = PresentationInput.model_validate(
+        {
+            "presentation": {
+                "title": "Deck",
+                "theme": "executive_premium_minimal",
+                "logo_text": "BOARD NAVY",
+                "logo_fill_color": "14263F",
+                "logo_text_color": "F7F5F2",
+            },
+            "slides": [{"type": "title", "title": "Hello"}],
+        }
+    )
+    renderer = PresentationRenderer(asset_root="examples")
+
+    rendered = renderer.render(spec, tmp_path / "brand_signature.pptx")
+
+    assert rendered.exists()
+
+
 def test_fit_text_frame_reduces_font_size_for_tight_box() -> None:
     presentation = Presentation()
     slide = presentation.slides.add_slide(presentation.slide_layouts[6])
@@ -299,6 +332,42 @@ def test_build_constrained_columns_respects_fixed_sidebar_width() -> None:
     assert columns[0][1] == pytest.approx(6.8)
 
 
+def test_build_named_columns_returns_bounds_by_kind() -> None:
+    renderer = PresentationRenderer(asset_root="examples")
+
+    columns = renderer.build_named_columns(
+        left=1.0,
+        width=6.0,
+        gap=0.2,
+        regions=[
+            {"kind": "main", "min_width": 2.0, "target_share": 2.0},
+            {"kind": "sidebar", "width": 1.8, "min_width": 1.8},
+        ],
+    )
+
+    assert set(columns) == {"main", "sidebar"}
+    assert columns["sidebar"][1] == pytest.approx(1.8)
+    assert columns["main"][0] == pytest.approx(1.0)
+
+
+def test_build_named_rows_returns_bounds_by_kind() -> None:
+    renderer = PresentationRenderer(asset_root="examples")
+
+    rows = renderer.build_named_rows(
+        top=1.0,
+        height=3.0,
+        gap=0.2,
+        regions=[
+            {"kind": "intro", "height": 0.6},
+            {"kind": "body", "min_height": 0.8, "flex": 1.0},
+        ],
+    )
+
+    assert set(rows) == {"intro", "body"}
+    assert rows["intro"][0] == pytest.approx(1.0)
+    assert rows["body"][1] > 0.8
+
+
 def test_build_panel_row_bounds_returns_rectangles() -> None:
     renderer = PresentationRenderer(asset_root="examples")
 
@@ -402,6 +471,27 @@ def test_build_weighted_panel_row_content_bounds_returns_panel_and_inner_bounds(
     assert first_content[0] == pytest.approx(first_panel[0] + 0.2)
 
 
+def test_build_named_panel_row_content_bounds_returns_lookup() -> None:
+    renderer = PresentationRenderer(asset_root="examples")
+
+    bounds = renderer.build_named_panel_row_content_bounds(
+        left=1.0,
+        top=2.0,
+        width=5.2,
+        height=1.6,
+        gap=0.12,
+        regions=[
+            {"kind": "primary", "min_width": 2.4, "target_share": 2.0},
+            {"kind": "secondary", "min_width": 1.6, "target_share": 1.0},
+        ],
+        padding=0.18,
+    )
+
+    assert set(bounds) == {"primary", "secondary"}
+    assert bounds["primary"]["content"][0] == pytest.approx(bounds["primary"]["panel"][0] + 0.18)
+    assert bounds["secondary"]["panel"][2] >= 1.6
+
+
 def test_build_panel_grid_content_bounds_returns_panel_and_inner_bounds() -> None:
     renderer = PresentationRenderer(asset_root="examples")
 
@@ -443,6 +533,27 @@ def test_build_panel_content_stack_bounds_uses_inner_padding() -> None:
     assert len(regions) == 2
     assert regions[0][1][0] == 1.2
     assert regions[0][1][2] == 3.6
+
+
+def test_build_named_panel_content_stack_bounds_returns_region_lookup() -> None:
+    renderer = PresentationRenderer(asset_root="examples")
+
+    regions = renderer.build_named_panel_content_stack_bounds(
+        left=1.0,
+        top=2.0,
+        width=4.0,
+        height=2.4,
+        regions=[
+            {"kind": "heading", "height": 0.3},
+            {"kind": "body", "min_height": 0.8, "flex": 1.0, "content_weight": 2.0},
+        ],
+        gap=0.1,
+        padding=0.2,
+    )
+
+    assert set(regions) == {"heading", "body"}
+    assert regions["heading"][0] == pytest.approx(1.2)
+    assert regions["body"][2] == pytest.approx(3.6)
 
 
 def test_build_constrained_panel_content_stack_bounds_uses_target_share_and_padding() -> None:
@@ -613,6 +724,176 @@ def test_add_image_cover_applies_crop_for_mismatched_aspect_ratio(tmp_path: Path
 
     assert picture.crop_left > 0
     assert picture.crop_right == pytest.approx(picture.crop_left)
+
+
+def test_add_accent_panel_returns_inner_bounds_with_padding() -> None:
+    presentation = Presentation()
+    slide = presentation.slides.add_slide(presentation.slide_layouts[6])
+    renderer = PresentationRenderer(asset_root="examples")
+
+    panel, inner_bounds = renderer.add_accent_panel(
+        slide,
+        left=1.0,
+        top=1.0,
+        width=4.0,
+        height=2.0,
+        accent_color=renderer.theme.colors.accent,
+        padding=0.2,
+    )
+
+    assert panel is not None
+    assert inner_bounds[0] == pytest.approx(1.2)
+    assert inner_bounds[1] == pytest.approx(1.2)
+    assert inner_bounds[2] == pytest.approx(3.6)
+    assert inner_bounds[3] == pytest.approx(1.6)
+
+
+def test_add_structured_panel_returns_named_content_regions() -> None:
+    presentation = Presentation()
+    slide = presentation.slides.add_slide(presentation.slide_layouts[6])
+    renderer = PresentationRenderer(asset_root="examples")
+
+    payload = renderer.add_structured_panel(
+        slide,
+        left=1.0,
+        top=1.0,
+        width=4.0,
+        height=2.2,
+        regions=[
+            {"kind": "heading", "height": 0.3},
+            {"kind": "body", "min_height": 0.8, "target_share": 2.0},
+        ],
+        gap=0.1,
+        padding=0.2,
+        accent_color=renderer.theme.colors.accent,
+        constrained=True,
+    )
+
+    assert payload["inner_bounds"][0] == pytest.approx(1.2)
+    assert set(payload["content_regions"]) == {"heading", "body"}
+    assert payload["content_regions"]["heading"][0] == pytest.approx(1.2)
+
+
+def test_add_visual_slot_returns_asset_metadata_for_existing_image(tmp_path: Path) -> None:
+    asset_path = tmp_path / "visual-slot.png"
+    Image.new("RGB", (640, 360), (50, 80, 120)).save(asset_path)
+    presentation = Presentation()
+    slide = presentation.slides.add_slide(presentation.slide_layouts[6])
+    renderer = PresentationRenderer(asset_root=tmp_path)
+    slide_spec = PresentationInput.model_validate(
+        {
+            "presentation": {"title": "Deck", "theme": "executive_premium_minimal"},
+            "slides": [
+                {
+                    "type": "title",
+                    "title": "Summary",
+                    "image_path": str(asset_path),
+                }
+            ],
+        }
+    ).slides[0]
+
+    result = renderer.add_visual_slot(
+        slide,
+        slide_spec,
+        left=1.0,
+        top=1.0,
+        width=3.0,
+        height=2.0,
+        accent_color=renderer.theme.colors.accent,
+    )
+
+    assert result["used_asset"] is True
+    assert result["asset"] == str(asset_path)
+
+
+def test_add_visual_slot_returns_placeholder_metadata_when_asset_missing() -> None:
+    presentation = Presentation()
+    slide = presentation.slides.add_slide(presentation.slide_layouts[6])
+    renderer = PresentationRenderer(asset_root="examples")
+    slide_spec = PresentationInput.model_validate(
+        {
+            "presentation": {"title": "Deck", "theme": "executive_premium_minimal"},
+            "slides": [
+                {
+                    "type": "image_text",
+                    "title": "Image placeholder",
+                    "body": "Body",
+                    "image_path": "missing-image.png",
+                }
+            ],
+        }
+    ).slides[0]
+
+    result = renderer.add_visual_slot(
+        slide,
+        slide_spec,
+        left=1.0,
+        top=1.0,
+        width=3.0,
+        height=2.0,
+        accent_color=renderer.theme.colors.accent,
+        padding=0.2,
+    )
+
+    assert result["used_asset"] is False
+    assert result["asset"] is None
+    assert "content_bounds" in result
+
+
+def test_section_layout_with_image_renders_without_crashing(tmp_path: Path) -> None:
+    asset_path = tmp_path / "section-visual.png"
+    Image.new("RGB", (1200, 800), (80, 120, 160)).save(asset_path)
+    spec = PresentationInput.model_validate(
+        {
+            "presentation": {"title": "Deck", "theme": "executive_premium_minimal"},
+            "slides": [
+                {
+                    "type": "section",
+                    "title": "Section with visual",
+                    "subtitle": "Transition to the next chapter",
+                    "section_label": "Section",
+                    "image_path": str(asset_path),
+                }
+            ],
+        }
+    )
+    output = tmp_path / "section-with-image.pptx"
+
+    renderer = PresentationRenderer(asset_root=tmp_path)
+    rendered = renderer.render(spec, output)
+
+    assert rendered.exists()
+
+
+def test_preview_section_with_image_respects_focal_point(tmp_path: Path) -> None:
+    asset_path = tmp_path / "section-preview-focus.png"
+    image = Image.new("RGB", (400, 200), (0, 0, 255))
+    draw = ImageDraw.Draw(image)
+    draw.rectangle((0, 0, 199, 199), fill=(255, 0, 0))
+    image.save(asset_path)
+
+    spec = PresentationInput.model_validate(
+        {
+            "presentation": {"title": "Deck", "theme": "executive_premium_minimal"},
+            "slides": [
+                {
+                    "type": "section",
+                    "title": "Section visual",
+                    "subtitle": "Transition",
+                    "section_label": "Section",
+                    "image_path": str(asset_path),
+                    "image_focal_x": 0.15,
+                }
+            ],
+        }
+    )
+
+    renderer = PreviewRenderer(asset_root=tmp_path)
+    rendered = renderer.render_slide(spec.presentation, spec.slides[0], 1, 1)
+
+    sampled = rendered.getpixel((960, 250))
+    assert sampled[0] > sampled[2]
 
 
 def test_preview_artifact_review_flags_body_content_packed_into_corner(tmp_path: Path) -> None:
