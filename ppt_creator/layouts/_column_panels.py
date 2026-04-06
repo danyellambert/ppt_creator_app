@@ -54,7 +54,7 @@ def render_column_panels(
         eyebrow=slide_spec.eyebrow or eyebrow_default,
         left=g.content_left,
         top=semantic.heading_top,
-        width=heading_width,
+        width=min(heading_width, 7.4),
         subtitle_width=subtitle_width,
         slide_type=slide_spec.type.value,
         layout_variant=slide_spec.layout_variant,
@@ -117,9 +117,12 @@ def render_column_panels(
                 left,
                 top,
                 width,
-                renderer.theme.components.accent_bar_height,
+                0.05,
                 color=accent,
             )
+
+        if idx == 0:
+            renderer.add_rule(slide, left + 0.18, top + 0.24, left + min(width * 0.42, 1.8), top + 0.24, color=colors.line, width_pt=0.9)
 
         regions: list[dict[str, float | str]] = []
         if column.tag:
@@ -178,7 +181,7 @@ def render_column_panels(
                         f"• {bullet}",
                         size=bullet_size,
                         color=colors.text,
-                        space_after=4 if dense else 6,
+                        space_after=3 if dense else 5,
                     )
                 renderer.fit_text_frame(tf, max_size=bullet_size, min_size=t.small_size - 1)
             elif kind == "footer":

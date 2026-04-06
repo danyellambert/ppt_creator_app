@@ -525,7 +525,7 @@ def _build_playground_html() -> str:
       </div>
     </div>
     <label>Describe the deck you want</label>
-    <textarea id='intentInput' style='min-height: 180px;' placeholder='Ex.: Quero uma apresentação para o board explicando por que devemos lançar um copiloto de vendas, com visual premium, KPIs, timeline, comparação de opções e fechamento forte.'></textarea>
+    <textarea id='intentInput' style='min-height: 180px;' placeholder='Example: Create a board deck explaining why we should launch a sales copilot now, with premium visuals, KPIs, a timeline, option comparison, and a strong close.'></textarea>
     <div class='editor-hint'>Write in plain language. In <strong>AI-first</strong> mode, the raw prompt is sent directly to the AI so it can author the whole deck structure. The structured JSON below remains an advanced/manual override.</div>
     <div class='toggles'>
       <label><input id='aiUseIntentMode' type='checkbox' checked /> Use the freeform description as the primary AI input</label>

@@ -28,13 +28,30 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
         eyebrow=slide_spec.eyebrow or "Executive table",
         left=g.content_left,
         top=g.title_top,
-        width=8.2,
-        subtitle_width=7.0,
+        width=7.8,
+        subtitle_width=6.3,
     )
 
     top = 2.10
     if slide_spec.body:
-        intro_box = renderer.textbox(slide, g.content_left, top, g.content_width, 0.7 if dense_table else 0.62)
+        intro_width = min(g.content_width, 6.8)
+        renderer.add_panel(
+            slide,
+            g.content_left,
+            top,
+            intro_width,
+            0.64 if dense_table else 0.58,
+            fill_color=colors.surface,
+            line_color=colors.line,
+        )
+        intro_left, intro_top, intro_inner_width, intro_inner_height = renderer.panel_inner_bounds(
+            left=g.content_left,
+            top=top,
+            width=intro_width,
+            height=0.64 if dense_table else 0.58,
+            padding=0.14,
+        )
+        intro_box = renderer.textbox(slide, intro_left, intro_top, intro_inner_width, intro_inner_height)
         renderer.write_paragraph(
             intro_box.text_frame,
             slide_spec.body,
@@ -46,11 +63,11 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
             max_size=t.body_size - 2 if dense_table else t.body_size - 1,
             min_size=t.small_size + 1,
         )
-        top += 0.78 if dense_table else 0.72
+        top += 0.74 if dense_table else 0.68
 
-    gap = 0.05 if dense_table else 0.06
-    header_height = 0.56 if any(len(column) > 16 for column in columns) else 0.50
-    row_height = 0.52 if dense_table else 0.54
+    gap = 0.07 if dense_table else 0.08
+    header_height = 0.60 if any(len(column) > 16 for column in columns) else 0.54
+    row_height = 0.50 if dense_table else 0.52
 
     column_weights = [
         renderer.estimate_content_weight(
@@ -62,9 +79,9 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
     column_regions = [
         {
             "kind": f"column_{index + 1}",
-            "min_width": 1.35 if index == 0 else 1.0,
+            "min_width": 1.5 if index == 0 else 1.05,
             "target_share": weight,
-            **({"max_width": 4.25} if index == 0 and len(columns) >= 3 else {}),
+            **({"max_width": 4.6} if index == 0 and len(columns) >= 3 else {}),
         }
         for index, weight in enumerate(column_weights)
     ]
@@ -76,15 +93,15 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
         height=header_height,
         gap=gap,
         regions=column_regions,
-        padding=0.07 if dense_table else 0.06,
+        padding=0.09 if dense_table else 0.08,
     )
 
-    available_rows_height = max(0.8, (g.footer_line_y - 0.22) - (top + header_height + 0.08))
+    available_rows_height = max(0.8, (g.footer_line_y - 0.30) - (top + header_height + 0.10))
     row_min_height = max(
         0.3 if dense_table else 0.28,
         min(
             row_height,
-            (available_rows_height - (0.08 * max(0, len(rows) - 1))) / max(1, len(rows)),
+            (available_rows_height - (0.10 * max(0, len(rows) - 1))) / max(1, len(rows)),
         ),
     )
     row_weights = [renderer.estimate_content_weight(body=" ".join(row)) for row in rows]
@@ -93,7 +110,7 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
             "kind": f"row_{index + 1}",
             "min_height": row_min_height,
             "target_share": weight,
-            **({"max_height": row_min_height * 1.28} if dense_table else {}),
+            **({"max_height": row_min_height * 1.24} if dense_table else {}),
         }
         for index, weight in enumerate(row_weights)
     ]
@@ -104,10 +121,10 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
         width=g.content_width,
         height=available_rows_height,
         column_gap=gap,
-        row_gap=0.06 if dense_table else 0.07,
+        row_gap=0.08 if dense_table else 0.09,
         column_regions=column_regions,
         row_regions=row_regions,
-        padding=0.07 if dense_table else 0.06,
+        padding=0.09 if dense_table else 0.08,
     )
 
     header_size = t.small_size + 1
@@ -124,6 +141,7 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
             fill_color=colors.soft_fill,
             line_color=colors.line,
         )
+        renderer.add_accent_bar(slide, left, panel_top, column_width, 0.04, color=colors.accent if len(columns) <= 4 else colors.navy)
         header_box = renderer.textbox(slide, content_left, content_top, content_width, content_height)
         renderer.write_paragraph(
             header_box.text_frame,
@@ -145,7 +163,7 @@ def render(renderer, slide, slide_spec, meta, index, total_slides) -> None:
                 panel_top,
                 column_width,
                 panel_height,
-                fill_color=colors.surface,
+                fill_color=colors.surface if (col_index + rows.index(row)) % 2 else colors.background,
                 line_color=colors.line,
             )
             cell_box = renderer.textbox(slide, content_left, content_top, content_width, content_height)
