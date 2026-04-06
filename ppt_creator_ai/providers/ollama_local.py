@@ -77,6 +77,17 @@ class OllamaLocalBriefingProvider(LocalServiceBriefingProvider):
     def resolve_timeout_seconds(self) -> int:
         return int(os.environ.get("PPT_CREATOR_OLLAMA_TIMEOUT_SECONDS", "180"))
 
+    def resolve_status_timeout_seconds(self) -> float:
+        raw_value = (
+            os.environ.get("PPT_CREATOR_OLLAMA_STATUS_TIMEOUT_SECONDS")
+            or os.environ.get("PPT_CREATOR_AI_STATUS_TIMEOUT_SECONDS")
+            or "2.0"
+        )
+        try:
+            return max(0.2, float(raw_value))
+        except ValueError:
+            return 2.0
+
     def resolve_retry_attempts(self) -> int:
         return max(1, int(os.environ.get("PPT_CREATOR_OLLAMA_RETRY_ATTEMPTS", "2")))
 
@@ -191,11 +202,12 @@ class OllamaLocalBriefingProvider(LocalServiceBriefingProvider):
 
         raise RuntimeError(f"Ollama local request to {base_url}{path} failed after {attempts} attempt(s)")
 
-    def _request_json_get(self, path: str) -> dict[str, object]:
+    def _request_json_get(self, path: str, *, timeout_seconds: float | None = None) -> dict[str, object]:
         base_url = self.resolve_base_url()
         req = request.Request(f"{base_url}{path}", method="GET")
+        resolved_timeout = timeout_seconds if timeout_seconds is not None else min(self.resolve_timeout_seconds(), 10)
         try:
-            with request.urlopen(req, timeout=min(self.resolve_timeout_seconds(), 10)) as response:
+            with request.urlopen(req, timeout=resolved_timeout) as response:
                 body = response.read().decode("utf-8", errors="replace")
         except error.HTTPError as exc:
             body = exc.read().decode("utf-8", errors="replace") if exc.fp is not None else ""
@@ -283,26 +295,42 @@ class OllamaLocalBriefingProvider(LocalServiceBriefingProvider):
         service_url = self.resolve_base_url()
         tags_url = f"{service_url}{self.MODELS_ENDPOINT}"
         version_url = f"{service_url}{self.VERSION_ENDPOINT}"
+        status_timeout_seconds = min(float(self.resolve_timeout_seconds()), self.resolve_status_timeout_seconds())
         version_payload: dict[str, object] | None = None
         health_status = "unknown"
         health_error: str | None = None
         models: list[dict[str, object]] = []
         try:
-            model_payload = self.list_models()
-            models = list(model_payload.get("models") or [])
+            model_payload = self._request_json_get(self.MODELS_ENDPOINT, timeout_seconds=status_timeout_seconds)
+            raw_models = model_payload.get("models") if isinstance(model_payload.get("models"), list) else []
+            models = []
+            for item in raw_models:
+                if not isinstance(item, dict):
+                    continue
+                name = str(item.get("name") or item.get("model") or "").strip()
+                if not name:
+                    continue
+                models.append(
+                    {
+                        "name": name,
+                        "size": item.get("size"),
+                        "modified_at": item.get("modified_at"),
+                        "digest": item.get("digest"),
+                        "details": item.get("details") if isinstance(item.get("details"), dict) else {},
+                    }
+                )
+            models.sort(key=lambda item: str(item.get("name") or ""))
             health_status = "ok"
             try:
-                version_payload = self._request_json_get(self.VERSION_ENDPOINT)
+                version_payload = self._request_json_get(self.VERSION_ENDPOINT, timeout_seconds=status_timeout_seconds)
             except Exception:
                 version_payload = None
         except Exception as exc:  # noqa: BLE001
             health_status = "error"
             health_error = str(exc)
-        selected_model: str | None = None
-        try:
-            selected_model = self.resolve_model_name()
-        except Exception:
-            selected_model = None
+        selected_model = (self._model_name_override or os.environ.get("PPT_CREATOR_OLLAMA_MODEL") or "").strip() or None
+        if selected_model is None and models:
+            selected_model = str(models[0].get("name") or "").strip() or None
         return {
             "service_url": service_url,
             "health_url": tags_url,
@@ -312,6 +340,7 @@ class OllamaLocalBriefingProvider(LocalServiceBriefingProvider):
             "model_name": selected_model,
             "model_source": self.resolve_model_source(),
             "timeout_seconds": self.resolve_timeout_seconds(),
+            "status_timeout_seconds": status_timeout_seconds,
             "retry_attempts": self.resolve_retry_attempts(),
             "retry_backoff_seconds": self.resolve_retry_backoff_seconds(),
             "generation_attempts": self.resolve_generation_attempts(),

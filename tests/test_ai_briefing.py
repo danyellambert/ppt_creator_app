@@ -19,6 +19,7 @@ from ppt_creator_ai.briefing import (
     summarize_text_to_executive_bullets,
 )
 from ppt_creator_ai.providers import get_provider, list_provider_names
+from ppt_creator_ai.refine import refine_presentation_payload
 
 
 def test_briefing_example_generates_valid_presentation_payload() -> None:
@@ -353,6 +354,54 @@ def test_quality_gate_flags_claims_without_enough_proof() -> None:
     assert any("strong claims appear without enough proof-bearing structure" in problem for problem in quality["problems"])
 
 
+def test_quality_gate_accepts_summary_claim_when_nearby_evidence_slide_supports_it() -> None:
+    briefing = build_minimal_briefing_from_intent_text(
+        "Crie um deck para o board com métricas claras de impacto, comparação de opções e uma recomendação final forte."
+    )
+
+    payload = {
+        "presentation": {"title": briefing.title, "theme": "executive_premium_minimal"},
+        "slides": [
+            {"type": "title", "title": briefing.title},
+            {
+                "type": "metrics",
+                "title": "Impacto esperado",
+                "metrics": [
+                    {"label": "Win rate", "value": "31%"},
+                    {"label": "Time saved", "value": "12h/mo"},
+                ],
+            },
+            {
+                "type": "summary",
+                "title": "Recomendação final",
+                "body": "Esta é a melhor escolha para acelerar resultado com menor risco.",
+                "bullets": ["Maior impacto com rollout mais controlado"],
+            },
+            {"type": "closing", "title": "Fechamento", "quote": "A decisão recomendada equilibra valor e risco."},
+        ],
+    }
+
+    quality = assess_generated_payload_quality(payload, briefing)
+
+    assert quality["claim_without_proof_slides"] == []
+    supported_summary = next(item for item in quality["claim_proof_relationships"] if item["slide_number"] == 3)
+    assert supported_summary["supported"] is True
+    assert supported_summary["relationship_type"] in {"self_proof", "adjacent_overlap", "summary_backlink"}
+
+
+def test_quality_gate_exposes_dynamic_specificity_threshold_metadata() -> None:
+    briefing = build_briefing_from_intent_text(
+        "Monte um proposal deck para cliente explicando por que esta abordagem de IA é a melhor opção comercial, com diferenciais, riscos, métricas esperadas e plano de execução em fases."
+    )
+
+    payload = generate_presentation_payload_from_briefing(briefing)
+    quality = assess_generated_payload_quality(payload, briefing)
+
+    assert quality["structured_signal_count"] >= 3
+    assert quality["specificity_threshold"] >= 24.0
+    assert quality["specificity_score"] >= quality["specificity_threshold"]
+
+
 def test_briefing_analysis_reports_broader_narrative_archetype() -> None:
     briefing = build_briefing_from_intent_text(
         "Monte um proposal deck para cliente explicando por que esta abordagem de IA é a melhor opção comercial, com diferenciais, riscos e plano de execução."
@@ -654,6 +703,72 @@ def test_local_service_provider_falls_back_from_low_quality_embedded_payload(mon
     generated_titles = [slide["title"] for slide in result.payload["slides"]]
     assert "Por que este movimento agora" in generated_titles
     assert "Riscos e objeções do board" in generated_titles
+
+
+def test_local_service_provider_reports_repair_loop_when_retry_succeeds(monkeypatch) -> None:
+    provider = get_provider("local_service")
+    briefing = BriefingInput.from_path("examples/briefing_sales.json")
+    captured_prompts: list[str] = []
+    attempts = {"count": 0}
+
+    valid_payload = generate_presentation_payload_from_briefing(briefing)
+
+    class _Response:
+        def __init__(self, payload: dict[str, object]) -> None:
+            self._payload = payload
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self) -> bytes:
+            return json.dumps(self._payload).encode("utf-8")
+
+    def _urlopen(req, *args, **kwargs):
+        payload = json.loads(req.data.decode("utf-8"))
+        captured_prompts.append(str(payload.get("prompt") or ""))
+        attempts["count"] += 1
+        if attempts["count"] == 1:
+            return _Response({"provider_name": "ollama", "response": '{"presentation": {"title": "Broken"}'})
+        return _Response({"provider_name": "ollama", "payload": valid_payload})
+
+    monkeypatch.setenv("PPT_CREATOR_AI_GENERATION_ATTEMPTS", "2")
+    monkeypatch.setattr("urllib.request.urlopen", _urlopen)
+
+    result = provider.generate(briefing)
+
+    assert attempts["count"] == 2
+    assert result.analysis["repair_loop_used"] is True
+    assert result.analysis["repair_attempt_count"] == 1
+    assert any("Repair the previous invalid response" in prompt for prompt in captured_prompts[1:])
+
+
+def test_refine_payload_rewrites_generic_titles_and_closing_copy_from_briefing() -> None:
+    briefing = build_minimal_briefing_from_intent_text(
+        "Crie um deck para o board explicando por que devemos lançar um copiloto de vendas agora, com riscos, métricas e recomendação final."
+    )
+    payload = {
+        "presentation": {"title": briefing.title, "theme": "executive_premium_minimal"},
+        "slides": [
+            {"type": "title", "title": briefing.title},
+            {"type": "summary", "title": "Executive summary", "body": "", "bullets": ["Resumo genérico"]},
+            {"type": "closing", "title": "Closing", "quote": "Done."},
+        ],
+    }
+    review = {
+        "slides": [
+            {"slide_number": 2, "risk_level": "high"},
+            {"slide_number": 3, "risk_level": "high"},
+        ]
+    }
+
+    refined = refine_presentation_payload(payload, review=review, briefing=briefing)
+
+    assert refined["slides"][1]["title"] == "Recomendação final"
+    assert refined["slides"][1]["body"]
+    assert refined["slides"][2]["quote"] != "Done."
 
 
 def test_local_service_provider_retries_retriable_http_errors(monkeypatch) -> None:

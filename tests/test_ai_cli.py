@@ -56,7 +56,58 @@ def test_ai_cli_can_run_benchmark_and_emit_report(tmp_path: Path) -> None:
     assert payload["unique_slide_type_count"] >= 8
     assert payload["fallback_rate"] >= 0.0
     assert payload["fallback_used_count"] >= 0
+    assert payload["specificity_summary"]["average_specificity_score"] is not None
+    assert payload["claim_proof_summary"]["unsupported_claim_scenarios"] >= 0
     assert (output_dir / "sales_qbr_prompt.json").exists()
+
+
+def test_ai_cli_can_compare_benchmark_results_across_providers(tmp_path: Path, monkeypatch) -> None:
+    output_dir = tmp_path / "benchmark_compare_outputs"
+    report = tmp_path / "benchmark_compare_report.json"
+    local_service_provider = get_provider("local_service")
+
+    fake_payload = {
+        "presentation": {"title": "AI copilots for sales teams", "theme": "executive_premium_minimal"},
+        "slides": [
+            {"type": "title", "title": "AI copilots for sales teams"},
+            {"type": "agenda", "title": "Agenda", "bullets": ["Context", "Decision"]},
+            {"type": "metrics", "title": "Metrics", "metrics": [{"value": "31%", "label": "win rate"}]},
+            {"type": "comparison", "title": "Comparison", "comparison_columns": [{"title": "Now", "body": "Current state"}, {"title": "Next", "body": "Recommended state"}]},
+            {"type": "timeline", "title": "Timeline", "timeline_items": [{"title": "Diagnose", "body": "Clarify"}, {"title": "Scale", "body": "Roll out"}]},
+            {"type": "faq", "title": "FAQ", "faq_items": [{"title": "Why now?", "body": "Momentum exists."}, {"title": "How to measure?", "body": "Track lift."}]},
+            {"type": "closing", "title": "Closing", "quote": "Done."},
+        ],
+    }
+
+    monkeypatch.setattr(
+        local_service_provider,
+        "generate",
+        lambda briefing, theme_name=None, feedback_messages=None: BriefingGenerationResult(
+            provider_name="local_service",
+            payload=fake_payload,
+            analysis={"image_suggestions": ["sales leadership dashboard"], "density_review": {"status": "ok", "warning_count": 0, "warnings": [], "slides": []}, "fallback_used": False, "repair_loop_used": False},
+        ),
+    )
+
+    result = main([
+        "benchmark",
+        str(output_dir),
+        "--provider",
+        "heuristic",
+        "--compare-provider",
+        "local_service",
+        "--report-json",
+        str(report),
+    ])
+
+    assert result == 0
+    payload = json.loads(report.read_text(encoding="utf-8"))
+    assert payload["mode"] == "briefing-benchmark-comparison"
+    assert payload["providers"] == ["heuristic", "local_service"]
+    assert payload["comparison_summary"]["best_provider_by_success_then_quality"] in {"heuristic", "local_service"}
+    assert "specificity_averages" in payload["comparison_summary"]
+    assert "claim_without_proof_rates" in payload["comparison_summary"]
+    assert payload["scenario_comparison"]
 
 
 def test_ai_cli_can_write_analysis_report(tmp_path: Path) -> None:

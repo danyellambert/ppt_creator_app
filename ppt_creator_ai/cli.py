@@ -133,6 +133,13 @@ def build_parser() -> argparse.ArgumentParser:
         choices=list_provider_names(),
         help="Provider used during the benchmark run",
     )
+    benchmark_parser.add_argument(
+        "--compare-provider",
+        dest="compare_providers",
+        action="append",
+        choices=list_provider_names(),
+        help="Optional additional provider to benchmark side-by-side against the primary provider",
+    )
     benchmark_parser.add_argument("--theme", help="Optional theme override applied to every benchmark scenario")
     benchmark_parser.add_argument(
         "--write-json-decks",
@@ -439,7 +446,12 @@ def generate_from_briefing(
         for pass_index in range(max(1, refine_passes)):
             if current_review["issue_count"] == 0 and (current_preview_score is None or current_preview_score == 0):
                 break
-            candidate_spec = refine_presentation_input(current_spec, review=current_review)
+            candidate_spec = refine_presentation_input(
+                current_spec,
+                review=current_review,
+                briefing=briefing,
+                slide_critiques=build_slide_critiques_from_review(current_spec, current_review),
+            )
             candidate_review = review_presentation(
                 candidate_spec,
                 asset_root=resolved_asset_root,
@@ -743,15 +755,23 @@ def main(argv: list[str] | None = None) -> int:
             result = run_generation_benchmark(
                 args.output_dir,
                 provider_name=args.provider,
+                compare_provider_names=args.compare_providers,
                 theme_name=args.theme,
                 write_json_decks=args.write_json_decks,
             )
             if args.report_json:
                 write_json(args.report_json, result)
-            print(
-                f"[OK] Benchmark finished: {result['successful_generations']}/{result['scenario_count']} scenarios valid; "
-                f"{result['unique_slide_type_count']} unique slide types covered"
-            )
+            if result.get("mode") == "briefing-benchmark-comparison":
+                summary = result.get("comparison_summary") or {}
+                print(
+                    f"[OK] Benchmark comparison finished for {', '.join(result.get('providers', []))}; "
+                    f"best provider: {summary.get('best_provider_by_success_then_quality') or 'n/a'}"
+                )
+            else:
+                print(
+                    f"[OK] Benchmark finished: {result['successful_generations']}/{result['scenario_count']} scenarios valid; "
+                    f"{result['unique_slide_type_count']} unique slide types covered"
+                )
             return 0
 
         result = generate_from_briefing(

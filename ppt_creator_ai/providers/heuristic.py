@@ -46,7 +46,12 @@ class HeuristicBriefingProvider:
         theme_name: str | None = None,
         feedback_messages: list[str] | None = None,
     ) -> BriefingGenerationResult:
-        payload = refine_presentation_payload(current_payload, review=review)
+        payload = refine_presentation_payload(
+            current_payload,
+            review=review,
+            briefing=briefing,
+            slide_critiques=slide_critiques,
+        )
         analysis = build_briefing_analysis(
             briefing,
             theme_name=theme_name,

@@ -5,7 +5,11 @@ from pathlib import Path
 
 from ppt_creator.qa import review_presentation
 from ppt_creator.schema import PresentationInput
-from ppt_creator_ai.briefing import BriefingInput, build_llm_generation_contract
+from ppt_creator_ai.briefing import (
+    BriefingInput,
+    assess_generated_payload_quality,
+    build_llm_generation_contract,
+)
 from ppt_creator_ai.providers import get_provider
 
 BENCHMARK_SCENARIOS: list[dict[str, object]] = [
@@ -126,10 +130,83 @@ BENCHMARK_SCENARIOS: list[dict[str, object]] = [
             ],
         },
     },
+    {
+        "name": "ai_engineer_interview_prompt",
+        "briefing": {
+            "title": "Entrevista de AI Engineer",
+            "audience": "Hiring panel",
+            "objective": "Mostrar profundidade técnica, execução em produção e capacidade de transformar problemas de negócio em sistemas de IA úteis.",
+            "briefing_text": "Quero uma apresentação para entrevista de AI Engineer mostrando minha trajetória, principais projetos em IA, arquitetura, produção, escalabilidade, resultados mensuráveis e o valor que posso gerar para a empresa.",
+            "recommendations": [
+                "Conectar trajetória, profundidade técnica e impacto real.",
+                "Mostrar projetos com evidência concreta e decisões de arquitetura.",
+                "Fechar com proposta de valor clara para a empresa.",
+            ],
+        },
+    },
+    {
+        "name": "client_proposal_prompt",
+        "briefing": {
+            "title": "Client AI proposal",
+            "audience": "Client steering committee",
+            "objective": "Defender uma proposta de IA com diferenciais claros, provas, riscos e plano de execução credível.",
+            "briefing_text": "Monte um proposal deck para cliente explicando por que esta abordagem de IA é a melhor opção comercial, com diferenciais, riscos, métricas esperadas e plano de execução em fases.",
+            "metrics": [
+                {"label": "Savings potential", "value": "$2.4M"},
+                {"label": "Cycle-time reduction", "value": "22%"},
+                {"label": "Adoption target", "value": "70%"},
+            ],
+            "milestones": [
+                {"title": "Diagnose workflows", "detail": "Map the highest-friction process", "phase": "Month 1"},
+                {"title": "Pilot one workflow", "detail": "Instrument success and adoption", "phase": "Month 2"},
+            ],
+            "options": [
+                {"title": "Generic automation", "body": "Lower commitment but weaker differentiation."},
+                {"title": "Tailored AI workflow", "bullets": ["Better fit", "Stronger adoption", "Higher strategic value"]},
+            ],
+            "faqs": [
+                {"question": "Why this approach?", "answer": "It balances value, feasibility and measurable rollout."},
+                {"question": "What is the main risk?", "answer": "Scaling before usage evidence is clear."},
+            ],
+            "recommendations": [
+                "Start with one high-friction workflow.",
+                "Use measurable proof before expanding.",
+                "Keep the proposal tied to commercial value.",
+            ],
+        },
+    },
+    {
+        "name": "support_operations_prompt",
+        "briefing": {
+            "title": "AI for support operations",
+            "audience": "Operations leadership",
+            "objective": "Melhorar a operação de atendimento com menos retrabalho, melhor SLA e sequência mais clara de execução.",
+            "briefing_text": "Crie um deck sobre como melhorar a operação de atendimento com IA, mostrando gargalos, métricas de execução, riscos, dependências e sequência operacional recomendada.",
+            "metrics": [
+                {"label": "SLA hit rate", "value": "82%"},
+                {"label": "Rework share", "value": "19%"},
+                {"label": "Resolution time", "value": "-14%"},
+            ],
+            "milestones": [
+                {"title": "Stabilize triage", "detail": "Reduce noisy intake and routing variance", "phase": "Sprint 1"},
+                {"title": "Pilot agent assist", "detail": "Instrument resolution quality and SLA impact", "phase": "Sprint 2"},
+                {"title": "Scale with guardrails", "detail": "Expand only after quality stabilizes", "phase": "Sprint 3"},
+            ],
+            "faqs": [
+                {"question": "What is the operating risk?", "answer": "Automating unstable workflows too early."},
+                {"question": "How will success be measured?", "answer": "By SLA lift, reduced rework and faster resolution."},
+            ],
+            "recommendations": [
+                "Fix routing before scaling automation.",
+                "Measure quality and resolution outcomes explicitly.",
+                "Keep the operating sequence narrow and staged.",
+            ],
+        },
+    },
 ]
 
 
-def run_generation_benchmark(
+def _run_generation_benchmark_for_provider(
     output_dir: str | Path,
     *,
     provider_name: str = "heuristic",
@@ -147,6 +224,13 @@ def run_generation_benchmark(
     successful_generations = 0
     fallback_used_count = 0
     resolved_models: set[str] = set()
+    specificity_scores: list[float] = []
+    specificity_thresholds: list[float] = []
+    specificity_margins: list[float] = []
+    below_specificity_threshold_count = 0
+    unsupported_claim_scenarios = 0
+    unsupported_claim_slide_count = 0
+    model_breakdown: dict[str, dict[str, object]] = {}
 
     for scenario in BENCHMARK_SCENARIOS:
         scenario_name = str(scenario["name"])
@@ -156,12 +240,50 @@ def run_generation_benchmark(
             spec = PresentationInput.model_validate(generation.payload)
             review = review_presentation(spec, asset_root=asset_root, theme_name=spec.presentation.theme)
             analysis = generation.analysis if isinstance(generation.analysis, dict) else {}
+            quality = assess_generated_payload_quality(spec.model_dump(mode="json"), briefing)
             fallback_used = bool(analysis.get("fallback_used", False))
             if fallback_used:
                 fallback_used_count += 1
             resolved_model = str(analysis.get("resolved_model") or analysis.get("backend_provider") or "").strip()
             if resolved_model:
                 resolved_models.add(resolved_model)
+            specificity_score = float(quality.get("specificity_score") or 0.0)
+            specificity_threshold = float(quality.get("specificity_threshold") or 0.0)
+            specificity_margin = round(specificity_score - specificity_threshold, 1)
+            specificity_scores.append(specificity_score)
+            specificity_thresholds.append(specificity_threshold)
+            specificity_margins.append(specificity_margin)
+            if specificity_score < specificity_threshold:
+                below_specificity_threshold_count += 1
+            claim_without_proof_slides = [
+                str(item) for item in (quality.get("claim_without_proof_slides") or []) if str(item).strip()
+            ]
+            if claim_without_proof_slides:
+                unsupported_claim_scenarios += 1
+                unsupported_claim_slide_count += len(claim_without_proof_slides)
+
+            model_key = resolved_model or provider.name
+            model_stats = model_breakdown.setdefault(
+                model_key,
+                {
+                    "scenario_count": 0,
+                    "average_specificity_score": 0.0,
+                    "average_specificity_threshold": 0.0,
+                    "average_specificity_margin": 0.0,
+                    "below_threshold_count": 0,
+                    "claim_without_proof_scenarios": 0,
+                },
+            )
+            model_stats["scenario_count"] = int(model_stats["scenario_count"]) + 1
+            model_stats["average_specificity_score"] = float(model_stats["average_specificity_score"]) + specificity_score
+            model_stats["average_specificity_threshold"] = float(model_stats["average_specificity_threshold"]) + specificity_threshold
+            model_stats["average_specificity_margin"] = float(model_stats["average_specificity_margin"]) + specificity_margin
+            model_stats["below_threshold_count"] = int(model_stats["below_threshold_count"]) + int(
+                specificity_score < specificity_threshold
+            )
+            model_stats["claim_without_proof_scenarios"] = int(model_stats["claim_without_proof_scenarios"]) + int(
+                bool(claim_without_proof_slides)
+            )
             slide_types = sorted({slide.type.value for slide in spec.slides})
             for slide_type in slide_types:
                 unique_slide_types.add(slide_type)
@@ -186,6 +308,13 @@ def run_generation_benchmark(
                     "average_score": review["average_score"],
                     "fallback_used": fallback_used,
                     "fallback_reason": analysis.get("fallback_reason"),
+                    "repair_loop_used": bool(analysis.get("repair_loop_used", False)),
+                    "repair_attempt_count": int(analysis.get("repair_attempt_count") or 0),
+                    "specificity_score": specificity_score,
+                    "specificity_threshold": specificity_threshold,
+                    "specificity_margin": specificity_margin,
+                    "claim_without_proof_slides": claim_without_proof_slides,
+                    "claim_proof_relationships": quality.get("claim_proof_relationships") or [],
                     "resolved_model": resolved_model or None,
                     "slide_types": slide_types,
                     "output_json": str(deck_path) if deck_path else None,
@@ -200,10 +329,23 @@ def run_generation_benchmark(
                     "valid": False,
                     "error": str(exc),
                     "fallback_used": None,
+                    "repair_loop_used": None,
+                    "repair_attempt_count": None,
                 }
             )
 
     scenario_count = len(BENCHMARK_SCENARIOS)
+    normalized_model_breakdown: dict[str, dict[str, object]] = {}
+    for model_name, stats in model_breakdown.items():
+        count = int(stats["scenario_count"]) or 1
+        normalized_model_breakdown[model_name] = {
+            "scenario_count": count,
+            "average_specificity_score": round(float(stats["average_specificity_score"]) / count, 2),
+            "average_specificity_threshold": round(float(stats["average_specificity_threshold"]) / count, 2),
+            "average_specificity_margin": round(float(stats["average_specificity_margin"]) / count, 2),
+            "below_threshold_count": int(stats["below_threshold_count"]),
+            "claim_without_proof_scenarios": int(stats["claim_without_proof_scenarios"]),
+        }
     return {
         "mode": "briefing-benchmark",
         "provider": provider.name,
@@ -216,7 +358,148 @@ def run_generation_benchmark(
         "fallback_used_count": fallback_used_count,
         "fallback_rate": round((fallback_used_count / scenario_count) * 100, 1) if scenario_count else 0.0,
         "resolved_models": sorted(resolved_models),
+        "specificity_summary": {
+            "average_specificity_score": round(sum(specificity_scores) / len(specificity_scores), 2) if specificity_scores else None,
+            "average_specificity_threshold": round(sum(specificity_thresholds) / len(specificity_thresholds), 2) if specificity_thresholds else None,
+            "average_specificity_margin": round(sum(specificity_margins) / len(specificity_margins), 2) if specificity_margins else None,
+            "below_threshold_count": below_specificity_threshold_count,
+        },
+        "claim_proof_summary": {
+            "unsupported_claim_scenarios": unsupported_claim_scenarios,
+            "unsupported_claim_slide_count": unsupported_claim_slide_count,
+        },
+        "model_breakdown": normalized_model_breakdown,
         "write_json_decks": write_json_decks,
         "generation_contract": build_llm_generation_contract(),
         "scenarios": results,
+    }
+
+
+def run_generation_benchmark(
+    output_dir: str | Path,
+    *,
+    provider_name: str = "heuristic",
+    compare_provider_names: list[str] | None = None,
+    theme_name: str | None = None,
+    write_json_decks: bool = False,
+) -> dict[str, object]:
+    requested_provider_names = [provider_name, *(compare_provider_names or [])]
+    normalized_provider_names: list[str] = []
+    for requested_name in requested_provider_names:
+        normalized_name = get_provider(requested_name).name
+        if normalized_name not in normalized_provider_names:
+            normalized_provider_names.append(normalized_name)
+
+    destination = Path(output_dir)
+    destination.mkdir(parents=True, exist_ok=True)
+
+    if len(normalized_provider_names) == 1:
+        return _run_generation_benchmark_for_provider(
+            destination,
+            provider_name=normalized_provider_names[0],
+            theme_name=theme_name,
+            write_json_decks=write_json_decks,
+        )
+
+    provider_runs: list[dict[str, object]] = []
+    for normalized_name in normalized_provider_names:
+        provider_output_dir = destination / normalized_name if write_json_decks else destination
+        provider_runs.append(
+            _run_generation_benchmark_for_provider(
+                provider_output_dir,
+                provider_name=normalized_name,
+                theme_name=theme_name,
+                write_json_decks=write_json_decks,
+            )
+        )
+
+    scenario_names = [str(item["name"]) for item in BENCHMARK_SCENARIOS]
+    scenario_comparison: list[dict[str, object]] = []
+    fallback_rates: dict[str, float] = {}
+    average_issue_counts: dict[str, float | None] = {}
+    repair_loop_rates: dict[str, float] = {}
+    specificity_averages: dict[str, float | None] = {}
+    specificity_margin_averages: dict[str, float | None] = {}
+    claim_without_proof_rates: dict[str, float] = {}
+    provider_model_breakdown: dict[str, dict[str, object]] = {}
+    for provider_run in provider_runs:
+        provider = str(provider_run["provider"])
+        fallback_rates[provider] = float(provider_run.get("fallback_rate") or 0.0)
+        valid_issue_counts = [
+            int(item.get("issue_count") or 0)
+            for item in provider_run.get("scenarios", [])
+            if item.get("valid") is True
+        ]
+        average_issue_counts[provider] = (
+            round(sum(valid_issue_counts) / len(valid_issue_counts), 2)
+            if valid_issue_counts
+            else None
+        )
+        valid_repair_count = sum(
+            1
+            for item in provider_run.get("scenarios", [])
+            if item.get("repair_loop_used") is True
+        )
+        scenario_count = int(provider_run.get("scenario_count") or 0)
+        repair_loop_rates[provider] = round((valid_repair_count / scenario_count) * 100, 1) if scenario_count else 0.0
+        specificity_summary = provider_run.get("specificity_summary") or {}
+        specificity_averages[provider] = specificity_summary.get("average_specificity_score")
+        specificity_margin_averages[provider] = specificity_summary.get("average_specificity_margin")
+        claim_summary = provider_run.get("claim_proof_summary") or {}
+        unsupported_claim_scenarios = int(claim_summary.get("unsupported_claim_scenarios") or 0)
+        claim_without_proof_rates[provider] = round((unsupported_claim_scenarios / scenario_count) * 100, 1) if scenario_count else 0.0
+        provider_model_breakdown[provider] = dict(provider_run.get("model_breakdown") or {})
+
+    for scenario_name in scenario_names:
+        row: dict[str, object] = {"scenario": scenario_name}
+        for provider_run in provider_runs:
+            provider = str(provider_run["provider"])
+            scenario_payload = next(
+                (item for item in provider_run.get("scenarios", []) if item.get("scenario") == scenario_name),
+                {"scenario": scenario_name, "valid": False, "error": "scenario missing from provider comparison"},
+            )
+            row[provider] = {
+                "valid": scenario_payload.get("valid"),
+                "issue_count": scenario_payload.get("issue_count"),
+                "average_score": scenario_payload.get("average_score"),
+                "fallback_used": scenario_payload.get("fallback_used"),
+                "repair_loop_used": scenario_payload.get("repair_loop_used"),
+                "specificity_score": scenario_payload.get("specificity_score"),
+                "specificity_threshold": scenario_payload.get("specificity_threshold"),
+                "specificity_margin": scenario_payload.get("specificity_margin"),
+                "claim_without_proof_slide_count": len(scenario_payload.get("claim_without_proof_slides") or []),
+                "resolved_model": scenario_payload.get("resolved_model"),
+                "error": scenario_payload.get("error"),
+            }
+        scenario_comparison.append(row)
+
+    best_provider = None
+    if provider_runs:
+        best_provider = sorted(
+            provider_runs,
+            key=lambda item: (
+                -int(item.get("successful_generations") or 0),
+                float(average_issue_counts.get(str(item.get("provider"))) or 9999.0),
+                float(item.get("fallback_rate") or 9999.0),
+            ),
+        )[0]["provider"]
+
+    return {
+        "mode": "briefing-benchmark-comparison",
+        "providers": normalized_provider_names,
+        "scenario_count": len(BENCHMARK_SCENARIOS),
+        "write_json_decks": write_json_decks,
+        "generation_contract": build_llm_generation_contract(),
+        "provider_runs": provider_runs,
+        "scenario_comparison": scenario_comparison,
+        "comparison_summary": {
+            "best_provider_by_success_then_quality": best_provider,
+            "fallback_rates": fallback_rates,
+            "repair_loop_rates": repair_loop_rates,
+            "average_issue_counts": average_issue_counts,
+            "specificity_averages": specificity_averages,
+            "specificity_margin_averages": specificity_margin_averages,
+            "claim_without_proof_rates": claim_without_proof_rates,
+            "provider_model_breakdown": provider_model_breakdown,
+        },
     }

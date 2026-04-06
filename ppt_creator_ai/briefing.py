@@ -2504,6 +2504,20 @@ def assess_generated_payload_quality(
     slide_types = {slide.type.value for slide in spec.slides}
     missing_required_types = sorted(required_slide_types - slide_types)
     narrative_archetype = _infer_narrative_archetype(prompt_text)
+    structured_signal_count = sum(
+        1
+        for flag in [
+            bool(briefing.subtitle),
+            bool(briefing.objective),
+            bool(briefing.context),
+            bool(briefing.recommendations),
+            len(resolved_metrics) >= 2,
+            len(resolved_milestones) >= 2,
+            len(resolved_options) >= 2,
+            len(resolved_faqs) >= 2,
+        ]
+        if flag
+    )
 
     def _title_token(value: str | None) -> str:
         return re.sub(r"\s+", " ", (value or "").strip().lower())
@@ -2567,14 +2581,41 @@ def assess_generated_payload_quality(
         _add_weighted_keywords(item, weight=2.0)
     for item in briefing.key_messages[:4]:
         _add_weighted_keywords(item, weight=1.5)
+    for item in briefing.recommendations[:4]:
+        _add_weighted_keywords(item, weight=1.75)
+    for metric in resolved_metrics[:4]:
+        _add_weighted_keywords(metric.label, weight=1.5)
+        _add_weighted_keywords(metric.detail, weight=1.0)
+    for milestone in resolved_milestones[:4]:
+        _add_weighted_keywords(milestone.title, weight=1.5)
+        _add_weighted_keywords(milestone.detail, weight=1.0)
+        _add_weighted_keywords(milestone.phase, weight=0.75)
+    for option in resolved_options[:3]:
+        _add_weighted_keywords(option.title, weight=1.5)
+        _add_weighted_keywords(option.body, weight=1.0)
+    for faq in resolved_faqs[:3]:
+        _add_weighted_keywords(faq.question, weight=1.25)
     _add_weighted_keywords(briefing.context, weight=1.5)
     _add_weighted_keywords(briefing.briefing_text, weight=1.0)
-    weighted_keywords = weighted_keywords[:18]
+    weighted_keywords = weighted_keywords[:28]
     weighted_total = sum(weight for _, weight in weighted_keywords) or 1.0
     matched_keywords = [token for token, weight in weighted_keywords if token in payload_token_set]
     matched_weight = sum(weight for token, weight in weighted_keywords if token in payload_token_set)
     specificity_score = round((matched_weight / weighted_total) * 100, 1)
-    specificity_threshold = 35.0 if len(weighted_keywords) >= 6 else 25.0
+
+    specificity_threshold = 24.0
+    if len(weighted_keywords) >= 6:
+        specificity_threshold += 4.0
+    if len(weighted_keywords) >= 10:
+        specificity_threshold += 4.0
+    if len(weighted_keywords) >= 16:
+        specificity_threshold += 3.0
+    specificity_threshold += min(structured_signal_count, 4) * 1.5
+    if narrative_archetype in {"decision", "proposal", "review", "strategy", "operating"}:
+        specificity_threshold += 1.5
+    if candidate_story_mode:
+        specificity_threshold -= 1.5
+    specificity_threshold = round(min(44.0, max(24.0, specificity_threshold)), 1)
 
     suspicious_default_tokens = {
         "executive lens",
@@ -2627,6 +2668,7 @@ def assess_generated_payload_quality(
                 weak_metric_values.append(f"{metric.label}: {metric.value}")
 
     evidence_slide_types = {"metrics", "chart", "table", "comparison", "timeline", "faq"}
+    navigational_slide_types = {"title", "agenda", "section"}
     claim_markers = {
         "impacto",
         "valor",
@@ -2668,13 +2710,10 @@ def assess_generated_payload_quality(
         "stack",
         "deploy",
         "pipeline",
-        "timeline",
-        "comparison",
         "benchmark",
         "arquitetura",
         "dados",
         "modelos",
-        "rollout",
     }
 
     def _contains_marker(text: str, markers: set[str]) -> bool:
@@ -2682,23 +2721,136 @@ def assess_generated_payload_quality(
         original = _title_token(text)
         return any(marker in normalized or marker in original for marker in markers)
 
+    def _topic_tokens_for_strings(strings: list[str]) -> set[str]:
+        ignored = {
+            "agenda",
+            "summary",
+            "closing",
+            "context",
+            "recommendation",
+            "decision",
+            "executive",
+            "review",
+            "impacto",
+            "valor",
+            "resultado",
+            "resultados",
+            "risks",
+            "riscos",
+            "next",
+            "move",
+            "final",
+            "launch",
+            "should",
+            "initiative",
+        }
+        return {
+            token
+            for token in _extract_keyword_tokens(" ".join(strings), min_length=4)
+            if token not in ignored
+        }
+
     deck_level_claim_pressure = sum(1 for text in payload_strings if _contains_marker(text, claim_markers))
-    deck_level_proof_pressure = sum(1 for text in payload_strings if _contains_marker(text, proof_markers) or _parse_numeric_signal(text) is not None)
-    deck_has_structural_proof = any(slide.type.value in evidence_slide_types for slide in spec.slides)
-    deck_has_textual_proof = deck_level_proof_pressure > 0
+    deck_level_proof_pressure = sum(
+        1 for text in payload_strings if _contains_marker(text, proof_markers) or _parse_numeric_signal(text) is not None
+    )
     claim_without_proof_slides: list[str] = []
-    for slide in spec.slides:
+    claim_proof_relationships: list[dict[str, object]] = []
+    slide_claim_entries: list[dict[str, object]] = []
+    evidence_entries: list[dict[str, object]] = []
+    for slide_number, slide in enumerate(spec.slides, start=1):
         slide_payload = slide.model_dump(mode="json")
         slide_strings = _iter_payload_strings(slide_payload)
         if not slide_strings:
+            continue
+        if slide.type.value in navigational_slide_types:
             continue
         has_claim = any(_contains_marker(text, claim_markers) for text in slide_strings)
         has_proof = slide.type.value in evidence_slide_types or any(
             _contains_marker(text, proof_markers) or _parse_numeric_signal(text) is not None
             for text in slide_strings
         )
-        if has_claim and not has_proof and not deck_has_structural_proof and not deck_has_textual_proof:
-            claim_without_proof_slides.append(slide.title or slide.type.value)
+        entry = {
+            "slide_number": slide_number,
+            "title": slide.title or slide.type.value,
+            "slide_type": slide.type.value,
+            "has_claim": has_claim,
+            "has_proof": has_proof,
+            "topic_tokens": _topic_tokens_for_strings(slide_strings),
+        }
+        slide_claim_entries.append(entry)
+        if has_proof:
+            evidence_entries.append(entry)
+
+    def _best_supporting_evidence(entry: dict[str, object]) -> tuple[dict[str, object] | None, list[str], str | None]:
+        if entry["has_proof"]:
+            return entry, [], "self_proof"
+
+        candidates: list[tuple[int, int, dict[str, object], list[str], str]] = []
+        for evidence in evidence_entries:
+            if evidence["slide_number"] == entry["slide_number"]:
+                continue
+            distance = abs(int(evidence["slide_number"]) - int(entry["slide_number"]))
+            shared_tokens = sorted(entry["topic_tokens"] & evidence["topic_tokens"])[:4]
+            if distance <= 2 and shared_tokens:
+                candidates.append((0, distance, evidence, shared_tokens, "adjacent_overlap"))
+                continue
+            if (
+                entry["slide_type"] in {"summary", "closing"}
+                and int(evidence["slide_number"]) < int(entry["slide_number"])
+                and (
+                    shared_tokens
+                    or evidence["slide_type"] in {"metrics", "chart", "comparison", "table", "timeline", "faq"}
+                )
+            ):
+                candidates.append((1, distance, evidence, shared_tokens, "summary_backlink"))
+                continue
+            if (
+                narrative_archetype in {"decision", "proposal", "review", "strategy", "operating"}
+                and distance <= 3
+                and shared_tokens
+            ):
+                candidates.append((2, distance, evidence, shared_tokens, "nearby_structural_support"))
+                continue
+            if (
+                entry["slide_type"] in {"bullets", "image_text", "two_column"}
+                and distance <= 4
+                and narrative_archetype in {"decision", "proposal", "review", "strategy", "operating"}
+            ):
+                candidates.append((3, distance, evidence, shared_tokens, "narrative_backlink"))
+
+        if not candidates:
+            return None, [], None
+        _, _, evidence, shared_tokens, relationship_type = sorted(candidates, key=lambda item: (item[0], item[1]))[0]
+        return evidence, shared_tokens, relationship_type
+
+    for entry in slide_claim_entries:
+        if not entry["has_claim"]:
+            continue
+        supporting_evidence, shared_tokens, relationship_type = _best_supporting_evidence(entry)
+        supported = supporting_evidence is not None
+        claim_proof_relationships.append(
+            {
+                "slide_number": entry["slide_number"],
+                "title": entry["title"],
+                "slide_type": entry["slide_type"],
+                "supported": supported,
+                "relationship_type": relationship_type,
+                "evidence_slide_number": (
+                    int(supporting_evidence["slide_number"])
+                    if supporting_evidence is not None and supporting_evidence is not entry
+                    else None
+                ),
+                "evidence_title": (
+                    str(supporting_evidence["title"])
+                    if supporting_evidence is not None and supporting_evidence is not entry
+                    else None
+                ),
+                "shared_tokens": shared_tokens,
+            }
+        )
+        if not supported:
+            claim_without_proof_slides.append(str(entry["title"]))
 
     problems: list[str] = []
     if missing_required_types:
@@ -2723,7 +2875,7 @@ def assess_generated_payload_quality(
         problems.append(
             f"specificity score too low ({specificity_score:.1f} < {specificity_threshold:.1f}); deck vocabulary does not reuse enough briefing-specific language"
         )
-    if claim_without_proof_slides or (deck_level_claim_pressure >= 3 and not deck_has_structural_proof and deck_level_proof_pressure == 0):
+    if claim_without_proof_slides or (deck_level_claim_pressure >= 3 and not evidence_entries and deck_level_proof_pressure == 0):
         problems.append(
             "strong claims appear without enough proof-bearing structure: "
             + ", ".join(claim_without_proof_slides[:4] or ["deck-level claim pressure exceeds proof density"])
@@ -2740,8 +2892,10 @@ def assess_generated_payload_quality(
         "narrative_archetype": narrative_archetype,
         "specificity_score": specificity_score,
         "specificity_threshold": specificity_threshold,
+        "structured_signal_count": structured_signal_count,
         "matched_keywords": matched_keywords[:12],
         "missing_keywords": [token for token, _ in weighted_keywords if token not in payload_token_set][:12],
         "claim_without_proof_slides": claim_without_proof_slides,
+        "claim_proof_relationships": claim_proof_relationships,
         "slide_types": sorted(slide_types),
     }

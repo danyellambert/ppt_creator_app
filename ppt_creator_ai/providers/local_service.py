@@ -69,6 +69,17 @@ class LocalServiceBriefingProvider:
     def resolve_timeout_seconds(self) -> int:
         return int(os.environ.get("PPT_CREATOR_AI_SERVICE_TIMEOUT_SECONDS", "180"))
 
+    def resolve_status_timeout_seconds(self) -> float:
+        raw_value = (
+            os.environ.get("PPT_CREATOR_AI_SERVICE_STATUS_TIMEOUT_SECONDS")
+            or os.environ.get("PPT_CREATOR_AI_STATUS_TIMEOUT_SECONDS")
+            or "2.0"
+        )
+        try:
+            return max(0.2, float(raw_value))
+        except ValueError:
+            return 2.0
+
     def resolve_retry_attempts(self) -> int:
         return max(1, int(os.environ.get("PPT_CREATOR_AI_SERVICE_RETRY_ATTEMPTS", "2")))
 
@@ -83,12 +94,13 @@ class LocalServiceBriefingProvider:
     def status_payload(self) -> dict[str, object]:
         base_url = self.resolve_base_url()
         health_url = f"{base_url}/health"
+        status_timeout_seconds = min(float(self.resolve_timeout_seconds()), self.resolve_status_timeout_seconds())
         health_status = "unknown"
         health_error: str | None = None
         health_payload: dict[str, object] | None = None
         try:
             req = request.Request(health_url, method="GET")
-            with request.urlopen(req, timeout=min(self.resolve_timeout_seconds(), 5)) as response:
+            with request.urlopen(req, timeout=status_timeout_seconds) as response:
                 body = response.read().decode("utf-8", errors="replace")
             decoded = json.loads(body)
             health_payload = decoded if isinstance(decoded, dict) else {"raw": body}
@@ -112,6 +124,7 @@ class LocalServiceBriefingProvider:
             "model_name": self.resolve_model_name(),
             "model_source": self.resolve_model_source(),
             "timeout_seconds": self.resolve_timeout_seconds(),
+            "status_timeout_seconds": status_timeout_seconds,
             "retry_attempts": self.resolve_retry_attempts(),
             "retry_backoff_seconds": self.resolve_retry_backoff_seconds(),
             "generation_attempts": self.resolve_generation_attempts(),
@@ -139,6 +152,28 @@ class LocalServiceBriefingProvider:
             messages.append("Return only a JSON object with the top-level key 'slide_critiques'.")
         else:
             messages.append("Return only a JSON object with top-level keys 'presentation' and 'slides'.")
+        return messages
+
+    def _repair_feedback_messages(
+        self,
+        error_message: str,
+        *,
+        raw_output: str | None = None,
+        critique_mode: bool = False,
+    ) -> list[str]:
+        messages = self._retry_feedback_messages(error_message, critique_mode=critique_mode)
+        messages.extend(
+            [
+                f"Repair the previous invalid response instead of simplifying the deck away. Validation/parsing failure: {error_message}",
+                "Preserve any valid business-specific structure from the previous draft, but return clean schema-valid JSON from the first brace to the final closing brace.",
+                "Keep requested evidence-bearing slides such as metrics, chart, comparison, timeline, table or FAQ when the briefing clearly asks for them.",
+                "Do not collapse the answer into generic bullets if the briefing asks for richer executive structure.",
+            ]
+        )
+        if raw_output:
+            messages.append(
+                "The last response contained a draft that may have partially worked. Use it only as a draft and rewrite it into one complete valid JSON object now."
+            )
         return messages
 
     def _extract_error_details(self, payload: object) -> tuple[str | None, str | None, bool | None]:
@@ -434,6 +469,8 @@ class LocalServiceBriefingProvider:
             "feedback_messages": feedback_messages or [],
             "fallback_used": fallback_used,
             "fallback_reason": fallback_reason,
+            "repair_loop_used": False,
+            "repair_attempt_count": 0,
             "executive_summary_bullets": briefing.recommendations[:3]
             or summarize_text_to_executive_bullets(summary_source, max_bullets=3),
             "image_suggestions": suggest_image_queries_from_briefing(briefing),
@@ -467,6 +504,8 @@ class LocalServiceBriefingProvider:
         )
         analysis["generation_attempts"] = generation_attempts
         analysis["retry_count"] = max(0, generation_attempts - 1)
+        analysis["repair_loop_used"] = generation_attempts > 1
+        analysis["repair_attempt_count"] = max(0, generation_attempts - 1)
         if ai_exchange is not None:
             analysis["ai_exchange"] = ai_exchange
         return BriefingGenerationResult(
@@ -499,6 +538,8 @@ class LocalServiceBriefingProvider:
             "revision_mode": "llm_review",
             "fallback_used": fallback_used,
             "fallback_reason": fallback_reason,
+            "repair_loop_used": False,
+            "repair_attempt_count": 0,
             "source_issue_count": review.get("issue_count"),
             "slide_critique_count": len(slide_critiques),
             "density_review": review_presentation_density(spec),
@@ -518,6 +559,8 @@ class LocalServiceBriefingProvider:
             "critique_mode": "llm_slide_critique",
             "feedback_messages": feedback_messages or [],
             "fallback_used": fallback_used,
+            "repair_loop_used": False,
+            "repair_attempt_count": 0,
             "critique_count": len(critiques),
         }
         return self._enrich_analysis_from_transport(analysis, response_payload)
@@ -557,7 +600,7 @@ class LocalServiceBriefingProvider:
                     break
                 combined_feedback = self._merge_feedback_messages(
                     combined_feedback,
-                    self._retry_feedback_messages(str(exc)),
+                    self._repair_feedback_messages(str(exc), raw_output=raw_output),
                 )
                 continue
 
@@ -571,6 +614,8 @@ class LocalServiceBriefingProvider:
             )
             analysis["generation_attempts"] = attempt
             analysis["retry_count"] = attempt - 1
+            analysis["repair_loop_used"] = attempt > 1
+            analysis["repair_attempt_count"] = max(0, attempt - 1)
             analysis["ai_exchange"] = ai_exchange
             return BriefingGenerationResult(
                 provider_name=str(payload.get("provider_name") or self.name),
@@ -629,7 +674,7 @@ class LocalServiceBriefingProvider:
                     ) from exc
                 combined_feedback = self._merge_feedback_messages(
                     combined_feedback,
-                    self._retry_feedback_messages(str(exc)),
+                    self._repair_feedback_messages(str(exc), raw_output=raw_output),
                 )
                 continue
 
@@ -645,6 +690,8 @@ class LocalServiceBriefingProvider:
             )
             analysis["generation_attempts"] = attempt
             analysis["retry_count"] = attempt - 1
+            analysis["repair_loop_used"] = attempt > 1
+            analysis["repair_attempt_count"] = max(0, attempt - 1)
             analysis["ai_exchange"] = ai_exchange
             return BriefingGenerationResult(
                 provider_name=str(payload.get("provider_name") or self.name),
@@ -692,7 +739,7 @@ class LocalServiceBriefingProvider:
                     ) from exc
                 combined_feedback = self._merge_feedback_messages(
                     combined_feedback,
-                    self._retry_feedback_messages(str(exc), critique_mode=True),
+                    self._repair_feedback_messages(str(exc), raw_output=raw_output, critique_mode=True),
                 )
                 continue
 
@@ -704,6 +751,8 @@ class LocalServiceBriefingProvider:
             )
             analysis["generation_attempts"] = attempt
             analysis["retry_count"] = attempt - 1
+            analysis["repair_loop_used"] = attempt > 1
+            analysis["repair_attempt_count"] = max(0, attempt - 1)
             analysis["ai_exchange"] = ai_exchange
             return DeckCritiqueResult(
                 provider_name=str(payload.get("provider_name") or self.name),
