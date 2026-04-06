@@ -883,6 +883,130 @@ def _build_layout_pressure_signals(renderer: PresentationRenderer, slide: Slide)
                 message="closing attribution is dense enough to wrap awkwardly below the quote",
             )
 
+    elif slide.type.value == "section":
+        semantic = renderer.resolve_semantic_layout(slide.type.value, slide.layout_variant)
+        has_visual = bool(slide.image_path)
+        section_columns = renderer.build_named_columns(
+            left=g.content_left,
+            width=g.content_width,
+            gap=0.42,
+            regions=[
+                {
+                    "kind": "section_content",
+                    "min_width": 6.6 if has_visual else 7.2,
+                    "target_share": renderer.estimate_content_weight(
+                        title=slide.title,
+                        body=slide.subtitle,
+                        tag=slide.section_label or slide.eyebrow or "SECTION",
+                    ),
+                },
+                *(
+                    [{"kind": "section_visual", "width": 2.55, "min_width": 2.2}]
+                    if has_visual
+                    else [{"kind": "section_marker", "width": 1.65, "min_width": 1.5}]
+                ),
+            ],
+        )
+        content_left, content_width = section_columns["section_content"]
+        _ = content_left
+        heading_density = _region_density(
+            width=content_width,
+            height=max(0.9, semantic.body_top - semantic.heading_top + 0.18),
+            title=slide.title,
+            body=slide.subtitle,
+            tag=slide.section_label or slide.eyebrow,
+        )
+        add_signal(
+            region="section:heading",
+            density=heading_density,
+            threshold=2.35,
+            message="section heading stack is dense enough to crowd the chapter transition",
+        )
+
+    elif slide.type.value == "cards" and slide.cards:
+        card_weights = [
+            renderer.estimate_content_weight(title=card.title, body=card.body, footer=card.footer)
+            for card in slide.cards
+        ]
+        dense_cards = any(weight >= 2.25 for weight in card_weights) or any(len(card.body) > 90 for card in slide.cards)
+        card_bounds = renderer.build_named_panel_row_content_bounds(
+            left=g.content_left,
+            top=2.55,
+            width=g.content_width,
+            height=3.08 if dense_cards else 2.95,
+            gap=0.28 if dense_cards else 0.35,
+            min_width=3.0,
+            regions=[
+                {"kind": f"card_{index + 1}", "min_width": 3.0, "flex": flex}
+                for index, flex in enumerate(renderer.normalize_content_flexes(card_weights, min_flex=0.95, max_flex=1.25))
+            ],
+        )
+        card_densities: list[float] = []
+        for index, card in enumerate(slide.cards, start=1):
+            content_bounds = card_bounds[f"card_{index}"]["content"]
+            density = _region_density(
+                width=content_bounds[2],
+                height=content_bounds[3],
+                title=card.title,
+                body=card.body,
+                footer=card.footer,
+            )
+            card_densities.append(density)
+        if card_densities:
+            add_signal(
+                region="cards:grid_density",
+                density=sum(card_densities) / len(card_densities),
+                threshold=3.15,
+                message="cards grid is dense enough to risk cramped multi-panel composition",
+            )
+
+    elif slide.type.value == "chart" and slide.chart_categories:
+        chart_density = _region_density(
+            width=g.content_width,
+            height=0.42,
+            body=" ".join(slide.chart_categories),
+        )
+        add_signal(
+            region="chart:category_labels",
+            density=chart_density,
+            threshold=4.0,
+            message="chart category labels are dense enough to wrap awkwardly or collide visually",
+        )
+
+    elif slide.type.value == "image_text" and slide.image_path:
+        split_regions = renderer.build_named_columns(
+            left=g.content_left,
+            width=g.content_width,
+            gap=0.42,
+            regions=[
+                {
+                    "kind": "text",
+                    "min_width": 5.2,
+                    "target_share": renderer.estimate_content_weight(
+                        title=slide.title,
+                        body=slide.body,
+                        bullets=slide.bullets,
+                        footer=slide.subtitle,
+                        tag=slide.eyebrow,
+                    ),
+                },
+                {"kind": "visual", "width": 5.15, "min_width": 4.8},
+            ],
+        )
+        text_width = split_regions["text"][1]
+        split_density = _region_density(
+            width=text_width,
+            height=3.1,
+            body=slide.body,
+            bullets=slide.bullets,
+        )
+        add_signal(
+            region="image_text:visual_split",
+            density=split_density,
+            threshold=2.7,
+            message="image-text narrative region is dense enough to compete with the visual split",
+        )
+
 
     elif slide.type.value == "table" and slide.table_rows and slide.table_columns:
         column_flexes = renderer.normalize_content_flexes(
