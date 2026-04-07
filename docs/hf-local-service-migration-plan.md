@@ -1,48 +1,48 @@
-# HF Local LLM Service → boundary de model server
+# HF Local LLM Service → model server boundary
 
-Este arquivo existe como checklist operacional da migração para não misturar mais:
+This file exists as an operational migration checklist so we no longer mix:
 
-- **infra genérica de serving de modelo** (`hf_local_llm_service`)
-- **lógica de domínio de decks** (`ppt_creator_ai` / `ppt_creator`)
+- **generic model-serving infrastructure** (`hf_local_llm_service`)
+- **deck domain logic** (`ppt_creator_ai` / `ppt_creator`)
 
-## Boundary alvo
+## Target boundary
 
-- `hf_local_llm_service` deve saber:
-  - resolver provider/modelo
-  - gerar texto genérico
-  - operar chat persistido
-  - gerar imagens
-  - expor health, readiness, registry, jobs e uploads
-- `hf_local_llm_service` não deve saber:
+- `hf_local_llm_service` should know how to:
+  - resolve provider/model
+  - generate generic text
+  - operate persistent chat
+  - generate images
+  - expose health, readiness, registry, jobs, and uploads
+- `hf_local_llm_service` should not know about:
   - `BriefingInput`
   - `PresentationInput`
-  - decks, slides, revise/critique de deck
-- `ppt_creator_ai` deve saber:
-  - construir prompts de deck
-  - extrair JSON do output bruto
-  - normalizar payload de slides
-  - validar schema do deck
-  - fazer revise/critique loops
+  - decks, slides, deck revise/critique
+- `ppt_creator_ai` should know how to:
+  - build deck prompts
+  - extract JSON from raw output
+  - normalize slide payloads
+  - validate deck schema
+  - run revise/critique loops
 
-## Checklist de implementação
+## Implementation checklist
 
-- [x] Introduzir endpoint genérico de inferência (`/v1/generate`) no `hf_local_llm_service`
-- [x] Migrar o fluxo principal do app para contrato genérico de text generation
-- [x] Remover imports de `ppt_creator*` do core do serviço em health/API principal
-- [x] Tirar `app_bridge` do path crítico de health/API/providers principais
-- [x] Migrar `ppt_creator_ai.providers.local_service` para usar `/v1/generate`
-- [x] Mover prompts / parsing / validação de deck para o `ppt_creator_ai`
-- [x] Manter `/v1/presentation/*` apenas como compatibilidade temporária
-- [x] Atualizar docs e testes do serviço para a identidade de model server
-- [x] Atualizar docs e testes do app para o novo fluxo
-- [x] Rodar testes dos dois lados e smoke tests HTTP
+- [x] Introduce a generic inference endpoint (`/v1/generate`) in `hf_local_llm_service`
+- [x] Migrate the app's main flow to a generic text-generation contract
+- [x] Remove `ppt_creator*` imports from the service core in the main health/API path
+- [x] Remove `app_bridge` from the critical path for health/API/main providers
+- [x] Migrate `ppt_creator_ai.providers.local_service` to use `/v1/generate`
+- [x] Move deck prompts / parsing / validation into `ppt_creator_ai`
+- [x] Keep `/v1/presentation/*` only as temporary compatibility
+- [x] Update service docs and tests to reflect the model server identity
+- [x] Update app docs and tests for the new flow
+- [x] Run tests on both sides and HTTP smoke tests
 
-## Estado final desta etapa
+## Final state of this phase
 
-- caminho **preferencial** do app: `ppt_creator_ai -> /v1/generate -> texto/JSON bruto -> parsing/validação no app`
-- caminho **legado/compat**: `/v1/presentation/*`
-- `app_bridge.py` ainda existe apenas para compatibilidade dos endpoints legados de deck, mas saiu do caminho crítico do servidor genérico
+- app **preferred** path: `ppt_creator_ai -> /v1/generate -> raw text/JSON -> parsing/validation in the app`
+- **legacy/compat** path: `/v1/presentation/*`
+- `app_bridge.py` still exists only for compatibility with the legacy deck endpoints, but it is no longer in the critical path of the generic server
 
-## Regra-guia
+## Guiding rule
 
-> O servidor sabe servir modelos. O app sabe fabricar decks.
+> The server knows how to serve models. The app knows how to build decks.

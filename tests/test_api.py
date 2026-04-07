@@ -255,7 +255,7 @@ def test_api_generate_and_generate_and_render_endpoints(tmp_path: Path) -> None:
         status, intent_generate_payload = _request_json(
             f"{base_url}/generate",
             {
-                "intent_text": "Quero um deck para o board explicando por que um copiloto de vendas deve ser lançado agora, com três benefícios, métricas, comparação de opções e fechamento forte.",
+                "intent_text": "Create a board deck explaining why a sales copilot should be launched now, with three benefits, metrics, option comparison, and a strong closing.",
                 "provider_name": "heuristic",
             },
             method="POST",
@@ -269,7 +269,7 @@ def test_api_generate_and_generate_and_render_endpoints(tmp_path: Path) -> None:
         status, intent_generate_render_payload = _request_json(
             f"{base_url}/generate-and-render",
             {
-                "intent_text": "Monte uma apresentação de product operating review mostrando onde o roadmap está diluído, quais decisões precisam ser tomadas, métricas, riscos, trade-offs e a sequência recomendada para o próximo trimestre.",
+                "intent_text": "Build a product operating review presentation showing where the roadmap is diluted, which decisions need to be made, metrics, risks, trade-offs, and the recommended sequence for next quarter.",
                 "provider_name": "heuristic",
                 "output_path": str(output_path_from_intent),
                 "include_review": True,
@@ -330,7 +330,7 @@ def test_api_generate_intent_with_local_service_defaults_to_ai_first_authoring(m
 
     result = generate_briefing_payload(
         provider_name="local_service",
-        intent_text="Quero uma apresentação para entrevista de AI Engineer mostrando minha trajetória, stack e projetos em IA.",
+        intent_text="I want an AI Engineer interview presentation showing my background, stack, and AI projects.",
     )
 
     assert result["provider"] == "local_service"
@@ -366,7 +366,7 @@ def test_api_generate_intent_without_provider_defaults_to_model_backed_ai_first(
     monkeypatch.setattr(provider, "generate", _fake_generate)
 
     result = generate_briefing_payload(
-        intent_text="Quero uma apresentação para entrevista de AI Engineer mostrando minha trajetória, stack e projetos em IA.",
+        intent_text="I want an AI Engineer interview presentation showing my background, stack, and AI projects.",
     )
 
     assert result["provider"] == "local_service"

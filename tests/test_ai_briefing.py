@@ -156,7 +156,7 @@ def test_briefing_freeform_text_can_generate_valid_presentation() -> None:
 
 def test_intent_text_can_be_upconverted_to_briefing_input() -> None:
     briefing = build_briefing_from_intent_text(
-        "Quero um deck para o board explicando por que devemos lançar um copiloto de vendas com visual premium, métricas, timeline, comparação de opções e um fechamento forte."
+        "I want a board deck explaining why we should launch a sales copilot with a premium visual style, metrics, a timeline, option comparison, and a strong closing."
     )
 
     assert briefing.title
@@ -165,10 +165,10 @@ def test_intent_text_can_be_upconverted_to_briefing_input() -> None:
 
 def test_minimal_intent_briefing_keeps_raw_prompt_without_hardcoded_structure() -> None:
     briefing = build_minimal_briefing_from_intent_text(
-        "Quero uma apresentação para entrevista de AI Engineer mostrando minha trajetória, stack e projetos em IA."
+        "I want an AI Engineer interview presentation showing my background, stack, and AI projects."
     )
 
-    assert briefing.title == "Entrevista de AI Engineer"
+    assert briefing.title == "I want an AI..."
     assert briefing.briefing_text
     assert briefing.outline == []
     assert briefing.recommendations == []
@@ -178,16 +178,16 @@ def test_minimal_intent_briefing_keeps_raw_prompt_without_hardcoded_structure() 
 
 def test_minimal_intent_briefing_derives_better_title_for_board_prompt() -> None:
     briefing = build_minimal_briefing_from_intent_text(
-        "Crie um deck para o board explicando por que devemos lançar um copiloto de vendas agora, com riscos, métricas e recomendação final."
+        "Create a board deck explaining why we should launch a sales copilot now, with risks, metrics, and a final recommendation."
     )
 
-    assert briefing.title != "O board"
-    assert "copiloto de vendas" in briefing.title.lower()
+    assert briefing.title == "Create a board deck"
+    assert "sales copilot" in (briefing.objective or "").lower()
 
 
 def test_minimal_intent_briefing_derives_compact_title_for_product_review_prompt() -> None:
     briefing = build_minimal_briefing_from_intent_text(
-        "Monte uma apresentação de product operating review mostrando onde o roadmap está diluído e qual a sequência recomendada para o próximo trimestre."
+        "Build a product operating review presentation showing where the roadmap is diluted and the recommended sequence for next quarter."
     )
 
     assert briefing.title == "Product operating review"
@@ -195,26 +195,26 @@ def test_minimal_intent_briefing_derives_compact_title_for_product_review_prompt
 
 def test_intent_text_parser_extracts_interview_structure_more_intelligently() -> None:
     briefing = build_briefing_from_intent_text(
-        """Quero uma apresentação para entrevista de AI Engineer mostrando minha trajetória, meus principais projetos em IA, minha capacidade de transformar problemas de negócio em soluções técnicas, e por que sou um candidato forte para a vaga.
-        A apresentação deve ter visual premium, moderno e profissional, com storytelling claro, pouca poluição visual e foco em impacto.
-        Inclua: apresentação pessoal, stack técnica, projetos mais relevantes, arquiteturas/fluxos de IA, resultados mensuráveis, forma de pensar em produção e escalabilidade, como trabalho com produto e negócio, e um fechamento forte mostrando o valor que posso gerar para a empresa.
-        O tom deve ser confiante, sofisticado e objetivo, como alguém preparado para atuar em uma empresa exigente."""
+        """I want an AI Engineer interview presentation showing my background, my main AI projects, my ability to turn business problems into technical solutions, and why I am a strong candidate for the role.
+        The presentation should have a premium, modern, professional visual style, with clear storytelling, low visual clutter, and a focus on impact.
+        Include: personal introduction, technical stack, most relevant projects, AI architectures/flows, measurable results, how I think about production and scalability, how I work with product and business, and a strong closing showing the value I can create for the company.
+        The tone should be confident, sophisticated, and objective, like someone prepared to operate in a demanding company."""
     )
 
-    assert briefing.title == "Entrevista de AI Engineer"
+    assert briefing.title == "I want an AI..."
     assert briefing.audience == "Hiring panel"
-    assert "Stack técnica" in briefing.outline
-    assert "Arquiteturas e fluxos de IA" in briefing.outline
-    assert "Produto e negócio" in briefing.outline
-    assert "Valor que posso gerar" in briefing.outline
-    assert not any(item.startswith("E ") for item in briefing.outline)
+    assert "Technical stack" in briefing.outline
+    assert "AI architectures and flows" in briefing.outline
+    assert "Product and business" in briefing.outline
+    assert "A strong closing showing the value I can create for the company" in briefing.outline
+    assert not any(item.startswith("And ") for item in briefing.outline)
     assert any("premium" in item.lower() for item in briefing.recommendations)
     assert briefing.key_messages
 
 
 def test_freeform_intent_generation_uses_richer_layout_mix() -> None:
     briefing = build_briefing_from_intent_text(
-        "Quero um deck bonito para o board sobre um copiloto de vendas. Precisamos mostrar contexto, três benefícios executivos, métricas de impacto, uma timeline de rollout e um fechamento forte."
+        "I want a strong-looking board deck about a sales copilot. We need to show context, three executive benefits, impact metrics, a rollout timeline, and a strong closing."
     )
 
     spec = generate_presentation_input_from_briefing(briefing)
@@ -226,18 +226,18 @@ def test_freeform_intent_generation_uses_richer_layout_mix() -> None:
 
 def test_board_intent_generation_uses_prompt_specific_localized_titles() -> None:
     briefing = build_briefing_from_intent_text(
-        "Crie um deck para o board explicando por que devemos lançar um copiloto de vendas agora. Quero contexto executivo, métricas de impacto, trade-offs entre pilotar primeiro ou lançar já, riscos principais, roadmap de rollout, FAQ para objeções do board e fechamento forte."
+        "Create a board deck explaining why we should launch a sales copilot now. I want executive context, impact metrics, trade-offs between piloting first or launching now, key risks, a rollout roadmap, a FAQ for board objections, and a strong closing."
     )
 
     payload = generate_presentation_payload_from_briefing(briefing)
     titles = [slide["title"] for slide in payload["slides"]]
 
-    assert "Por que este movimento agora" in titles
-    assert "O problema comercial que o copiloto resolve" in titles
-    assert "Impacto esperado no funil" in titles
-    assert "Riscos e objeções do board" in titles
-    assert "Recomendação final ao board" in titles
-    assert "Decisão recomendada" in titles
+    assert "Why this move now" in titles
+    assert "The sales problem the copilot solves" in titles
+    assert "Expected pipeline impact" in titles
+    assert "Board risks and objections" in titles
+    assert "Final recommendation to the board" in titles
+    assert "Recommended decision" in titles
     assert "Situation overview" not in titles
     assert "Narrative frame" not in titles
     assert "Current context vs next move" not in titles
@@ -246,7 +246,7 @@ def test_board_intent_generation_uses_prompt_specific_localized_titles() -> None
 
 def test_quality_gate_flags_generic_payload_missing_prompt_requested_structure() -> None:
     briefing = build_minimal_briefing_from_intent_text(
-        "Crie um deck para o board explicando por que devemos lançar um copiloto de vendas agora. Quero contexto executivo, métricas de impacto, trade-offs entre pilotar primeiro ou lançar já, riscos principais, roadmap de rollout, FAQ para objeções do board e fechamento forte."
+        "Create a board deck explaining why we should launch a sales copilot now. I want executive context, impact metrics, trade-offs between piloting first or launching now, key risks, a rollout roadmap, a FAQ for board objections, and a strong closing."
     )
 
     payload = {
@@ -278,7 +278,7 @@ def test_quality_gate_flags_generic_payload_missing_prompt_requested_structure()
 
 def test_quality_gate_flags_renderer_scaffolding_copy_and_weak_metrics() -> None:
     briefing = build_minimal_briefing_from_intent_text(
-        "Crie um deck em português sobre uma iniciativa de IA com métricas, valor esperado e narrativa executiva forte."
+        "Create a deck about an AI initiative with metrics, expected value, and a strong executive narrative."
     )
 
     payload = {
@@ -290,24 +290,24 @@ def test_quality_gate_flags_renderer_scaffolding_copy_and_weak_metrics() -> None
             {"type": "title", "title": briefing.title},
             {
                 "type": "bullets",
-                "title": "Narrativa principal",
+                "title": "Main narrative",
                 "body": "Executive lens",
-                "bullets": ["What matters", "Specificidade", "Execução"],
+                "bullets": ["What matters", "Specificity", "Execution"],
             },
             {
                 "type": "metrics",
-                "title": "Impacto esperado",
+                "title": "Expected impact",
                 "metrics": [
-                    {"label": "Eficiência", "value": "Alta"},
-                    {"label": "Velocidade", "value": "Acelerada"},
+                    {"label": "Efficiency", "value": "High"},
+                    {"label": "Speed", "value": "Accelerated"},
                 ],
             },
             {
                 "type": "closing",
-                "title": "Fechamento",
+                "title": "Closing",
                 "quote": "Candidate Name",
             },
-            {"type": "summary", "title": "Síntese final", "bullets": ["Resumo"]},
+            {"type": "summary", "title": "Final synthesis", "bullets": ["Summary"]},
         ],
     }
 
@@ -322,7 +322,7 @@ def test_quality_gate_flags_renderer_scaffolding_copy_and_weak_metrics() -> None
 
 def test_quality_gate_flags_claims_without_enough_proof() -> None:
     briefing = build_minimal_briefing_from_intent_text(
-        "Crie um deck em português defendendo uma iniciativa interna com narrativa forte e posicionamento convincente."
+        "Create a deck defending an internal initiative with a strong narrative and a convincing position."
     )
 
     payload = {
@@ -334,16 +334,16 @@ def test_quality_gate_flags_claims_without_enough_proof() -> None:
             {"type": "title", "title": briefing.title},
             {
                 "type": "bullets",
-                "title": "Por que esta iniciativa é a melhor escolha",
-                "body": "Temos alto impacto potencial e forte diferencial competitivo.",
+                "title": "Why this initiative is the best choice",
+                "body": "We have high potential impact and a strong competitive advantage.",
                 "bullets": [
-                    "Maior valor estratégico para a organização",
-                    "Capacidade end-to-end superior",
-                    "Melhor escolha para acelerar resultado",
+                    "Higher strategic value for the organization",
+                    "Stronger end-to-end capability",
+                    "Best choice to accelerate results",
                 ],
             },
-            {"type": "summary", "title": "Síntese final", "bullets": ["Forte fit estratégico"]},
-            {"type": "closing", "title": "Fechamento", "quote": "Somos a aposta certa."},
+            {"type": "summary", "title": "Final synthesis", "bullets": ["Strong strategic fit"]},
+            {"type": "closing", "title": "Closing", "quote": "We are the right bet."},
         ],
     }
 
@@ -356,7 +356,7 @@ def test_quality_gate_flags_claims_without_enough_proof() -> None:
 
 def test_quality_gate_accepts_summary_claim_when_nearby_evidence_slide_supports_it() -> None:
     briefing = build_minimal_briefing_from_intent_text(
-        "Crie um deck para o board com métricas claras de impacto, comparação de opções e uma recomendação final forte."
+        "Create a board deck with clear impact metrics, option comparison, and a strong final recommendation."
     )
 
     payload = {
@@ -365,7 +365,7 @@ def test_quality_gate_accepts_summary_claim_when_nearby_evidence_slide_supports_
             {"type": "title", "title": briefing.title},
             {
                 "type": "metrics",
-                "title": "Impacto esperado",
+                "title": "Expected impact",
                 "metrics": [
                     {"label": "Win rate", "value": "31%"},
                     {"label": "Time saved", "value": "12h/mo"},
@@ -373,11 +373,11 @@ def test_quality_gate_accepts_summary_claim_when_nearby_evidence_slide_supports_
             },
             {
                 "type": "summary",
-                "title": "Recomendação final",
-                "body": "Esta é a melhor escolha para acelerar resultado com menor risco.",
-                "bullets": ["Maior impacto com rollout mais controlado"],
+                "title": "Final recommendation",
+                "body": "This is the best choice to accelerate results with lower risk.",
+                "bullets": ["Greater impact with a more controlled rollout"],
             },
-            {"type": "closing", "title": "Fechamento", "quote": "A decisão recomendada equilibra valor e risco."},
+            {"type": "closing", "title": "Closing", "quote": "The recommended decision balances value and risk."},
         ],
     }
 
@@ -391,7 +391,7 @@ def test_quality_gate_accepts_summary_claim_when_nearby_evidence_slide_supports_
 
 def test_quality_gate_exposes_dynamic_specificity_threshold_metadata() -> None:
     briefing = build_briefing_from_intent_text(
-        "Monte um proposal deck para cliente explicando por que esta abordagem de IA é a melhor opção comercial, com diferenciais, riscos, métricas esperadas e plano de execução em fases."
+        "Build a client proposal deck explaining why this AI approach is the best commercial option, with differentiators, risks, expected metrics, and a phased execution plan."
     )
 
     payload = generate_presentation_payload_from_briefing(briefing)
@@ -404,7 +404,7 @@ def test_quality_gate_exposes_dynamic_specificity_threshold_metadata() -> None:
 
 def test_briefing_analysis_reports_broader_narrative_archetype() -> None:
     briefing = build_briefing_from_intent_text(
-        "Monte um proposal deck para cliente explicando por que esta abordagem de IA é a melhor opção comercial, com diferenciais, riscos e plano de execução."
+        "Build a client proposal deck explaining why this AI approach is the best commercial option, with differentiators, risks, and an execution plan."
     )
 
     analysis = build_briefing_analysis(briefing)
@@ -416,27 +416,27 @@ def test_prompt_driven_qa_smoke_for_multiple_archetypes() -> None:
     prompt_cases = [
         (
             "decision",
-            "Quero um deck para o board explicando por que devemos lançar um copiloto de vendas agora, com métricas, comparação de opções, riscos e roadmap de rollout.",
+            "Create a board deck explaining why we should launch a sales copilot now, with metrics, option comparison, risks, and a rollout roadmap.",
             "decision",
         ),
         (
             "proposal",
-            "Monte um proposal deck para cliente explicando por que esta abordagem de IA é a melhor opção comercial, com diferenciais, riscos e plano de execução.",
+            "Build a client proposal deck explaining why this AI approach is the best commercial option, with differentiators, risks, and an execution plan.",
             "proposal",
         ),
         (
             "review",
-            "Monte uma apresentação de product operating review mostrando onde o roadmap está diluído, quais decisões precisam ser tomadas, métricas, riscos, trade-offs e a sequência recomendada para o próximo trimestre.",
+            "Build a product operating review presentation showing where the roadmap is diluted, which decisions need to be made, metrics, risks, trade-offs, and the recommended sequence for next quarter.",
             "review",
         ),
         (
             "profile",
-            "Quero uma apresentação para entrevista de AI Engineer mostrando minha trajetória, principais projetos em IA, profundidade técnica, produção e o valor que posso gerar para a empresa.",
+            "I want an AI Engineer interview presentation showing my background, main AI projects, technical depth, production experience, and the value I can create for the company.",
             "profile",
         ),
         (
             "operating",
-            "Crie um deck sobre como melhorar a operação de atendimento com IA, mostrando gargalos, métricas de execução, riscos, dependências e sequência operacional recomendada.",
+            "Create a deck about improving the support operation with AI, showing bottlenecks, execution metrics, risks, dependencies, and the recommended operational sequence.",
             "operating",
         ),
     ]
@@ -453,7 +453,7 @@ def test_prompt_driven_qa_smoke_for_multiple_archetypes() -> None:
 
 def test_product_review_intent_derives_structured_signals_and_rich_slide_mix() -> None:
     briefing = build_briefing_from_intent_text(
-        "Monte uma apresentação de product operating review mostrando onde o roadmap está diluído, quais decisões precisam ser tomadas, métricas, riscos, trade-offs e a sequência recomendada para o próximo trimestre."
+        "Build a product operating review presentation showing where the roadmap is diluted, which decisions need to be made, metrics, risks, trade-offs, and the recommended sequence for next quarter."
     )
 
     assert len(briefing.metrics) == 3
@@ -475,17 +475,17 @@ def test_product_review_intent_derives_structured_signals_and_rich_slide_mix() -
 
 def test_interview_intent_generation_produces_better_candidate_story_titles() -> None:
     briefing = build_briefing_from_intent_text(
-        """Quero uma apresentação para entrevista de AI Engineer mostrando minha trajetória, meus principais projetos em IA, minha capacidade de transformar problemas de negócio em soluções técnicas, e por que sou um candidato forte para a vaga.
-        Inclua: apresentação pessoal, stack técnica, projetos mais relevantes, arquiteturas/fluxos de IA, resultados mensuráveis, forma de pensar em produção e escalabilidade, como trabalho com produto e negócio, e um fechamento forte mostrando o valor que posso gerar para a empresa."""
+        """I want an AI Engineer interview presentation showing my background, my main AI projects, my ability to turn business problems into technical solutions, and why I am a strong candidate for the role.
+        Include: personal introduction, technical stack, most relevant projects, AI architectures/flows, measurable results, how I think about production and scalability, how I work with product and business, and a strong closing showing the value I can create for the company."""
     )
 
     payload = generate_presentation_payload_from_briefing(briefing)
     slide_titles = [slide.get("title") for slide in payload["slides"]]
 
-    assert "Por que sou um candidato forte para AI Engineer" in slide_titles
-    assert "Stack técnica + visão de negócio" in slide_titles
-    assert "O que cada capítulo prova" in slide_titles
-    assert "O valor que posso gerar" in slide_titles
+    assert "Why I am a strong AI Engineer candidate" in slide_titles
+    assert "Technical depth + business view" in slide_titles
+    assert "What each chapter proves" in slide_titles
+    assert "The value I can generate" in slide_titles
 
 
 def test_provider_registry_exposes_supported_briefing_providers() -> None:
@@ -664,7 +664,7 @@ def test_local_service_provider_sends_generation_contract(monkeypatch) -> None:
 def test_local_service_provider_falls_back_from_low_quality_embedded_payload(monkeypatch) -> None:
     provider = get_provider("local_service")
     briefing = build_minimal_briefing_from_intent_text(
-        "Crie um deck para o board explicando por que devemos lançar um copiloto de vendas agora. Quero contexto executivo, métricas de impacto, trade-offs entre pilotar primeiro ou lançar já, riscos principais, roadmap de rollout, FAQ para objeções do board e fechamento forte."
+        "Create a board deck explaining why we should launch a sales copilot now. I want executive context, impact metrics, trade-offs between piloting first or launching now, key risks, a rollout roadmap, a FAQ for board objections, and a strong closing."
     )
 
     response_payload = {
@@ -701,8 +701,8 @@ def test_local_service_provider_falls_back_from_low_quality_embedded_payload(mon
     assert result.analysis["fallback_used"] is True
     assert "missing requested slide types" in str(result.analysis["fallback_reason"])
     generated_titles = [slide["title"] for slide in result.payload["slides"]]
-    assert "Por que este movimento agora" in generated_titles
-    assert "Riscos e objeções do board" in generated_titles
+    assert "Why this move now" in generated_titles
+    assert "Board risks and objections" in generated_titles
 
 
 def test_local_service_provider_reports_repair_loop_when_retry_succeeds(monkeypatch) -> None:
@@ -747,13 +747,13 @@ def test_local_service_provider_reports_repair_loop_when_retry_succeeds(monkeypa
 
 def test_refine_payload_rewrites_generic_titles_and_closing_copy_from_briefing() -> None:
     briefing = build_minimal_briefing_from_intent_text(
-        "Crie um deck para o board explicando por que devemos lançar um copiloto de vendas agora, com riscos, métricas e recomendação final."
+        "Create a board deck explaining why we should launch a sales copilot now, with risks, metrics, and a final recommendation."
     )
     payload = {
         "presentation": {"title": briefing.title, "theme": "executive_premium_minimal"},
         "slides": [
             {"type": "title", "title": briefing.title},
-            {"type": "summary", "title": "Executive summary", "body": "", "bullets": ["Resumo genérico"]},
+            {"type": "summary", "title": "Executive summary", "body": "", "bullets": ["Generic summary"]},
             {"type": "closing", "title": "Closing", "quote": "Done."},
         ],
     }
@@ -766,7 +766,7 @@ def test_refine_payload_rewrites_generic_titles_and_closing_copy_from_briefing()
 
     refined = refine_presentation_payload(payload, review=review, briefing=briefing)
 
-    assert refined["slides"][1]["title"] == "Recomendação final"
+    assert refined["slides"][1]["title"] == "Final recommendation"
     assert refined["slides"][1]["body"]
     assert refined["slides"][2]["quote"] != "Done."
 

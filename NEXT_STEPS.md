@@ -1,77 +1,77 @@
 # NEXT STEPS — PPT Creator Roadmap
 
-## Ajuste tático em andamento — host-native first com Docker service-first preparado
+## Tactical adjustment in progress — host-native first with Docker service-first ready
 
-Objetivo desta trilha curta:
+Objective of this short track:
 
-- consolidar o `ppt_creator_app` como renderer HTTP especializado do AI Workbench Local
-- manter **host-native** como modo operacional recomendado agora
-- deixar a imagem/container e o compose prontos para adoção futura sem refazer a arquitetura
+- consolidate `ppt_creator_app` as the specialized HTTP renderer for AI Workbench Local
+- keep **host-native** as the recommended operational mode for now
+- leave the image/container and compose ready for future adoption without redesigning the architecture
 
-### Checklist desta trilha
+### Checklist for this track
 
-- [x] confirmar o `boundary` oficial: AI Workbench = domínio/orquestração, `ppt_creator_app` = renderer especializado
-- [x] manter `GET /health`, `POST /render` e `GET /artifact` como contrato principal do P1 atual
-- [x] formalizar `host-native` como operação recomendada de curto prazo
-- [x] preparar Dockerfile para modo API service-first
-- [x] adicionar `docker-compose.yml` para subir o serviço em `:8787`
-- [x] adicionar helper/targets para `docker compose up --build`
-- [x] documentar o fluxo para integração com o AI Workbench
-- [ ] validar smoke test manual do caminho containerizado (`/health`, `/render`, `/artifact`, `/playground`)
-- [ ] decidir quando o modo containerizado vira o default operacional
+- [x] confirm the official `boundary`: AI Workbench = domain/orchestration, `ppt_creator_app` = specialized renderer
+- [x] keep `GET /health`, `POST /render`, and `GET /artifact` as the main contract for the current P1
+- [x] formalize `host-native` as the recommended short-term operating mode
+- [x] prepare the Dockerfile for API service-first mode
+- [x] add `docker-compose.yml` to bring the service up on `:8787`
+- [x] add helpers/targets for `docker compose up --build`
+- [x] document the integration flow with AI Workbench
+- [ ] validate a manual smoke test for the containerized path (`/health`, `/render`, `/artifact`, `/playground`)
+- [ ] decide when containerized mode becomes the operational default
 
-Este documento agora combina **duas coisas ao mesmo tempo**:
+This document now combines **two things at the same time**:
 
-1. uma visão consolidada e atual do que ainda falta para o app ficar incrível
-2. o **histórico preservado** das fases e entregas anteriores, sem apagar o que já foi feito
+1. a consolidated, current view of what is still missing for the app to become amazing
+2. the **preserved history** of previous phases and deliveries, without erasing what has already been done
 
-O bloco inicial abaixo mostra a leitura mais atual do projeto.
-No final do arquivo existe um **anexo histórico preservado** com as fases anteriores e os acompanhamentos que já tinham sido construídos.
+The opening block below shows the most current reading of the project.
+At the end of the file there is a **preserved historical appendix** with the earlier phases and tracking that had already been built.
 
-O `ppt_creator` já deixou de ser um MVP simples. Hoje ele já funciona como:
+`ppt_creator` is no longer a simple MVP. Today it already works as:
 
-- motor Python de `JSON -> .pptx`
-- CLI de validate / render / review / preview / compare
-- API HTTP local com playground
-- biblioteca de layouts executivos e temas prontos
-- bloco reutilizável para pipelines
-- camada opcional de briefing/IA desacoplada do renderizador base
+- a Python `JSON -> .pptx` engine
+- a CLI for validate / render / review / preview / compare
+- a local HTTP API with playground
+- a library of executive layouts and ready-made themes
+- a reusable block for pipelines
+- an optional briefing/AI layer decoupled from the base renderer
 
-O que falta agora não é “virar funcional”.
+What is missing now is not “becoming functional.”
 
-O que falta é o app ficar:
+What is missing is for the app to become:
 
-1. **visualmente impecável no artefato final**
-2. **mais previsível em QA visual e regressão**
-3. **mais fácil de usar no dia a dia**
-4. **mais forte como produto reutilizável e distribuível**
+1. **visually impeccable in the final artifact**
+2. **more predictable in visual QA and regression**
+3. **easier to use day to day**
+4. **stronger as a reusable and distributable product**
 
 ---
 
-## 1. Estado atual consolidado
+## 1. Consolidated current state
 
-Hoje o app já entrega:
+Today the app already delivers:
 
-- [x] schema com `pydantic`
-- [x] renderização `.pptx` com `python-pptx`
+- [x] schema with `pydantic`
+- [x] `.pptx` rendering with `python-pptx`
 - [x] speaker notes
-- [x] CLI de validate / render / review / preview / compare
-- [x] API HTTP local
-- [x] playground local inicial
+- [x] validate / render / review / preview / compare CLI
+- [x] local HTTP API
+- [x] initial local playground
 - [x] batch rendering
 - [x] dry-run / reports / asset warnings
-- [x] temas prontos (`executive_premium_minimal`, `consulting_clean`, `dark_boardroom`, `startup_minimal`)
-- [x] branding básico por cor / logo / footer / client name
-- [x] layouts executivos principais
-- [x] workflows, audience profiles e asset collections iniciais
-- [x] catálogo interno leve de temas / layouts / workflows / brand packs / assets / perfis
-- [x] QA heurístico por slide e por deck
-- [x] preview sintético e preview via runtime Office
-- [x] comparação visual entre versões `.pptx`
-- [x] Docker / Makefile / Ruff / CI / testes
-- [x] camada opcional `ppt_creator_ai/` desacoplada do núcleo
+- [x] ready-made themes (`executive_premium_minimal`, `consulting_clean`, `dark_boardroom`, `startup_minimal`)
+- [x] basic branding by color / logo / footer / client name
+- [x] main executive layouts
+- [x] initial workflows, audience profiles, and asset collections
+- [x] lightweight internal catalog of themes / layouts / workflows / brand packs / assets / profiles
+- [x] heuristic QA per slide and per deck
+- [x] synthetic preview and preview via Office runtime
+- [x] visual comparison between `.pptx` versions
+- [x] Docker / Makefile / Ruff / CI / tests
+- [x] optional `ppt_creator_ai/` layer decoupled from the core
 
-### Layouts já suportados
+### Layouts already supported
 
 - [x] `title`
 - [x] `section`
@@ -91,89 +91,89 @@ Hoje o app já entrega:
 
 ---
 
-## 2. Entregas concluídas no ciclo atual
+## 2. Deliveries completed in the current cycle
 
-Este ciclo fechou uma parte importante do gap de **preview/regressão visual**:
+This cycle closed an important part of the **preview / visual regression** gap:
 
-- [x] gerar e salvar **manifesto de preview** com provenance do conjunto gerado
-- [x] registrar no manifesto:
+- [x] generate and save a **preview manifest** with provenance for the generated set
+- [x] record in the manifest:
   - [x] `preview_source`
   - [x] `backend_requested`
   - [x] `backend_used`
   - [x] `office_conversion_strategy`
-  - [x] arquivos e ordem dos slides
-- [x] fazer regressão visual usar a **ordem do manifesto**, não só o `glob` de PNGs do diretório
-- [x] expor metadados de provenance em relatórios de preview / compare
-- [x] detectar e reportar **mismatch de provenance** entre baseline e current preview
-- [x] adicionar flags de **require real preview** na CLI
-- [x] adicionar suporte equivalente na API
-- [x] adicionar testes cobrindo:
-  - [x] manifesto de preview
-  - [x] regressão usando manifesto
-  - [x] falha quando preview real é obrigatório e não existe runtime Office
-  - [x] compare de `.pptx` com provenance real
-- [x] adicionar catálogo interno/marketplace leve via API/CLI para temas, layouts, perfis, workflows, brand packs e assets
-- [x] adicionar trilha explícita de proposta/comercial com `domain=proposal`, `profile=proposal` e workflow `commercial_proposal`
-- [x] consolidar helpers nomeados de layout e painéis estruturados reutilizáveis (`build_named_columns`, `build_named_rows`, `build_named_panel_row_content_bounds`, `build_named_panel_content_stack_bounds`, `add_structured_panel`) com adoção inicial em `title`, `section`, `summary` e `closing`
-- [x] expandir focal point contextual/crop para `section` no renderer e no preview sintético correspondente
-- [x] introduzir uma biblioteca leve de componentes visuais reutilizáveis (`ppt_creator/layouts/_components.py`) com adoção inicial em `metrics`, `cards` e `agenda`
-- [x] reduzir coordenadas rígidas adicionais em layouts narrativos com splits/columns semânticos em `image_text` e `bullets`
+  - [x] slide files and ordering
+- [x] make visual regression use the **manifest order**, not only the directory PNG `glob`
+- [x] expose provenance metadata in preview / compare reports
+- [x] detect and report **provenance mismatch** between baseline and current preview
+- [x] add **require real preview** flags to the CLI
+- [x] add equivalent support in the API
+- [x] add tests covering:
+  - [x] preview manifest
+  - [x] regression using the manifest
+  - [x] failure when real preview is required and no Office runtime exists
+  - [x] `.pptx` compare with real provenance
+- [x] add a lightweight internal catalog/marketplace via API/CLI for themes, layouts, profiles, workflows, brand packs, and assets
+- [x] add an explicit proposal/commercial track with `domain=proposal`, `profile=proposal`, and workflow `commercial_proposal`
+- [x] consolidate named layout helpers and reusable structured-panel helpers (`build_named_columns`, `build_named_rows`, `build_named_panel_row_content_bounds`, `build_named_panel_content_stack_bounds`, `add_structured_panel`) with initial adoption in `title`, `section`, `summary`, and `closing`
+- [x] expand contextual focal point / crop to `section` in the renderer and in the corresponding synthetic preview
+- [x] introduce a lightweight reusable visual component library (`ppt_creator/layouts/_components.py`) with initial adoption in `metrics`, `cards`, and `agenda`
+- [x] reduce additional rigid coordinates in narrative layouts with semantic splits/columns in `image_text` and `bullets`
 
 ---
 
-## 3. O que ainda falta para o app ficar incrível
+## 3. What is still missing for the app to become amazing
 
-### Leitura curta e priorizada do que falta
+### Short, prioritized reading of what is missing
 
-Se a pergunta for **"o que realmente falta agora?"**, a resposta curta é esta:
+If the question is **"what is really missing right now?"**, the short answer is this:
 
-#### Faltando agora
+#### Missing right now
 
-- [x] reduzir o retoque manual nos layouts mais sensíveis com um `visual slot` compartilhado, placeholders/crop mais consistentes e adoção prática em `section`, `image_text`, `summary` e `closing`
-- [x] reduzir atrito do playground com foco automático no slide de maior risco e edição guiada de `image_path`, caption e focal point
-- [x] consolidar primitives/constraints reutilizáveis com `add_accent_panel` e `add_visual_slot`
-- [x] calibrar os exemplos e layouts principais até o corpus de referência sair com QA limpo e bem próximo de **zero retoque manual** no artefato final
+- [x] reduce manual touch-up in the most sensitive layouts with a shared `visual slot`, more consistent placeholders/crop, and practical adoption in `section`, `image_text`, `summary`, and `closing`
+- [x] reduce playground friction with automatic focus on the highest-risk slide and guided editing of `image_path`, caption, and focal point
+- [x] consolidate reusable primitives/constraints with `add_accent_panel` and `add_visual_slot`
+- [x] calibrate the main examples and layouts until the reference corpus comes out with clean QA and very close to **zero manual touch-up** in the final artifact
 
-#### Faltando depois
+#### Missing later
 
-- [x] ampliar o QA para `section`, `cards`, `chart` e `image_text` com sinais explícitos e cobertura de teste
-- [x] endurecer QA visual e regressão baseada no `.pptx` real como caminho operacional dominante
-- [x] endurecer a camada AI opcional com repair loop, observabilidade, benchmarking entre providers/modelos e previsibilidade de saída
-- [x] separar o backlog aspiracional em trilhas de expansão futura, sem tratar wishlist como bloqueio do core roadmap
+- [x] expand QA for `section`, `cards`, `chart`, and `image_text` with explicit signals and test coverage
+- [x] harden visual QA and regression based on the real `.pptx` as the dominant operational path
+- [x] harden the optional AI layer with a repair loop, observability, provider/model benchmarking, and output predictability
+- [x] separate the aspirational backlog into future-expansion tracks without treating wishlist items as blockers for the core roadmap
 
-#### Itens históricos que já podem ser tratados como arquivados
+#### Historical items that can already be treated as archived
 
-- [x] tudo que já está marcado como concluído nas prioridades principais deve ser lido como **feito e preservado por contexto**, não como trabalho ainda em aberto
-- [x] itens antigos que falavam em **"primeira camada"**, quando já tiveram expansão e testes no ciclo atual, podem ser considerados encerrados no roadmap principal
-- [x] temas mais aspiracionais como marketplace interno, biblioteca visual mais ampla e integrações operacionais/comerciais podem ficar como **wishlist / expansão futura**, e não como bloqueio para considerar o app excelente
+- [x] everything already marked as complete in the main priorities should be read as **done and preserved for context**, not as still-open work
+- [x] older items that spoke about a **"first layer"**, when they have already been expanded and tested in the current cycle, can be considered closed in the main roadmap
+- [x] more aspirational themes such as the internal marketplace, broader visual library, and operational/commercial integrations can remain as **wishlist / future expansion**, not as blockers to consider the app excellent
 
-## Prioridade 1 — Fidelidade visual final e QA de verdade
+## Priority 1 — Final visual fidelity and real QA
 
-Esses são os itens de maior impacto percebido.
+These are the items with the highest perceived impact.
 
-### 3.1. Preview e regressão visual
+### 3.1. Preview and visual regression
 
-- [x] salvar manifesto de preview por execução
-- [x] usar manifesto para ordenar/comparar previews
-- [x] exigir preview real via CLI/API quando necessário
-- [x] tornar o preview derivado do `.pptx` real o caminho **padrão recomendado** em toda a documentação e nos fluxos de regressão mais críticos
-- [x] adicionar workflow explícito de **promote baseline** / refresh de golden previews
-- [x] adicionar modo de **falha por regressão** para CI/pipeline (`fail on diff`)
-- [x] destacar melhor nos relatórios:
-  - [x] slides adicionados/removidos
-  - [x] top diffs por severidade
-  - [x] mismatch de provenance com guidance acionável
-- [x] permitir comparação entre conjuntos com labels / metadata mais legíveis para debugging
+- [x] save a preview manifest per run
+- [x] use the manifest to order/compare previews
+- [x] require real preview via CLI/API when needed
+- [x] make preview derived from the real `.pptx` the **recommended default path** across the documentation and in the most critical regression flows
+- [x] add an explicit **promote baseline** / golden preview refresh workflow
+- [x] add a **fail on regression** mode for CI/pipeline (`fail on diff`)
+- [x] highlight better in reports:
+  - [x] added/removed slides
+  - [x] top diffs by severity
+  - [x] provenance mismatch with actionable guidance
+- [x] allow comparison between sets with more readable labels / metadata for debugging
 
-### 3.2. Detectores visuais mais fortes
+### 3.2. Stronger visual detectors
 
-- [x] evoluir heurísticas para algo mais próximo de colisão/clipping real
-- [x] detectar melhor:
-  - [x] overflow em caixas compostas
-  - [x] clipping perto de footer
-  - [x] crowding em cantos e safe areas
-  - [x] colisões entre blocos em layouts compostos
-- [x] adicionar sinais mais fortes específicos para:
+- [x] evolve heuristics toward something closer to real collision/clipping
+- [x] improve detection of:
+  - [x] overflow in composed boxes
+  - [x] clipping near the footer
+  - [x] crowding in corners and safe areas
+  - [x] collisions between blocks in composed layouts
+- [x] add stronger layout-specific signals for:
   - [x] `summary`
   - [x] `comparison`
   - [x] `two_column`
@@ -183,16 +183,16 @@ Esses são os itens de maior impacto percebido.
 
 ---
 
-## Prioridade 2 — Polimento do motor de layout
+## Priority 2 — Layout engine polish
 
-O motor já está forte, mas ainda falta acabamento sistemático.
+The engine is already strong, but it still lacks systematic finish.
 
-### 4.1. Rebalance e auto-fit em layouts compostos
+### 4.1. Rebalance and auto-fit in composed layouts
 
-- [x] criar um renderer compartilhado para famílias parecidas (`comparison` / `two_column`) para reduzir drift visual
-- [x] adicionar uma segunda passada de rebalance quando o shrink de texto ficar agressivo
-- [x] expandir auto-fit real para caixas compostas e painéis complexos
-- [x] balancear melhor alturas e colunas em:
+- [x] create a shared renderer for similar families (`comparison` / `two_column`) to reduce visual drift
+- [x] add a second rebalance pass when text shrink becomes too aggressive
+- [x] expand real auto-fit to composed boxes and complex panels
+- [x] balance heights and columns better in:
   - [x] `comparison`
   - [x] `two_column`
   - [x] `summary`
@@ -201,192 +201,192 @@ O motor já está forte, mas ainda falta acabamento sistemático.
   - [x] `metrics`
   - [x] `closing`
 
-### 4.2. Baselines e anchors semânticos
+### 4.2. Baselines and semantic anchors
 
-- [x] formalizar baseline vertical por tipo de slide
-- [x] formalizar anchors consistentes para:
+- [x] formalize a vertical baseline by slide type
+- [x] formalize consistent anchors for:
   - [x] heading
   - [x] subtitle
   - [x] panel title
   - [x] body region
   - [x] footer boundary
-- [x] reduzir pequenas variações de alinhamento entre layouts semelhantes
+- [x] reduce small alignment variations across similar layouts
 
-### 4.3. Revisão visual slide a slide
+### 4.3. Slide-by-slide visual review
 
-- [x] revisar detalhadamente `title`
-- [x] revisar detalhadamente `metrics`
-- [x] revisar detalhadamente `comparison`
-- [x] revisar detalhadamente `two_column`
-- [x] revisar detalhadamente `table`
-- [x] revisar detalhadamente `faq`
-- [x] revisar detalhadamente `summary`
-- [x] revisar detalhadamente `closing`
+- [x] review `title` in detail
+- [x] review `metrics` in detail
+- [x] review `comparison` in detail
+- [x] review `two_column` in detail
+- [x] review `table` in detail
+- [x] review `faq` in detail
+- [x] review `summary` in detail
+- [x] review `closing` in detail
 
 ---
 
-## Prioridade 3 — Pipeline de imagens e placeholders
+## Priority 3 — Image pipeline and placeholders
 
-### 5.1. Crop e focal point
+### 5.1. Crop and focal point
 
-- [x] cover-fit/focal point inicial em `image_text`
-- [x] expansão inicial para `title.hero_cover`
-- [x] expandir crop/focal point para mais layouts com imagem
-- [x] adicionar regras contextuais por tipo de slide para decidir melhor framing/crop
+- [x] initial cover-fit/focal point in `image_text`
+- [x] initial expansion to `title.hero_cover`
+- [x] expand crop/focal point to more image-based layouts
+- [x] add contextual rules by slide type to decide framing/crop better
 
-### 5.2. Placeholders mais premium
+### 5.2. More premium placeholders
 
-- [x] primeira evolução do placeholder estruturado
-- [x] criar placeholders contextuais por tipo de slide
-- [x] diferenciar melhor placeholder de:
-  - [x] foto
+- [x] first evolution of the structured placeholder
+- [x] create contextual placeholders by slide type
+- [x] differentiate placeholders more clearly for:
+  - [x] photo
   - [x] screenshot
-  - [x] diagrama
-  - [x] gráfico/visual analítico
+  - [x] diagram
+  - [x] chart / analytical visual
 
 ### 5.3. Asset pipeline
 
-- [x] brand packs reutilizáveis com logo/cor/footer/cover style
-- [x] presets de assets visuais por domínio/workflow
-- [x] sugestões mais contextuais de imagem por slide e narrativa
+- [x] reusable brand packs with logo/color/footer/cover style
+- [x] visual asset presets by domain/workflow
+- [x] more contextual image suggestions by slide and narrative
 
 ---
 
-## Prioridade 4 — UX de criação e operação
+## Priority 4 — Creation and operations UX
 
-Hoje o app é poderoso, mas ainda muito centrado em JSON.
+Today the app is powerful, but still too centered on JSON.
 
-### 6.1. Playground e fluxo de uso
+### 6.1. Playground and usage flow
 
-- [x] playground local inicial
-- [x] bootstrap por workflow/template/perfil
-- [x] persistência local de estado no navegador
-- [x] live preview / live review sem tanta fricção
-- [x] UX melhor de “editar -> revisar -> ajustar -> exportar”
-- [x] cards visuais para artifacts/reports no playground
-- [x] erros de validação com foco mais acionável por campo/bloco
-- [x] abrir e comparar versões do deck mais facilmente no playground
+- [x] initial local playground
+- [x] bootstrap by workflow/template/profile
+- [x] local browser state persistence
+- [x] live preview / live review with less friction
+- [x] better UX for “edit -> review -> adjust -> export”
+- [x] visual cards for artifacts/reports in the playground
+- [x] validation errors with a more actionable focus by field/block
+- [x] open and compare deck versions more easily in the playground
 
-### 6.2. Editor visual leve
+### 6.2. Lightweight visual editor
 
-- [x] editor visual leve para os casos mais comuns
-- [x] edição guiada de:
+- [x] lightweight visual editor for the most common cases
+- [x] guided editing of:
   - [x] title/subtitle/body
   - [x] bullets
   - [x] metrics
   - [x] comparison columns
   - [x] table rows
   - [x] FAQ items
-- [x] sem substituir o JSON, mas reduzindo atrito para uso diário
+- [x] without replacing JSON, but reducing friction for daily use
 
 ---
 
-## Prioridade 5 — Productização, distribuição e adoção
+## Priority 5 — Productization, distribution, and adoption
 
-### 7.1. Release e distribuição
+### 7.1. Release and distribution
 
 - [x] CI / lint / Makefile / changelog
-- [x] pipeline de release formal
-- [x] publicação consistente do pacote
-- [x] estratégia de versionamento e releases mais operacional
+- [x] formal release pipeline
+- [x] consistent package publishing
+- [x] more operational versioning and release strategy
 
-### 7.2. Documentação e prova visual
+### 7.2. Documentation and visual proof
 
-- [x] README com galeria visual real de decks gerados
-- [x] screenshots / exemplos visuais por layout
-- [x] docs específicas para:
+- [x] README with a real visual gallery of generated decks
+- [x] screenshots / visual examples by layout
+- [x] specific docs for:
   - [x] preview provenance
   - [x] visual regression
   - [x] compare-pptx
   - [x] review-pptx
   - [x] baseline management
-- [x] docs específicas para a camada AI opcional e seu boundary com o app
-- [x] mais exemplos end-to-end por workflow real:
+- [x] specific docs for the optional AI layer and its boundary with the app
+- [x] more end-to-end examples by real workflow:
   - [x] sales QBR
   - [x] board strategy review
   - [x] product operating review
   - [x] consulting steerco
 
-### 7.3. Posicionamento do produto
+### 7.3. Product positioning
 
-- [x] deixar mais explícito se o produto é:
+- [x] make it clearer whether the product is a:
   - [x] library
   - [x] CLI tool
   - [x] local service
-  - [x] app com playground
-- [x] documentar a arquitetura “core renderer vs AI service” de forma mais honesta e estável
+  - [x] app with playground
+- [x] document the “core renderer vs AI service” architecture more honestly and more stably
 
 ---
 
-## Prioridade 6 — Camada opcional de IA
+## Priority 6 — Optional AI layer
 
-IA continua opcional. O core deve seguir desacoplado.
+AI remains optional. The core should remain decoupled.
 
-### 8.1. O que já existe
+### 8.1. What already exists
 
-- [x] provider heurístico
-- [x] provider `local_service`
-- [x] geração de deck estruturado a partir de briefing
-- [x] review/refine/regenerate heurístico inicial
-- [x] crítica slide a slide combinando sinais de QA
+- [x] heuristic provider
+- [x] `local_service` provider
+- [x] structured deck generation from a briefing
+- [x] initial heuristic review/refine/regenerate flow
+- [x] slide-by-slide critique combining QA signals
 
-### 8.2. O que ainda falta
+### 8.2. What was still missing
 
-- [x] decidir e documentar melhor a fronteira do app:
-  - [x] manter providers reais só atrás de `local_service`
-  - [x] ou expor providers first-class no próprio app
-- [x] hardening mais profundo de integrações reais
-- [x] retries / timeout / structured errors melhores
-- [x] reescrita executiva mais forte para slides fracos
-- [x] loop iterativo com critério de parada mais claro:
+- [x] decide and document the app boundary more clearly:
+  - [x] keep real providers only behind `local_service`
+  - [x] or expose first-class providers in the app itself
+- [x] deeper hardening of real integrations
+- [x] better retries / timeout / structured errors
+- [x] stronger executive rewriting for weak slides
+- [x] a more explicit iterative loop with a clearer stopping criterion:
   - [x] briefing
-  - [x] geração
+  - [x] generation
   - [x] render
-  - [x] QA visual
-  - [x] crítica
-  - [x] revisão opcional
-  - [x] nova iteração
-- [x] exemplos e docs melhores da camada AI opcional
+  - [x] visual QA
+  - [x] critique
+  - [x] optional revision
+  - [x] new iteration
+- [x] better examples and docs for the optional AI layer
 
-### 8.3. Direção decidida para prompts livres e providers model-backed
+### 8.3. Decided direction for free prompts and model-backed providers
 
-- [x] `ai_first` passa a ser o caminho principal para `intent_text` / prompt livre
-- [x] a heurística não deve ser o caminho padrão quando o objetivo for autoria por IA
-- [x] a heurística permanece como fallback de segurança, não como trajetória principal
-- [x] quando `provider_name` não for informado em prompt livre, o app deve preferir um provider model-backed (`local_service` no backend)
-- [x] no playground, providers model-backed devem aparecer como caminho preferencial de uso
-- [x] `ollama_local` passa a existir como provider first-class no app
-- [x] `ollama_local` precisa permitir listar modelos disponíveis e selecionar explicitamente um deles
+- [x] `ai_first` becomes the main path for `intent_text` / free prompt
+- [x] heuristics should not be the default path when the goal is AI authorship
+- [x] heuristics remain a safety fallback, not the primary trajectory
+- [x] when `provider_name` is not informed for a free prompt, the app should prefer a model-backed provider (`local_service` on the backend)
+- [x] in the playground, model-backed providers should appear as the preferred path
+- [x] `ollama_local` now exists as a first-class provider in the app
+- [x] `ollama_local` must allow listing available models and explicitly selecting one of them
 
-Evoluções que ainda valem depois desta decisão:
+Evolutions that still matter after this decision:
 
-- [x] medir a taxa de fallback heurístico por provider/modelo
-- [x] benchmark comparativo entre `ollama_local` e `local_service` para prompts livres
-- [x] endurecer ainda mais o repair loop antes do fallback heurístico
+- [x] measure heuristic fallback rate by provider/model
+- [x] comparative benchmark between `ollama_local` and `local_service` for free prompts
+- [x] harden the repair loop even further before heuristic fallback
 
-### 8.4. Hardening universal de qualidade AI sem overfitting por tipo de deck
+### 8.4. Universal AI quality hardening without overfitting by deck type
 
-Direção decidida para não perder o raciocínio:
+Decided direction so the reasoning is not lost:
 
-- [x] priorizar **sinais universais de qualidade** em vez de hacks específicos para um único tipo de deck
-- [x] evitar overfitting de entrevista / board / sales como solução principal
-- [x] melhorar a qualidade por meio de **guardrails generalizáveis** de narrativa, evidência, consistência de idioma e anti-template leakage
+- [x] prioritize **universal quality signals** instead of hacks for a single deck type
+- [x] avoid overfitting interview / board / sales as the main solution
+- [x] improve quality through **generalizable guardrails** for narrative, evidence, language consistency, and anti-template leakage
 
-Princípios universais que valem para muitos decks:
+Universal principles that apply to many decks:
 
-- [x] bloquear vazamento de scaffolding/template copy no output final
-  - [x] evitar textos default como `Executive lens`, `What matters`, `Key takeaways`, `Next actions`, `Candidate Name`
-  - [x] evitar labels técnicos/placeholder gritados no artefato final quando faltarem imagens
-- [x] reforçar **specificity over template feel**
-  - [x] títulos e bullets devem reutilizar o vocabulário do briefing
-  - [x] claims fortes devem vir acompanhados de alguma forma de evidência
-- [x] reforçar **evidence-bearing structures**
-  - [x] quando houver claims de impacto/capacidade/valor, preferir métricas, chart, tabela, comparison, timeline, case cards ou detalhe operacional concreto
-- [x] bloquear **pseudo-métricas qualitativas fracas**
-  - [x] exemplos: `Alta`, `Otimizada`, `Contínua`, `Strong`, `Optimized`, `Accelerated`
-- [x] manter consistência de idioma no output final
-  - [x] se o briefing está em PT-BR, evitar rótulos soltos em inglês sem necessidade
-- [x] pensar em arquétipos amplos de deck, não hacks estreitos
+- [x] block scaffolding/template-copy leakage in the final output
+  - [x] avoid default text like `Executive lens`, `What matters`, `Key takeaways`, `Next actions`, `Candidate Name`
+  - [x] avoid loud technical/placeholder labels in the final artifact when images are missing
+- [x] reinforce **specificity over template feel**
+  - [x] titles and bullets should reuse the vocabulary of the briefing
+  - [x] strong claims should be accompanied by some form of evidence
+- [x] reinforce **evidence-bearing structures**
+  - [x] when there are claims of impact/capability/value, prefer metrics, chart, table, comparison, timeline, case cards, or concrete operational detail
+- [x] block **weak qualitative pseudo-metrics**
+  - [x] examples: `High`, `Optimized`, `Continuous`, `Strong`, `Accelerated`
+- [x] keep output language consistent
+  - [x] if the briefing is in PT-BR, avoid stray English labels unless truly needed
+- [x] think in terms of broad deck archetypes, not narrow hacks
   - [x] decision deck
   - [x] review deck
   - [x] strategy deck
@@ -394,20 +394,19 @@ Princípios universais que valem para muitos decks:
   - [x] proposal deck
   - [x] operating deck
 
-Backlog derivado desta linha:
+Derived backlog from this direction:
 
-- [x] adicionar guardrails universais no contrato/prompt para anti-template leakage e consistência de idioma
-- [x] endurecer o quality gate para detectar scaffolding copy e métricas qualitativas fracas
-- [x] reduzir textos default do renderer que poluem o deck final
-- [x] medir “specificity score” mais explicitamente no quality gate
-- [x] medir “claim sem prova” de forma mais robusta
-- [x] transformar os domínios atuais em arquétipos narrativos mais amplos e reaproveitáveis
+- [x] add universal guardrails in the contract/prompt for anti-template leakage and language consistency
+- [x] harden the quality gate to detect scaffolding copy and weak qualitative metrics
+- [x] reduce renderer default text that pollutes the final deck
+- [x] measure “claim without proof” more robustly
+- [x] transform the current domains into broader, more reusable narrative archetypes
 
-Detalhamento do que entrou nesta iteração:
+Details of what entered in this iteration:
 
-- [x] `specificity score` v1 baseado em cobertura ponderada de vocabulário do briefing no payload final
-- [x] detecção v1 de `claim sem prova` considerando pressão de claims vs slides/strings com evidência
-- [x] introdução de arquétipos narrativos amplos reutilizáveis:
+- [x] `specificity score` v1 based on weighted coverage of briefing vocabulary in the final payload
+- [x] v1 detection of `claim without proof` considering claim pressure vs slides/strings with evidence
+- [x] introduction of broad reusable narrative archetypes:
   - [x] `decision`
   - [x] `review`
   - [x] `strategy`
@@ -415,661 +414,661 @@ Detalhamento do que entrou nesta iteração:
   - [x] `proposal`
   - [x] `operating`
 
-O que ainda pode evoluir depois disso:
+What can still evolve after that:
 
-- [x] calibrar thresholds do `specificity score` com benchmark maior por provider/modelo
-- [x] sofisticar a detecção de `claim sem prova` para usar relações slide-a-slide e não só heurística textual/estrutural
-- [x] usar arquétipos também no loop de refine/review para orientar regeneração e crítica
-
----
-
-## 4. Ordem recomendada de execução daqui para frente
-
-### Agora
-
-1. tornar preview real / regressão visual mais oficial no pipeline
-2. fortalecer detectores de clipping/collision/overflow
-3. fazer polish dos layouts mais sensíveis
-
-### Em seguida
-
-4. melhorar playground e fluxo de edição/review/export
-5. evoluir brand packs / assets / placeholders
-6. melhorar docs visuais e prova de qualidade
-
-### Depois
-
-7. release/distribuição mais madura
-8. editor visual leve
-9. IA iterativa mais forte
+- [x] calibrate `specificity score` thresholds with a larger benchmark by provider/model
+- [x] make `claim without proof` detection more sophisticated using slide-to-slide relationships, not only textual/structural heuristics
+- [x] use archetypes in the refine/review loop as well to guide regeneration and critique
 
 ---
 
-## 5. Critério para considerar o app “incrível”
+## 4. Recommended execution order from here forward
 
-Podemos considerar que o app atingiu esse nível quando:
+### Now
 
-- [x] o preview/regressão usa o artefato final com confiança alta
-- [x] os principais layouts saem quase sem retoque manual
-- [x] o review aponta primeiro os slides realmente arriscados
-- [x] o playground permite iteração rápida sem dor
-- [x] novos decks podem ser gerados por template/workflow sem mexer em código
-- [x] a documentação visual prova a qualidade do resultado
-- [x] o app pode ser reutilizado como library, CLI ou service com pouco atrito
+1. make real preview / visual regression more official in the pipeline
+2. strengthen clipping/collision/overflow detectors
+3. polish the most sensitive layouts
 
----
+### Next
 
-## 6. Próximo ciclo recomendado
+4. improve the playground and the edit/review/export flow
+5. evolve brand packs / assets / placeholders
+6. improve visual docs and proof of quality
 
-Se o próximo ciclo for curto e de máximo impacto, a recomendação é:
+### Later
 
-### Sprint sugerida
-
-1. `fail-on-regression` + baseline promotion workflow
-2. detectores visuais mais fortes para preview final
-3. polish de `comparison`, `two_column`, `summary` e `table`
-4. README com galeria visual + docs de preview/regressão
-5. melhorias de UX no playground para review/export
-
-Esse é o caminho com maior chance de transformar o app de “forte tecnicamente” em **muito forte também na percepção de produto**.
+7. more mature release/distribution
+8. lightweight visual editor
+9. stronger iterative AI
 
 ---
 
-## 7. Programa longo para fechar o backlog histórico remanescente
+## 5. Criterion for considering the app “amazing”
 
-Os itens ainda abertos no anexo histórico **não são todos independentes**: parte deles é duplicação de itens-pai antigos, e parte é trabalho técnico real ainda não concluído.
+We can consider the app to have reached that level when:
 
-Para atacar **literalmente tudo** de forma honesta, o caminho correto é este programa em etapas:
-
-### Etapa 1 — Consolidação final do motor de layout
-
-- consolidar primitives reutilizáveis de mais alto nível para `stack`, `grid`, `panel row` e composições mistas
-- substituir mais coordenadas rígidas restantes por constraints/layout semântico
-- criar stacks/rows/columns realmente reutilizáveis para reduzir drift entre layouts semelhantes
-- fechar a lacuna restante entre primitives já existentes e uma biblioteca interna de composição mais uniforme
-
-### Etapa 2 — Balanceamento, auto-fit e prevenção forte de overflow
-
-- expandir balanceamento para regras mais fortes e consistentes em todo o sistema
-- reforçar o balanceamento automático de alturas/colunas em todos os layouts compostos relevantes
-- fechar os últimos gaps de auto-fit real por caixa/bloco nas regiões ainda mais frágeis
-- adicionar prevenção mais forte de overflow visual antes da etapa final de preview
-
-### Etapa 3 — Convergência total para preview/regressão do artefato real
-
-- tornar a comparação baseada preferencialmente em preview do `.pptx` real o comportamento dominante em todos os fluxos históricos equivalentes
-- eliminar ambiguidades restantes entre caminhos sintéticos e caminhos baseados no artefato final
-- fechar os itens-pai históricos restantes de preview/regressão assim que a convergência estiver completa e comprovada
-
-### Etapa 4 — Biblioteca visual e pipeline de imagem mais inteligente
-
-- criar uma biblioteca de componentes visuais reutilizáveis acima dos helpers atuais
-- expandir a estratégia de crop/focal point para mais layouts e regras contextuais
-- evoluir “crop mais inteligente” de recurso pontual para comportamento sistêmico do renderer
-
-### Etapa 5 — Expansão e hardening mais profundo da camada AI opcional
-
-- adicionar providers/integrações adicionais quando houver boundary estável para isso
-- endurecer ainda mais a infraestrutura de runtime/provider, observabilidade e previsibilidade operacional
-- fechar o backlog histórico remanescente da camada AI sem misturar isso com o core renderer
-
-### Critério de fechamento desse programa
-
-Esse programa só deve ser considerado concluído quando:
-
-- os itens-pai históricos restantes puderem ser marcados sem ambiguidade
-- os itens técnicos remanescentes tiverem evidência em código + teste + comportamento real
-- o anexo histórico puder ser lido mais como registro preservado do que como backlog ativo
+- [x] preview/regression uses the final artifact with high confidence
+- [x] the main layouts come out with almost no manual touch-up
+- [x] review surfaces the truly risky slides first
+- [x] the playground enables fast iteration without pain
+- [x] new decks can be generated by template/workflow without touching code
+- [x] the visual documentation proves output quality
+- [x] the app can be reused as a library, CLI, or service with low friction
 
 ---
 
-## Anexo A — Histórico preservado do roadmap anterior
+## 6. Recommended next cycle
 
-Este anexo preserva o conteúdo histórico do `NEXT_STEPS` anterior para que as fases já pensadas e o acompanhamento do que foi concluído **não se percam**.
+If the next cycle is short and aimed at maximum impact, the recommendation is:
+
+### Suggested sprint
+
+1. `fail-on-regression` + baseline-promotion workflow
+2. stronger visual detectors for final preview
+3. polish `comparison`, `two_column`, `summary`, and `table`
+4. README with visual gallery + preview/regression docs
+5. UX improvements in the playground for review/export
+
+This is the path with the best chance of turning the app from “technically strong” into **very strong in product perception too**.
 
 ---
 
-### A.1. Estado do projeto na visão anterior
+## 7. Long program to close the remaining historical backlog
 
-Na versão anterior do roadmap, o projeto já era entendido como uma base muito boa, com:
+The items still open in the historical appendix **are not all independent**: part of them duplicates older parent items, and part is real technical work that is not yet completed.
 
-- módulo Python reutilizável
-- CLI para validação e renderização
-- schema com `pydantic`
-- renderização `.pptx` com `python-pptx`
-- tema inicial premium
-- layouts principais de slides
-- suporte a speaker notes
-- exemplo funcional de deck
+To tackle **literally everything** honestly, the correct path is this staged program:
+
+### Stage 1 — Final consolidation of the layout engine
+
+- consolidate higher-level reusable primitives for `stack`, `grid`, `panel row`, and mixed compositions
+- replace more of the remaining rigid coordinates with semantic constraints/layout
+- create truly reusable stacks/rows/columns to reduce drift between similar layouts
+- close the remaining gap between already existing primitives and a more uniform internal composition library
+
+### Stage 2 — Balancing, auto-fit, and strong overflow prevention
+
+- expand balancing into stronger, more consistent rules across the whole system
+- reinforce automatic balancing of heights/columns across all relevant composed layouts
+- close the last gaps in real box/block auto-fit in the most fragile remaining regions
+- add stronger visual overflow prevention before the final preview stage
+
+### Stage 3 — Full convergence to real-artifact preview/regression
+
+- make comparison based preferentially on preview from the real `.pptx` the dominant behavior in all equivalent historical flows
+- eliminate remaining ambiguities between synthetic paths and final-artifact-based paths
+- close the remaining historical parent items for preview/regression as soon as convergence is complete and proven
+
+### Stage 4 — Visual library and smarter image pipeline
+
+- create a library of reusable visual components above the current helpers
+- expand the crop/focal-point strategy to more layouts and contextual rules
+- evolve “smarter crop” from a point feature into systemic renderer behavior
+
+### Stage 5 — Deeper expansion and hardening of the optional AI layer
+
+- add more providers/integrations when a stable boundary exists for that
+- harden runtime/provider infrastructure, observability, and operational predictability even further
+- close the remaining historical backlog of the AI layer without mixing it with the core renderer
+
+### Criterion for closing this program
+
+This program should only be considered complete when:
+
+- the remaining historical parent items can be marked without ambiguity
+- the remaining technical items have evidence in code + tests + real behavior
+- the historical appendix can be read more as a preserved record than as an active backlog
+
+---
+
+## Appendix A — Preserved history of the previous roadmap
+
+This appendix preserves the historical content of the previous `NEXT_STEPS` so that the phases that had already been envisioned and the tracking of what was completed **are not lost**.
+
+---
+
+### A.1. Project state in the previous view
+
+In the previous version of the roadmap, the project was already understood as a very good foundation, with:
+
+- reusable Python module
+- CLI for validation and rendering
+- schema with `pydantic`
+- `.pptx` rendering with `python-pptx`
+- initial premium theme
+- main slide layouts
+- speaker notes support
+- a functional deck example
 - Dockerfile
-- testes rápidos
+- fast tests
 
-Leitura central daquela fase:
+Main takeaway from that phase:
 
-> já existia um **MVP técnico funcional**, e o foco passava a ser endurecer a base e elevar o nível de profissionalismo.
-
----
-
-### A.2. Visão de produto preservada
-
-Visão sugerida no roadmap anterior:
-
-> Um renderizador de apresentações em Python, leve e desacoplado, capaz de transformar conteúdo estruturado em decks executivos visualmente consistentes, com qualidade suficiente para uso interno, consultivo e comercial.
-
-Pontos de princípio preservados:
-
-- o `ppt_creator` não precisa virar um framework gigante
-- ele deve ser um **motor confiável de geração de decks**
-- o JSON estruturado continua sendo a interface principal
-- LLM/IA entra como camada opcional, não como dependência do núcleo
+> there was already a **functional technical MVP**, and the focus then shifted to hardening the foundation and raising the level of professionalism.
 
 ---
 
-### A.3. Princípios de qualidade preservados
+### A.2. Preserved product vision
 
-#### Engenharia
+Vision suggested in the previous roadmap:
 
-- API simples e previsível
-- baixo acoplamento
-- testes rápidos e confiáveis
-- versionamento claro
-- comportamento reprodutível
+> A lightweight, decoupled presentation renderer in Python, capable of turning structured content into visually consistent executive decks, with enough quality for internal, consulting, and commercial use.
+
+Preserved guiding points:
+
+- `ppt_creator` does not need to become a giant framework
+- it should be a **reliable deck-generation engine**
+- structured JSON remains the main interface
+- LLM/AI enters as an optional layer, not as a core dependency
+
+---
+
+### A.3. Preserved quality principles
+
+#### Engineering
+
+- simple, predictable API
+- low coupling
+- fast and reliable tests
+- clear versioning
+- reproducible behavior
 
 #### Design
 
-- consistência entre slides
-- sistema de tokens claro
-- layouts equilibrados
-- boa hierarquia tipográfica
-- qualidade visual sem depender de assets proprietários
+- consistency across slides
+- clear token system
+- balanced layouts
+- good typographic hierarchy
+- visual quality without depending on proprietary assets
 
-#### Produto
+#### Product
 
-- fácil de rodar localmente
-- fácil de rodar via Docker
-- fácil de copiar para outro projeto
-- documentação objetiva
-- exemplos reais e úteis
-- escopo claro e independente do playground legado
+- easy to run locally
+- easy to run via Docker
+- easy to copy into another project
+- objective documentation
+- real and useful examples
+- clear scope independent of the legacy playground
 
-#### Operação
+#### Operations
 
-- mensagens de erro boas
-- inputs válidos e inválidos bem tratados
-- outputs previsíveis
-- fácil automação em pipeline
-
----
-
-### A.4. Roadmap histórico por fases
-
-## Fase 0 — Hardening do MVP
-
-Objetivo histórico: deixar a base estável, limpa e pronta para crescer.
-
-#### Status preservado
-
-- [x] normalizar nomes de tema e campos textuais no schema
-- [x] melhorar mensagens de erro da CLI
-- [x] validar arquivo de entrada inexistente com erro claro
-- [x] validar extensão de saída `.pptx`
-- [x] adicionar testes rápidos para validações e erros comuns
-- [x] revisar a API pública do pacote
-- [x] padronizar nomes de funções, classes e arquivos
-- [x] adicionar testes de regressão mínimos para todos os layouts
-- [x] documentar melhor limitações restantes da Fase 0
-
-#### Entregas preservadas
-
-- [x] revisar a API pública do pacote
-- [x] padronizar nomes de funções, classes e arquivos
-- [x] revisar mensagens de erro da CLI
-- [x] melhorar validações do schema
-- [x] revisar tratamento de caminhos de imagem e output
-- [x] adicionar testes de regressão mínimos para cada layout
-- [x] documentar melhor limitações conhecidas
-
-#### Itens concretos preservados
-
-- [x] garantir comportamento consistente entre tipos de slide
-- [x] validar limites úteis por tipo de conteúdo
-  - [x] quantidade máxima recomendada de bullets
-  - [x] quantidade esperada de métricas
-  - [x] campos obrigatórios por tipo
-- [x] melhorar o fallback de imagem ausente
-- [x] revisar geração de notes para evitar edge cases
-- [x] padronizar strings de tema e nomes internos
-
-Resultado histórico esperado: o projeto deixava de ser “protótipo promissor” e passava a ser um **MVP sólido**.
+- good error messages
+- valid and invalid inputs handled well
+- predictable outputs
+- easy pipeline automation
 
 ---
 
-## Fase 1 — Design System de verdade
+### A.4. Historical roadmap by phases
 
-Objetivo histórico: elevar a qualidade visual e tornar o tema realmente reutilizável.
+## Phase 0 — MVP hardening
 
-#### Status preservado
+Historical objective: make the foundation stable, clean, and ready to grow.
 
-- [x] expandir tokens com grupos de spacing e components
-- [x] criar primeiras variantes de layout reutilizáveis
-- [x] formalizar grid/layout base de forma mais abrangente
-- [x] criar helpers adicionais para blocos visuais recorrentes
-- [x] revisar proporções e alinhamentos slide a slide
+#### Preserved status
 
-#### Entregas preservadas
+- [x] normalize theme names and text fields in the schema
+- [x] improve CLI error messages
+- [x] validate nonexistent input file with a clear error
+- [x] validate `.pptx` output extension
+- [x] add fast tests for validations and common errors
+- [x] review the package public API
+- [x] standardize function, class, and file names
+- [x] add minimum regression tests for all layouts
+- [x] better document remaining Phase 0 limitations
 
-- [x] expandir tokens visuais
-- [x] formalizar grid/layout base
-- [x] criar regras consistentes de spacing
-- [x] criar componentes visuais reutilizáveis
-- [x] reduzir diferenças visuais entre layouts
+#### Preserved deliverables
 
-#### Itens concretos preservados
+- [x] review the package public API
+- [x] standardize function, class, and file names
+- [x] review CLI error messages
+- [x] improve schema validation
+- [x] review handling of image and output paths
+- [x] add minimum regression tests for each layout
+- [x] better document known limitations
 
-- [x] separar melhor tokens de:
-  - [x] cores
-  - [x] tipografia
+#### Preserved concrete items
+
+- [x] ensure consistent behavior across slide types
+- [x] validate useful limits by content type
+  - [x] recommended maximum bullet count
+  - [x] expected metric count
+  - [x] required fields by type
+- [x] improve missing-image fallback
+- [x] review notes generation to avoid edge cases
+- [x] standardize theme strings and internal names
+
+Expected historical outcome: the project stopped being a “promising prototype” and became a **solid MVP**.
+
+---
+
+## Phase 1 — A real design system
+
+Historical objective: raise visual quality and make the theme truly reusable.
+
+#### Preserved status
+
+- [x] expand tokens with spacing groups and components
+- [x] create the first reusable layout variants
+- [x] formalize the base grid/layout more broadly
+- [x] create additional helpers for recurring visual blocks
+- [x] review proportions and alignment slide by slide
+
+#### Preserved deliverables
+
+- [x] expand visual tokens
+- [x] formalize the base grid/layout
+- [x] create consistent spacing rules
+- [x] create reusable visual components
+- [x] reduce visual differences between layouts
+
+#### Preserved concrete items
+
+- [x] separate tokens more clearly for:
+  - [x] colors
+  - [x] typography
   - [x] spacing
   - [x] grid
   - [x] cards
-  - [x] métricas
-  - [x] imagem/placeholder
-- [x] definir áreas seguras por slide
-- [x] criar helpers para:
-  - [x] título padrão
-  - [x] eyebrow padrão
-  - [x] footer padrão
-  - [x] painéis/cartões padrão
-  - [x] blocos de quote
-- [x] revisar proporções e alinhamentos slide a slide
-- [x] criar variantes para layouts-chave
-  - [x] bullets: “left text / right insight” e “full-width bullets”
-  - [x] metrics: “3 KPIs” e “4 KPIs compactos”
-  - [x] image_text: “image right” e “image left”
+  - [x] metrics
+  - [x] image/placeholder
+- [x] define safe areas per slide
+- [x] create helpers for:
+  - [x] default title
+  - [x] default eyebrow
+  - [x] default footer
+  - [x] default panels/cards
+  - [x] quote blocks
+- [x] review proportions and alignment slide by slide
+- [x] create variants for key layouts
+  - [x] bullets: “left text / right insight” and “full-width bullets”
+  - [x] metrics: “3 KPIs” and “4 compact KPIs”
+  - [x] image_text: “image right” and “image left”
 
-Resultado histórico esperado: o projeto ganhava um **design system interno real**.
+Expected historical outcome: the project gained a **real internal design system**.
 
-#### Aprofundamento de design/layout preservado
+#### Preserved design/layout deepening
 
-- [x] substituir coordenadas mais rígidas por primitives de layout e constraints semânticas
-  - [x] primeira primitive utilitária para bounds internos de painéis e distribuição vertical de regiões
-  - [x] primeira aplicação dessas primitives em layouts compostos (`comparison`, `faq`, `cards`, `two_column`)
-  - [x] distribuição horizontal reutilizável para rows/columns, aplicada em `metrics`, `cards` e `table`
-  - [x] composição simples de grids multi-painel aplicada em `comparison`, `two_column`, `faq` e `summary`
-  - [x] primeiros helpers mais semânticos reaproveitados em múltiplos layouts
-  - [x] expandir primitives para stacks/rows/columns semânticos de uso geral
-  - [x] primeira stack vertical guiada por conteúdo aplicada em regiões narrativas mistas
-  - [x] expansão inicial dessas stacks/weights para `agenda`, `bullets` e `closing`
-  - [x] primeira expansão adicional para `title`, `section`, `chart` e `timeline`
-  - [x] primeira camada explícita de constraints semânticas com `target_share`, `max_width` e `max_height`
-  - [x] expandir stacks semânticas reutilizáveis para mais layouts e regiões internas
-  - [x] consolidar helpers nomeados de layout/painel estruturado para reduzir wiring manual de bounds em layouts reais
-- [x] criar stacks/rows/columns reutilizáveis para reduzir desalinhamentos entre layouts
-  - [x] primeira camada prática de APIs nomeadas para columns/rows/panel rows aplicada em layouts executivos reais
-  - [x] nova adoção em layouts narrativos (`agenda`, `bullets`, `image_text`) reduzindo drift de composição entre famílias semelhantes
-- [x] adicionar auto-fit tipográfico e controle de overflow por bloco
-  - [x] primeira camada de auto-fit em títulos, subtitles e caixas homogêneas críticas
-  - [x] expansão inicial para layouts com maior risco de overflow (`agenda`, `metrics`, `faq`, `table`, `image_text`)
-  - [x] expansão adicional para `title`, `section`, `chart` e `timeline`
-  - [x] expandir auto-fit para todos os layouts e blocos compostos
-- [x] balancear melhor colunas, cards e painéis quando o conteúdo variar
-  - [x] primeira camada de balanceamento adaptativo por peso de conteúdo em layouts executivos chave
-  - [x] avanço adicional com panel-grids/rows constrained em `metrics`, `comparison`, `faq` e `summary`
-  - evolução futura preservada: expandir balanceamento para heurísticas ainda mais fortes e consistentes em todo o sistema
-- [x] formalizar baseline vertical e anchors consistentes por tipo de slide
-- [x] revisar visualmente, slide a slide, `title`, `metrics`, `comparison`, `table`, `faq`, `summary` e `closing`
+- [x] replace more rigid coordinates with layout primitives and semantic constraints
+  - [x] first utility primitive for panel inner bounds and vertical distribution of regions
+  - [x] first application of those primitives in composed layouts (`comparison`, `faq`, `cards`, `two_column`)
+  - [x] reusable horizontal distribution for rows/columns, applied in `metrics`, `cards`, and `table`
+  - [x] simple multi-panel grid composition applied in `comparison`, `two_column`, `faq`, and `summary`
+  - [x] first higher-level semantic helpers reused across multiple layouts
+  - [x] expand primitives to semantic stacks/rows/columns for general use
+  - [x] first content-guided vertical stack applied in mixed narrative regions
+  - [x] initial expansion of those stacks/weights to `agenda`, `bullets`, and `closing`
+  - [x] first additional expansion to `title`, `section`, `chart`, and `timeline`
+  - [x] first explicit semantic-constraint layer with `target_share`, `max_width`, and `max_height`
+  - [x] expand reusable semantic stacks to more layouts and internal regions
+  - [x] consolidate named layout / structured-panel helpers to reduce manual bounds wiring in real layouts
+- [x] create reusable stacks/rows/columns to reduce misalignment across layouts
+  - [x] first practical layer of named APIs for columns/rows/panel rows applied in real executive layouts
+  - [x] new adoption in narrative layouts (`agenda`, `bullets`, `image_text`) reducing composition drift across similar families
+- [x] add typographic auto-fit and overflow control by block
+  - [x] first auto-fit layer in titles, subtitles, and critical homogeneous boxes
+  - [x] initial expansion to layouts with higher overflow risk (`agenda`, `metrics`, `faq`, `table`, `image_text`)
+  - [x] additional expansion to `title`, `section`, `chart`, and `timeline`
+  - [x] expand auto-fit to all layouts and composed blocks
+- [x] balance columns, cards, and panels better when content varies
+  - [x] first layer of adaptive balancing by content weight in key executive layouts
+  - [x] additional progress with constrained panel-grids/rows in `metrics`, `comparison`, `faq`, and `summary`
+  - future evolution preserved: expand balancing to even stronger, more consistent heuristics across the system
+- [x] formalize vertical baselines and consistent anchors by slide type
+- [x] visually review, slide by slide, `title`, `metrics`, `comparison`, `table`, `faq`, `summary`, and `closing`
 
 ---
 
-## Fase 2 — Productização e experiência de desenvolvedor
+## Phase 2 — Productization and developer experience
 
-Objetivo histórico: fazer o projeto parecer e funcionar como uma ferramenta séria.
+Historical objective: make the project look and work like a serious tool.
 
-#### Status preservado
+#### Preserved status
 
-- [x] definir estratégia inicial de versionamento semântico
-- [x] criar `CHANGELOG.md`
-- [x] adicionar `Makefile` com comandos principais
-- [x] adicionar lint/format com Ruff
-- [x] configurar CI simples
-- [x] adicionar mais exemplos de entrada
-- [x] melhorar README com fluxos de uso e DX
-- [x] restringir lint/CI ao escopo do subprojeto `ppt_creator`
+- [x] define an initial semantic versioning strategy
+- [x] create `CHANGELOG.md`
+- [x] add `Makefile` with main commands
+- [x] add lint/format with Ruff
+- [x] configure simple CI
+- [x] add more input examples
+- [x] improve the README with usage flows and DX
+- [x] restrict lint/CI to the `ppt_creator` subproject scope
 
-#### Entregas preservadas
+#### Preserved deliverables
 
-- [x] empacotamento melhor
-- [x] versionamento formal
+- [x] better packaging
+- [x] formal versioning
 - [x] changelog
-- [x] automação de qualidade
-- [x] documentação de uso mais forte
+- [x] quality automation
+- [x] stronger usage documentation
 
-#### Itens concretos preservados
+#### Preserved concrete items
 
-- [x] definir estratégia de versionamento semântico
-- [x] criar `CHANGELOG.md`
-- [x] adicionar `Makefile` com comandos curtos
+- [x] define semantic versioning strategy
+- [x] create `CHANGELOG.md`
+- [x] add `Makefile` with short commands
   - [x] `make install`
   - [x] `make test`
   - [x] `make render-example`
   - [x] `make docker-render`
-- [x] adicionar lint/format com Ruff
-- [x] configurar CI simples para instalar dependências, rodar testes e validar exemplo JSON
-- [x] melhorar README com fluxos de uso
-- [x] adicionar mais exemplos de entrada
-- [x] explicitar o escopo da productização no subprojeto `ppt_creator`
+- [x] add lint/format with Ruff
+- [x] configure simple CI to install dependencies, run tests, and validate a JSON example
+- [x] improve the README with usage flows
+- [x] add more input examples
+- [x] make the scope of productization explicit in the `ppt_creator` subproject
 
-Resultado histórico esperado: qualquer pessoa conseguiria clonar, instalar, testar e usar o projeto com muito menos atrito.
+Expected historical outcome: anyone could clone, install, test, and use the project with far less friction.
 
 ---
 
-## Fase 3 — Expansão funcional útil
+## Phase 3 — Useful functional expansion
 
-Objetivo histórico: aumentar a utilidade prática para uso executivo real.
+Historical objective: increase practical usefulness for real executive use.
 
-#### Entregas preservadas
+#### Preserved deliverables
 
-- novos tipos de slide
-- branding configurável
-- mais flexibilidade sem perder simplicidade
+- new slide types
+- configurable branding
+- more flexibility without losing simplicity
 
-#### Funcionalidades candidatas já concluídas
+#### Candidate features already completed
 
-- [x] tabela executiva
+- [x] executive table
 - [x] agenda / roadmap slide
 - [x] timeline
 - [x] comparison slide
 - [x] two-column narrative slide
 - [x] FAQ / appendix slide
-- [x] summary slide final
+- [x] final summary slide
 - [x] cover variants
 
-#### Branding e configuração preservados
+#### Preserved branding and configuration
 
-- permitir configuração simples por JSON ou arquivo de tema:
-  - [x] cor principal
-  - [x] cor secundária
-  - [x] logo opcional
-  - [x] nome do cliente
-  - [x] rodapé customizado
-- preparar suporte a múltiplos temas:
+- allow simple configuration via JSON or theme file:
+  - [x] primary color
+  - [x] secondary color
+  - [x] optional logo
+  - [x] client name
+  - [x] custom footer
+- prepare support for multiple themes:
   - [x] `executive_premium_minimal`
   - [x] `consulting_clean`
   - [x] `dark_boardroom`
   - [x] `startup_minimal`
 
-Resultado histórico esperado: o `ppt_creator` deixava de ser um gerador para caso único e passava a ser uma **plataforma leve de decks executivos**.
+Expected historical outcome: `ppt_creator` stopped being a single-case generator and became a **lightweight executive deck platform**.
 
 ---
 
-## Fase 4 — Robustez para uso em pipeline
+## Phase 4 — Robustness for pipeline use
 
-Objetivo histórico: preparar o projeto para uso recorrente e embutido em fluxos maiores.
+Historical objective: prepare the project for recurring use and for embedding in larger flows.
 
-#### Entregas preservadas
+#### Preserved deliverables
 
-- execução batch
-- validação mais forte
-- outputs auxiliares
-- previsibilidade operacional
+- batch execution
+- stronger validation
+- auxiliary outputs
+- operational predictability
 
-#### Itens concretos preservados
+#### Preserved concrete items
 
-- [x] suportar renderização em lote
-- [x] emitir logs mais claros
-- [x] adicionar modo `--check` / `--dry-run`
-- [x] gerar relatório simples de renderização
-- [x] validar assets ausentes com warnings úteis
-- [x] suportar diretórios de input/output configuráveis
-- [x] permitir templates de deck por domínio
-  - [x] vendas
-  - [x] consultoria
-  - [x] estratégia
-  - [x] produto
+- [x] support batch rendering
+- [x] emit clearer logs
+- [x] add `--check` / `--dry-run` mode
+- [x] generate a simple render report
+- [x] validate missing assets with useful warnings
+- [x] support configurable input/output directories
+- [x] allow domain-based deck templates
+  - [x] sales
+  - [x] consulting
+  - [x] strategy
+  - [x] product
 
-#### Bloco prioritário histórico de pipeline visual
+#### Preserved historical priority block for the visual pipeline
 
-- [x] melhorar a folha de thumbnails com composição mais legível e metadados por slide
-- [x] adicionar overlays opcionais de debug para grid e safe areas no preview sintético
-- [x] adicionar revisão heurística inicial de qualidade visual no relatório de preview
-- [x] enriquecer a thumbnail sheet com sinais de risco vindos do review heurístico
-- [x] expor revisão heurística dedicada via CLI/API para QA do deck
-- [x] reaproveitar revisão heurística em relatórios de preview e render/dry-run
-- [x] preparar seleção de backend com tentativa de preview via runtime Office e fallback limpo para o sintético
+- [x] improve the thumbnail sheet with more readable composition and per-slide metadata
+- [x] add optional debug overlays for grid and safe areas in the synthetic preview
+- [x] add initial heuristic visual-quality review in the preview report
+- [x] enrich the thumbnail sheet with risk signals coming from heuristic review
+- [x] expose dedicated heuristic review via CLI/API for deck QA
+- [x] reuse heuristic review in preview reports and render/dry-run reports
+- [x] prepare backend selection with Office-runtime preview attempts and clean fallback to synthetic preview
 
-##### Preview real / regressão — histórico preservado
+##### Real preview / regression — preserved history
 
-- [x] gerar preview a partir do `.pptx` real em vez de reconstrução paralela em Pillow
-  - [x] primeiro fluxo explícito de preview a partir de `.pptx` real via CLI/API
-  - [x] fallback mais robusto quando o Office não exporta um PNG por slide diretamente (`.pptx` -> `.pdf` -> PNG por página)
-  - [x] integração inicial desse caminho ao fluxo principal de render, preferindo o artefato final quando possível
-  - [x] camada opcional de geração/preview passou a preferir automaticamente o `.pptx` final em mais cenários
-  - [x] evoluir para usar isso como caminho preferencial em mais cenários de QA/regressão
-  - [x] primeiro fluxo explícito de review QA direto sobre `.pptx` renderizado
-- [x] adicionar regressão visual baseada em previews reais/golden files
-  - [x] primeira camada de comparação contra golden previews com diffs opcionais
-  - [x] caminhos opcionais com `render-pptx` + baseline passaram a favorecer preview real quando disponível
-  - [x] primeiro fluxo dedicado para comparar duas versões `.pptx` via previews reais e diff automático
-  - [x] evoluir para comparação baseada preferencialmente em preview do `.pptx` real
-- [x] criar detectores mais fortes de colisão, overflow e clipping
-  - [x] primeira camada heurística de risco de overflow e desbalanceamento exposta no review/QA
-  - [x] sumarização de slides mais arriscados e sinais de clipping/overflow em relatórios de QA
-  - [x] primeira análise de artefatos no próprio preview (edge contact / edge density)
-  - [x] nova camada de sinais baseados no corpo útil do preview (safe-area intrusion, footer-boundary crowding, unsafe corner density)
-  - [x] primeira camada de sinais de layout-pressure/collision aproximando regiões reais de composição por tipo de slide
-  - [x] evoluir para detectores mais próximos de colisão/clipping real com base em preview/layout final
+- [x] generate preview from the real `.pptx` instead of a parallel reconstruction in Pillow
+  - [x] first explicit flow for preview from real `.pptx` via CLI/API
+  - [x] more robust fallback when Office does not export one PNG per slide directly (`.pptx` -> `.pdf` -> PNG per page)
+  - [x] initial integration of that path into the main render flow, preferring the final artifact whenever possible
+  - [x] optional generation/preview layer began automatically preferring the final `.pptx` in more scenarios
+  - [x] evolve this into the preferred path in more QA/regression scenarios
+  - [x] first explicit QA review flow directly on rendered `.pptx`
+- [x] add visual regression based on real previews / golden files
+  - [x] first layer of comparison against golden previews with optional diffs
+  - [x] optional `render-pptx` + baseline paths began favoring real preview when available
+  - [x] first dedicated flow to compare two `.pptx` versions via real previews and automatic diff
+  - [x] evolve toward preferential comparison based on preview from the real `.pptx`
+- [x] create stronger collision, overflow, and clipping detectors
+  - [x] first heuristic layer of overflow and imbalance risk exposed in review/QA
+  - [x] summaries of the riskiest slides and clipping/overflow signals in QA reports
+  - [x] first artifact analysis on the preview itself (edge contact / edge density)
+  - [x] new layer of signals based on the useful preview body (safe-area intrusion, footer-boundary crowding, unsafe-corner density)
+  - [x] first layer of layout-pressure/collision signals approximating real composition regions by slide type
+  - [x] evolve toward detectors closer to real collision/clipping based on final preview/layout
 
-Resultado histórico esperado: o projeto ficava pronto para funcionar como **bloco de infraestrutura** dentro de outros sistemas.
-
----
-
-## Fase 5 — Camada inteligente opcional
-
-Objetivo histórico: adicionar inteligência sem acoplar o núcleo ao LLM.
-
-#### Direção importante preservada
-
-O núcleo do projeto deveria continuar sendo:
-
-> conteúdo estruturado -> renderização consistente -> `.pptx`
-
-Qualquer camada de IA deveria continuar opcional.
-
-#### Possibilidades e avanços preservados
-
-- [x] gerar JSON inicial a partir de briefing estruturado
-- [x] expandir outline em slides estruturados
-- [x] sugerir títulos, bullets e KPIs iniciais a partir do briefing
-- [x] resumir texto longo em conteúdo executivo
-- [x] sugerir imagens ou placeholders automáticos
-- [x] revisar densidade de conteúdo por slide
-- [x] usar LLM para revisão iterativa de narrativa após o primeiro deck ser gerado
-- [x] usar LLM para reescrever títulos, subtitles e summaries em tom mais executivo
-- [x] usar LLM para crítica slide a slide combinando briefing + QA visual
-  - [x] primeira crítica slide a slide heurística derivada do review/QA nos relatórios da camada AI
-  - [x] evoluir para crítica via LLM combinando briefing + QA visual
-
-#### Providers e integrações preservados
-
-- [x] provider local GGUF via `llama.cpp` para experimentar com `PPTAgent`
-- [x] provider local via `Ollama`
-- [x] providers remotos iniciais via `OpenAI` e `Anthropic`
-- [x] endurecer execução local em modo não interativo com timeout e captura opcional de saída bruta
-- [x] adaptar payloads alternativos do PPTAgent local para o schema canônico do `ppt_creator`
-- evolução futura preservada: providers adicionais e hardening mais profundo de cada integração
-
-#### Roadmap IA ainda aberto no histórico
-
-- [x] geração de outline e narrativa a partir de briefing livre
-- [x] reescrita executiva de conteúdo fraco
-- [x] revisão iterativa do deck após renderização e QA
-- [x] manter um loop mais forte: briefing -> estrutura -> render -> QA -> revisão opcional -> nova iteração
-  - [x] primeira integração prática de generate + review + render dentro da CLI opcional de briefing
-  - [x] primeira iteração automática heurística de refine/re-review na CLI opcional
-  - [x] integração inicial de preview visual no pipeline opcional de briefing
-  - [x] integração inicial de preview derivado do `.pptx` renderizado no pipeline opcional de briefing
-  - [x] primeira regeneração automática baseada em feedback heurístico do review
-  - [x] primeira incorporação de feedback vindo também do preview visual ao loop heurístico opcional
-  - [x] evoluir para revisão opcional/regeração iterativa automática mais forte
-
-Resultado histórico esperado: o projeto passava a ter potencial de **copiloto de criação de decks**, sem comprometer a simplicidade do núcleo.
+Expected historical outcome: the project became ready to function as an **infrastructure block** inside other systems.
 
 ---
 
-### A.5. Ordem recomendada de execução preservada
+## Phase 5 — Optional intelligent layer
 
-#### Prioridade alta
+Historical objective: add intelligence without coupling the core to the LLM.
 
-1. **Fase 0 — Hardening do MVP**
-2. **Fase 1 — Design System de verdade**
-3. **Fase 2 — Productização e DX**
+#### Preserved important direction
 
-#### Prioridade média
+The core of the project should continue to be:
 
-4. **Fase 3 — Expansão funcional útil**
-5. **Fase 4 — Robustez para pipeline**
+> structured content -> consistent rendering -> `.pptx`
 
-#### Prioridade futura
+Any AI layer should remain optional.
 
-6. **Fase 5 — Camada inteligente opcional**
+#### Preserved possibilities and progress
 
----
+- [x] generate initial JSON from a structured briefing
+- [x] expand an outline into structured slides
+- [x] suggest initial titles, bullets, and KPIs from the briefing
+- [x] summarize long text into executive content
+- [x] suggest images or automatic placeholders
+- [x] review content density per slide
+- [x] use an LLM for iterative narrative review after the first deck is generated
+- [x] use an LLM to rewrite titles, subtitles, and summaries in a more executive tone
+- [x] use an LLM for slide-by-slide critique combining the briefing + visual QA
+  - [x] first heuristic slide-by-slide critique derived from review/QA in AI-layer reports
+  - [x] evolve toward LLM-driven critique combining the briefing + visual QA
 
-### A.6. Top 10 melhorias de maior impacto preservadas
+#### Preserved providers and integrations
 
-1. refinar visual e grid dos slides atuais
-2. criar mais testes por layout
-3. melhorar documentação de input JSON
-4. adicionar CI
-5. adicionar lint/format
-6. criar 2 ou 3 exemplos adicionais de deck
-7. suportar branding simples por tema/config
-8. adicionar novos layouts executivos essenciais
-9. melhorar fallback de imagens
-10. criar um fluxo de release/versionamento
+- [x] local GGUF provider via `llama.cpp` to experiment with `PPTAgent`
+- [x] local provider via `Ollama`
+- [x] initial remote providers via `OpenAI` and `Anthropic`
+- [x] harden local execution in non-interactive mode with timeout and optional raw-output capture
+- [x] adapt alternative local PPTAgent payloads to the canonical `ppt_creator` schema
+- future evolution preserved: additional providers and deeper hardening of each integration
 
----
+#### AI roadmap still open in the historical record
 
-### A.7. Sinais preservados de que o projeto virou “muito profissional”
+- [x] outline and narrative generation from a free-form briefing
+- [x] executive rewriting of weak content
+- [x] iterative deck review after rendering and QA
+- [x] maintain a stronger loop: briefing -> structure -> render -> QA -> optional review -> new iteration
+  - [x] first practical integration of generate + review + render inside the optional briefing CLI
+  - [x] first automatic heuristic refine/re-review iteration in the optional CLI
+  - [x] initial visual preview integration in the optional briefing pipeline
+  - [x] initial preview integration derived from rendered `.pptx` in the optional briefing pipeline
+  - [x] first automatic regeneration based on heuristic review feedback
+  - [x] first incorporation of feedback also coming from visual preview into the optional heuristic loop
+  - [x] evolve toward a stronger optional automatic iterative review/regeneration loop
 
-- novos decks são criados sem mexer no código-fonte
-- o visual fica consistente em apresentações diferentes
-- o schema impede a maioria dos erros comuns
-- o projeto roda localmente e via Docker sem fricção
-- os testes cobrem o núcleo de forma confiável
-- a documentação permite reuso em outro projeto sem explicação verbal adicional
-- novos temas e layouts podem ser adicionados sem refatorar o núcleo
-
----
-
-### A.8. Backlog estratégico preservado
-
-- [x] exportar preview PNG por slide
-- [x] gerar thumbnails automáticos do deck
-- [x] suportar gráficos simples gerados por dados
-- [x] suportar tabelas executivas com estilo consistente
-- [x] biblioteca de componentes visuais reutilizáveis
-- [x] marketplace interno de temas/layouts
-- [x] integração com workflow de propostas/comercial
-- [x] modo API/serviço
-- [x] editor visual futuro para montar JSON com menos fricção
-
-#### Plano exaustivo de melhoria de máximo impacto preservado
-
-##### Prioridade 1 — Fidelidade de preview e QA visual
-
-- [x] preview gerado a partir do `.pptx`/PDF real
-- [x] thumbnail sheet mais forte para inspeção visual
-- [x] overlays de debug para analisar composição
-- [x] revisão heurística inicial de qualidade
-- [x] comparação visual automática entre versões
-
-##### Prioridade 2 — Refatoração do motor de layout
-
-- [x] primitives de layout (`stack`, `grid`, `two-column`, `panel row`)
-  - [x] primeira base utilitária para inner bounds e distribuição vertical de regiões
-  - [x] primeira aplicação em layouts compostos já existentes
-  - [x] primeira distribuição horizontal reutilizável aplicada em rows/columns executivos
-  - [x] primeira composição simples de grids aplicada em layouts multi-painel
-  - [x] primeiros helpers semânticos de mais alto nível reaproveitados em layouts reais
-  - [x] consolidar primitives reutilizáveis de mais alto nível
-  - [x] primeira consolidação prática com constrained columns/rows em capas, seções, charts e timelines
-  - [x] primeira expansão com helpers semânticos adicionais para panel-grid ponderado e panel-content stacks reutilizáveis
-  - [x] nova expansão prática com constrained panel grids/rows em layouts compostos adicionais
-  - [x] nova consolidação prática com helpers nomeados e painéis estruturados reutilizáveis em múltiplos layouts
-- [x] constraints semânticas em vez de posições excessivamente rígidas
-- [x] auto-fit real de texto por caixa
-  - [x] primeira camada aplicada em caixas homogêneas críticas
-  - [x] expansão inicial para layouts executivos com risco maior de densidade/overflow
-  - [x] expansão para caixas compostas, grids e painéis complexos
-- [x] balanceamento automático de alturas e colunas
-  - [x] primeira camada guiada por peso de conteúdo em layouts executivos chave
-  - evolução futura preservada: expandir para regras ainda mais fortes e consistentes em todo o sistema
-- [x] prevenção mais forte de overflow visual
-
-##### Prioridade 3 — Polimento visual por layout
-
-- [x] revisão detalhada de `title`
-- [x] revisão detalhada de `metrics`
-- [x] revisão detalhada de `comparison` e `two_column`
-- [x] revisão detalhada de `table`
-- [x] revisão detalhada de `faq`
-- [x] revisão detalhada de `summary` e `closing`
-
-##### Prioridade 4 — Pipeline de imagens e placeholders
-
-- [x] crop mais inteligente
-  - [x] primeira camada de cover-fit/crop aplicada a caixas fixas de imagem (`image_text` + preview correspondente)
-  - [x] primeira camada de focal point explícito (`image_focal_x` / `image_focal_y`) no render e no preview de slides com imagem
-  - [x] primeira expansão da estratégia para além de `image_text`, aplicada a `title.hero_cover`
-  - [x] nova expansão contextual para `section`, incluindo focal point no preview sintético correspondente
-  - [x] expandir a estratégia para mais layouts e regras de focal point/contexto
-- [x] placeholders mais premium e contextuais
-  - [x] primeira evolução visual do placeholder estruturado em `image_text`
-- [x] sugestões de imagem por tipo de slide, não só por briefing geral
-  - [x] primeira camada de sugestões mais granulares por slide/tipo na análise heurística de briefing
-  - [x] evoluir para sugestões mais contextuais com focal point/asset style
-- [x] biblioteca básica de assets e estilos visuais
-
-##### Prioridade 5 — LLM opcional de conteúdo e revisão
-
-- [x] provider layer para múltiplas LLMs
-- [x] provider local GGUF via `llama.cpp` para experimentar com `PPTAgent`
-- [x] geração de outline e narrativa a partir de briefing livre
-- [x] reescrita executiva de conteúdo fraco
-- [x] revisão iterativa do deck após renderização e QA
-
-##### Prioridade 6 — Produto / experiência de uso
-
-- [x] editor visual leve
-- [x] playground local para gerar/editar/re-renderizar decks
-- [x] playground local mais robusto com bootstrap de template/perfil e controles operacionais básicos
-- [x] perfis de público (board, consulting, sales, product)
-- [x] integração com workflows comerciais e operacionais
-  - [x] primeira biblioteca de workflow presets operacionais/comerciais com bootstrap via CLI/API
-  - [x] playground local agora consegue carregar workflows e expor artefatos/previews de forma mais operacional
+Expected historical outcome: the project gained the potential to become a **deck-creation copilot** without compromising core simplicity.
 
 ---
 
-### A.9. Sugestão prática de próximo ciclo preservada
+### A.5. Preserved recommended execution order
 
-Sprint sugerida no roadmap anterior:
+#### High priority
 
-1. endurecer schema e CLI
-2. refinar os layouts atuais visualmente
-3. adicionar CI + lint/format
-4. criar 2 exemplos novos
-5. adicionar 2 novos tipos de slide muito úteis
+1. **Phase 0 — MVP hardening**
+2. **Phase 1 — A real design system**
+3. **Phase 2 — Productization and DX**
+
+#### Medium priority
+
+4. **Phase 3 — Useful functional expansion**
+5. **Phase 4 — Pipeline robustness**
+
+#### Future priority
+
+6. **Phase 5 — Optional intelligent layer**
 
 ---
 
-### A.10. Resumo executivo preservado
+### A.6. Preserved top 10 highest-impact improvements
 
-- **primeiro**: consolidar o que já existe
-- **depois**: elevar a qualidade visual e estrutural
-- **em seguida**: transformar em ferramenta fácil de usar e manter
-- **só depois**: expandir temas, layouts e inteligência opcional
+1. refine the visual design and grid of the current slides
+2. create more tests per layout
+3. improve input JSON documentation
+4. add CI
+5. add lint/format
+6. create 2 or 3 additional deck examples
+7. support simple branding by theme/config
+8. add essential new executive layouts
+9. improve image fallback
+10. create a release/versioning flow
 
-Mensagem estratégica preservada:
+---
 
-> fortalecer o núcleo, formalizar o design system, productizar o uso e só então expandir.
+### A.7. Preserved signals that the project became “very professional”
+
+- new decks are created without changing source code
+- the visuals remain consistent across different presentations
+- the schema prevents most common errors
+- the project runs locally and via Docker with low friction
+- the tests cover the core reliably
+- the documentation enables reuse in another project without additional verbal explanation
+- new themes and layouts can be added without refactoring the core
+
+---
+
+### A.8. Preserved strategic backlog
+
+- [x] export preview PNG per slide
+- [x] generate automatic deck thumbnails
+- [x] support simple charts generated from data
+- [x] support executive tables with consistent style
+- [x] reusable visual components library
+- [x] internal marketplace for themes/layouts
+- [x] integration with proposal/commercial workflow
+- [x] API/service mode
+- [x] future visual editor to assemble JSON with less friction
+
+#### Preserved exhaustive maximum-impact improvement plan
+
+##### Priority 1 — Preview fidelity and visual QA
+
+- [x] preview generated from the real `.pptx`/PDF
+- [x] stronger thumbnail sheet for visual inspection
+- [x] debug overlays to analyze composition
+- [x] initial heuristic quality review
+- [x] automatic visual comparison between versions
+
+##### Priority 2 — Layout-engine refactor
+
+- [x] layout primitives (`stack`, `grid`, `two-column`, `panel row`)
+  - [x] first utility base for inner bounds and vertical distribution of regions
+  - [x] first application to already existing composed layouts
+  - [x] first reusable horizontal distribution applied to executive rows/columns
+  - [x] first simple grid composition applied to multi-panel layouts
+  - [x] first higher-level semantic helpers reused in real layouts
+  - [x] consolidate higher-level reusable primitives
+  - [x] first practical consolidation with constrained columns/rows in covers, sections, charts, and timelines
+  - [x] first expansion with additional semantic helpers for weighted panel-grid and reusable panel-content stacks
+  - [x] new practical expansion with constrained panel grids/rows in additional composed layouts
+  - [x] new practical consolidation with named helpers and reusable structured panels in multiple layouts
+- [x] semantic constraints instead of excessively rigid positions
+- [x] real text auto-fit per box
+  - [x] first layer applied to critical homogeneous boxes
+  - [x] initial expansion to executive layouts with greater density/overflow risk
+  - [x] expansion to composed boxes, grids, and complex panels
+- [x] automatic height and column balancing
+  - [x] first content-weight-guided layer in key executive layouts
+  - future evolution preserved: expand to even stronger, more consistent rules across the system
+- [x] stronger visual overflow prevention
+
+##### Priority 3 — Visual polish by layout
+
+- [x] detailed review of `title`
+- [x] detailed review of `metrics`
+- [x] detailed review of `comparison` and `two_column`
+- [x] detailed review of `table`
+- [x] detailed review of `faq`
+- [x] detailed review of `summary` and `closing`
+
+##### Priority 4 — Image pipeline and placeholders
+
+- [x] smarter crop
+  - [x] first layer of cover-fit/crop applied to fixed image boxes (`image_text` + corresponding preview)
+  - [x] first explicit focal-point layer (`image_focal_x` / `image_focal_y`) in render and preview for image-based slides
+  - [x] first expansion of the strategy beyond `image_text`, applied to `title.hero_cover`
+  - [x] new contextual expansion to `section`, including focal point in the corresponding synthetic preview
+  - [x] expand the strategy to more layouts and focal-point/context rules
+- [x] more premium and contextual placeholders
+  - [x] first visual evolution of the structured placeholder in `image_text`
+- [x] image suggestions by slide type, not just by general briefing
+  - [x] first layer of more granular suggestions by slide/type in heuristic briefing analysis
+  - [x] evolve to more contextual suggestions with focal point / asset style
+- [x] basic asset and visual-style library
+
+##### Priority 5 — Optional LLM for content and review
+
+- [x] provider layer for multiple LLMs
+- [x] local GGUF provider via `llama.cpp` to experiment with `PPTAgent`
+- [x] outline and narrative generation from free briefing
+- [x] executive rewriting of weak content
+- [x] iterative deck review after rendering and QA
+
+##### Priority 6 — Product / usage experience
+
+- [x] lightweight visual editor
+- [x] local playground to generate/edit/re-render decks
+- [x] more robust local playground with template/profile bootstrap and basic operational controls
+- [x] audience profiles (board, consulting, sales, product)
+- [x] integration with commercial and operational workflows
+  - [x] first library of operational/commercial workflow presets with bootstrap via CLI/API
+  - [x] local playground can now load workflows and expose artifacts/previews in a more operational way
+
+---
+
+### A.9. Preserved practical next-cycle suggestion
+
+Suggested sprint in the previous roadmap:
+
+1. harden schema and CLI
+2. visually refine the current layouts
+3. add CI + lint/format
+4. create 2 new examples
+5. add 2 very useful new slide types
+
+---
+
+### A.10. Preserved executive summary
+
+- **first**: consolidate what already exists
+- **then**: raise visual and structural quality
+- **next**: turn it into an easy tool to use and maintain
+- **only after that**: expand themes, layouts, and optional intelligence
+
+Preserved strategic message:
+
+> strengthen the core, formalize the design system, productize usage, and only then expand.
