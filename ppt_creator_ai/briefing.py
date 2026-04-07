@@ -131,6 +131,12 @@ def _extract_keyword_tokens(text: str | None, *, min_length: int = 4) -> list[st
 
 def _infer_narrative_archetype(intent_text: str | None) -> str:
     lowered = (intent_text or "").lower()
+
+    # Treat explicit review-style prompts as a higher-priority signal than
+    # generic decision language like "recommendation" or "trade-offs".
+    if any(keyword in lowered for keyword in ["operating review", "business review", "qbr", "status update", "retrospective"]):
+        return "review"
+
     scores = {
         "decision": 0,
         "review": 0,
