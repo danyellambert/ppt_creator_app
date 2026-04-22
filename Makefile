@@ -4,7 +4,7 @@ PYTEST := $(PYTHON) -m pytest
 RUFF := $(PYTHON) -m ruff
 QUALITY_PATHS := ppt_creator ppt_creator_ai tests
 
-.PHONY: install install-dev test lint format validate-example render-example render-all-examples review-example review-pptx-example playground api generate-briefing-example docker-render-example docker-api-build docker-api docker-api-down gallery layout-audit ai-benchmark build-dist check-dist release-smoke ci
+.PHONY: install install-dev test lint format validate-example render-example render-all-examples review-example review-pptx-example playground api generate-briefing-example docker-render-example docker-api-build docker-api docker-api-down docker-api-cloud docker-api-cloud-down gallery layout-audit ai-benchmark build-dist check-dist release-smoke ci
 
 install:
 	$(PIP) install -e .
@@ -72,6 +72,12 @@ docker-api:
 
 docker-api-down:
 	docker compose down
+
+docker-api-cloud:
+	docker compose --profile cloudlike up --build ppt_creator_api_cloud
+
+docker-api-cloud-down:
+	docker compose --profile cloudlike down
 
 build-dist:
 	rm -rf dist build *.egg-info

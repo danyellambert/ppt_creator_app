@@ -7,10 +7,35 @@ services:
     ports:
       - "8787:8787"
     environment:
+      PPT_CREATOR_RUNTIME_MODE: docker_compose
       PPT_CREATOR_API_HOST: 0.0.0.0
       PPT_CREATOR_API_PORT: 8787
       PPT_CREATOR_API_ASSET_ROOT: /work/examples
+      PPT_CREATOR_AI_SERVICE_URL: "${PPT_CREATOR_AI_SERVICE_URL:-http://host.docker.internal:8788}"
     working_dir: /work
     volumes:
       - ./:/work
     restart: unless-stopped
+
+  ppt_creator_api_cloud:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ppt_creator_api_cloud
+    profiles:
+      - cloudlike
+    ports:
+      - "8787:8787"
+    environment:
+      PPT_CREATOR_RUNTIME_MODE: docker_compose_cloudlike
+      PPT_CREATOR_API_HOST: 0.0.0.0
+      PPT_CREATOR_API_PORT: 8787
+      PPT_CREATOR_API_ASSET_ROOT: /app/examples
+      PPT_CREATOR_AI_SERVICE_URL: "${PPT_CREATOR_AI_SERVICE_URL:-http://host.docker.internal:8788}"
+    working_dir: /work
+    volumes:
+      - ppt_creator_cloud_workspace:/work
+    restart: unless-stopped
+
+volumes:
+  ppt_creator_cloud_workspace:

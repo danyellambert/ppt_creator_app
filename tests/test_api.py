@@ -37,6 +37,10 @@ def test_api_health_and_templates_endpoints(monkeypatch) -> None:
         status, health_payload = _request_json(f"{base_url}/health")
         assert status == 200
         assert health_payload["status"] == "ok"
+        assert health_payload["service"] == "ppt_creator_api"
+        assert health_payload["runtime_mode"] == "host_native"
+        assert health_payload["bind_port"] == server.server_address[1]
+        assert health_payload["asset_root"]
 
         status, templates_payload = _request_json(f"{base_url}/templates")
         assert status == 200

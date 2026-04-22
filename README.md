@@ -311,6 +311,20 @@ Open:
 - `http://127.0.0.1:8787/health`
 - `http://127.0.0.1:8787/playground`
 
+The health endpoint now also reports runtime metadata, which helps distinguish a host-native instance from a Dockerized one:
+
+```bash
+curl http://127.0.0.1:8787/health
+```
+
+Example fields:
+
+- `runtime_mode`
+- `pid`
+- `bind_host`
+- `bind_port`
+- `asset_root`
+
 ### 6. Generate deck JSON from a briefing (optional AI layer)
 
 ```bash
@@ -585,6 +599,19 @@ Reference:
 
 The repository is prepared for a service-first container path, while host-native operation remains the most complete local workflow.
 
+### Mode 1: Dockerized API with host compatibility preserved
+
+Use this when you want `ppt_creator_app` to run in Docker **without changing AI Workbench**.
+
+The service still binds:
+
+- host `127.0.0.1:8787`
+- container `0.0.0.0:8787`
+
+So AI Workbench can keep calling the same base URL:
+
+- `http://127.0.0.1:8787`
+
 ### Build the API image
 
 ```bash
@@ -596,6 +623,44 @@ docker compose build ppt_creator_api
 ```bash
 docker compose up --build ppt_creator_api
 ```
+
+This mode keeps the project directory bind-mounted into the container at `/work`, which makes it the best local compatibility path when your client still expects workspace-relative files.
+
+### Mode 2: Cloud-like container mode
+
+Use this when you want something closer to a small VM/container deployment, where the app runs in Docker but does **not** depend on your local repo being bind-mounted.
+
+```bash
+docker compose --profile cloudlike up --build ppt_creator_api_cloud
+```
+
+Or:
+
+```bash
+bash bin/run_ppt_creator_api_cloud_docker.sh
+```
+
+This mode still exposes:
+
+- `http://127.0.0.1:8787/health`
+- `http://127.0.0.1:8787/playground`
+
+So the caller can keep using port `8787`, but the container workspace is backed by a named Docker volume instead of the local repo checkout.
+
+### Important compatibility note for AI Workbench
+
+If AI Workbench only depends on the HTTP contract:
+
+- `GET /health`
+- `POST /render`
+- `GET /artifact`
+
+and uses API-returned artifact paths, then the Dockerized setup can stay transparent.
+
+If AI Workbench depends on **host absolute filesystem paths** outside the container, then the fully cloud-like mode will not be perfectly transparent, because those host paths do not exist inside the containerized runtime. In that case:
+
+- use `ppt_creator_api` for the most local compatibility, or
+- update the external client to rely on the API artifact contract rather than host filesystem access.
 
 ### Helper script
 
@@ -615,6 +680,36 @@ bash bin/run_ppt_creator_api_docker.sh
 
 - `http://127.0.0.1:8787/health`
 - `http://127.0.0.1:8787/playground`
+
+Use the health endpoint to confirm which runtime is answering on port `8787`:
+
+```bash
+curl http://127.0.0.1:8787/health
+```
+
+Typical values:
+
+- `runtime_mode: "host_native"` → a local Python process owns the port
+- `runtime_mode: "docker_compose"` → the standard Docker Compose service owns the port
+- `runtime_mode: "docker_compose_cloudlike"` → the cloud-like Docker profile owns the port
+
+If you expect Docker but still see `host_native`, another local `python -m ppt_creator.api` process is still bound to `127.0.0.1:8787` and must be stopped before the container can take over the port.
+
+### AI service URL from inside Docker
+
+When the app uses the `local_service` provider, the container now defaults to:
+
+```bash
+PPT_CREATOR_AI_SERVICE_URL=http://host.docker.internal:8788
+```
+
+This avoids the common container networking problem where `127.0.0.1:8788` would otherwise point back to the container itself instead of your host machine.
+
+You can override it when needed:
+
+```bash
+PPT_CREATOR_AI_SERVICE_URL=http://host.docker.internal:8788 docker compose up --build ppt_creator_api
+```
 
 ---
 
@@ -732,6 +827,7 @@ Common targets from the `Makefile`:
 | `make layout-audit` | Run the layout audit pipeline |
 | `make ai-benchmark` | Run the AI benchmark |
 | `make docker-api` | Start the API via Docker Compose |
+| `make docker-api-cloud` | Start the cloud-like Docker API profile |
 | `make build-dist` | Build the distributable package |
 | `make check-dist` | Validate distribution artifacts |
 | `make release-smoke` | Run packaging smoke checks |

@@ -351,7 +351,7 @@ AI remains optional. The core should remain decoupled.
 ### 8.3. Decided direction for free prompts and model-backed providers
 
 - [x] `ai_first` becomes the main path for `intent_text` / free prompt
-- [x] heuristics should not be the default path when the goal is AI authorship
+- [x] heuristics should not be the default path when Prethe goal is AI authorship
 - [x] heuristics remain a safety fallback, not the primary trajectory
 - [x] when `provider_name` is not informed for a free prompt, the app should prefer a model-backed provider (`local_service` on the backend)
 - [x] in the playground, model-backed providers should appear as the preferred path

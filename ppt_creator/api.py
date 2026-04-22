@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import mimetypes
+import os
 import tempfile
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -2578,6 +2579,19 @@ def serve_api(
         server.server_close()
 
 
+def build_health_payload(server: ThreadingHTTPServer) -> dict[str, object]:
+    asset_root = getattr(server, "asset_root", None)
+    return {
+        "status": "ok",
+        "service": "ppt_creator_api",
+        "runtime_mode": os.getenv("PPT_CREATOR_RUNTIME_MODE", "host_native"),
+        "pid": os.getpid(),
+        "bind_host": str(server.server_address[0]),
+        "bind_port": int(server.server_address[1]),
+        "asset_root": str(asset_root) if asset_root is not None else None,
+    }
+
+
 class PptCreatorAPIHandler(BaseHTTPRequestHandler):
     server_version = "ppt-creator-api/0.1"
 
@@ -2634,7 +2648,7 @@ class PptCreatorAPIHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:  # noqa: N802
         parsed = urlparse(self.path)
         if parsed.path == "/health":
-            self._json_response(HTTPStatus.OK, {"status": "ok"})
+            self._json_response(HTTPStatus.OK, build_health_payload(self.server))
             return
         if parsed.path == "/playground":
             self._html_response(HTTPStatus.OK, _build_playground_html())
